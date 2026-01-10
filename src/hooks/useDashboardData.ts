@@ -15,7 +15,7 @@ const loadFromStorage = (): MonthData[] => {
       return initialData.map((month, index) => ({
         ...month, // Metas fixas sempre preservadas
         realizadoVendas: savedData[index]?.realizadoVendas || 0,
-        realizadoFaturamento: (savedData[index]?.realizadoVendas || 0) * VALOR_POR_VENDA,
+        realizadoFaturamento: savedData[index]?.realizadoFaturamento || 0, // Agora independente
         realizadoPrimeiraReuniao: savedData[index]?.realizadoPrimeiraReuniao || 0,
         realizadoSegundaReuniao: savedData[index]?.realizadoSegundaReuniao || 0,
         realizadoFechamentos: savedData[index]?.realizadoFechamentos || 0
@@ -33,6 +33,7 @@ const saveToStorage = (data: MonthData[]) => {
   try {
     const realizados = data.map(month => ({
       realizadoVendas: month.realizadoVendas,
+      realizadoFaturamento: month.realizadoFaturamento, // Agora salvo independentemente
       realizadoPrimeiraReuniao: month.realizadoPrimeiraReuniao,
       realizadoSegundaReuniao: month.realizadoSegundaReuniao,
       realizadoFechamentos: month.realizadoFechamentos
@@ -53,12 +54,7 @@ export const useDashboardData = () => {
     setData(prevData => {
       const newData = [...prevData];
       const currentMonth = { ...newData[monthIndex], ...updates };
-      
-      // Recalcula faturamento realizado baseado nas vendas
-      if (updates.realizadoVendas !== undefined) {
-        currentMonth.realizadoFaturamento = updates.realizadoVendas * VALOR_POR_VENDA;
-      }
-      
+      // Faturamento agora é editado independentemente, não calculado automaticamente
       newData[monthIndex] = currentMonth;
       saveToStorage(newData);
       return newData;
