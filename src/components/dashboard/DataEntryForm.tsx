@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MonthData, MONTHS, VALOR_POR_VENDA } from '@/types/dashboard';
-import { Save, RefreshCw, DollarSign, Users, Handshake, Calendar, Target, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2 } from 'lucide-react';
 
 interface DataEntryFormProps {
   selectedMonth: number;
@@ -61,14 +61,6 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }:
       meta: currentData.metaSegundaReuniao,
       realizadoField: 'realizadoSegundaReuniao' as keyof MonthData,
       realizadoValue: currentData.realizadoSegundaReuniao
-    },
-    {
-      title: 'Fechamentos',
-      icon: Handshake,
-      color: 'green',
-      meta: currentData.metaFechamentos,
-      realizadoField: 'realizadoFechamentos' as keyof MonthData,
-      realizadoValue: currentData.realizadoFechamentos
     }
   ];
 

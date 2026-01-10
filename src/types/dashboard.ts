@@ -10,8 +10,6 @@ export interface MonthData {
   realizadoPrimeiraReuniao: number;
   metaSegundaReuniao: number;
   realizadoSegundaReuniao: number;
-  metaFechamentos: number;
-  realizadoFechamentos: number;
 }
 
 export interface ChartData {
@@ -40,18 +38,18 @@ export const VALOR_POR_VENDA = 2700;
 
 // METAS FIXAS - Imutáveis (fornecidas pelo usuário)
 export const METAS_FIXAS = [
-  { vendas: 10, primeiraReuniao: 86, segundaReuniao: 29, fechamentos: 0 },   // Janeiro
-  { vendas: 12, primeiraReuniao: 103, segundaReuniao: 35, fechamentos: 0 },  // Fevereiro
-  { vendas: 14, primeiraReuniao: 121, segundaReuniao: 41, fechamentos: 0 },  // Março
-  { vendas: 10, primeiraReuniao: 86, segundaReuniao: 29, fechamentos: 0 },   // Abril
-  { vendas: 18, primeiraReuniao: 153, segundaReuniao: 52, fechamentos: 0 },  // Maio
-  { vendas: 14, primeiraReuniao: 121, segundaReuniao: 41, fechamentos: 0 },  // Junho
-  { vendas: 24, primeiraReuniao: 203, segundaReuniao: 69, fechamentos: 0 },  // Julho
-  { vendas: 25, primeiraReuniao: 212, segundaReuniao: 72, fechamentos: 0 },  // Agosto
-  { vendas: 22, primeiraReuniao: 189, segundaReuniao: 64, fechamentos: 0 },  // Setembro
-  { vendas: 24, primeiraReuniao: 203, segundaReuniao: 69, fechamentos: 0 },  // Outubro
-  { vendas: 30, primeiraReuniao: 256, segundaReuniao: 87, fechamentos: 0 },  // Novembro
-  { vendas: 26, primeiraReuniao: 221, segundaReuniao: 75, fechamentos: 0 },  // Dezembro
+  { vendas: 10, primeiraReuniao: 86, segundaReuniao: 29 },   // Janeiro
+  { vendas: 12, primeiraReuniao: 103, segundaReuniao: 35 },  // Fevereiro
+  { vendas: 14, primeiraReuniao: 121, segundaReuniao: 41 },  // Março
+  { vendas: 10, primeiraReuniao: 86, segundaReuniao: 29 },   // Abril
+  { vendas: 18, primeiraReuniao: 153, segundaReuniao: 52 },  // Maio
+  { vendas: 14, primeiraReuniao: 121, segundaReuniao: 41 },  // Junho
+  { vendas: 24, primeiraReuniao: 203, segundaReuniao: 69 },  // Julho
+  { vendas: 25, primeiraReuniao: 212, segundaReuniao: 72 },  // Agosto
+  { vendas: 22, primeiraReuniao: 189, segundaReuniao: 64 },  // Setembro
+  { vendas: 24, primeiraReuniao: 203, segundaReuniao: 69 },  // Outubro
+  { vendas: 30, primeiraReuniao: 256, segundaReuniao: 87 },  // Novembro
+  { vendas: 26, primeiraReuniao: 221, segundaReuniao: 75 },  // Dezembro
 ];
 
 export const createEmptyMonthData = (monthIndex: number): MonthData => ({
@@ -65,9 +63,7 @@ export const createEmptyMonthData = (monthIndex: number): MonthData => ({
   metaPrimeiraReuniao: METAS_FIXAS[monthIndex].primeiraReuniao,
   realizadoPrimeiraReuniao: 0,
   metaSegundaReuniao: METAS_FIXAS[monthIndex].segundaReuniao,
-  realizadoSegundaReuniao: 0,
-  metaFechamentos: METAS_FIXAS[monthIndex].fechamentos,
-  realizadoFechamentos: 0
+  realizadoSegundaReuniao: 0
 });
 
 export const createInitialData = (): MonthData[] => {

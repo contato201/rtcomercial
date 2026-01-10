@@ -1,6 +1,6 @@
 import { MonthData } from '@/types/dashboard';
 import { StatCard } from './StatCard';
-import { ShoppingCart, DollarSign, Users, Calendar, Handshake } from 'lucide-react';
+import { ShoppingCart, DollarSign, Users, Calendar } from 'lucide-react';
 
 interface StatsOverviewProps {
   data: MonthData;
@@ -42,12 +42,6 @@ export const StatsOverview = ({ data, calculateVariation }: StatsOverviewProps) 
       meta: data.metaSegundaReuniao,
       realizado: data.realizadoSegundaReuniao,
       icon: Calendar
-    },
-    {
-      title: 'Fechamentos',
-      meta: data.metaFechamentos,
-      realizado: data.realizadoFechamentos,
-      icon: Handshake
     }
   ];
 
