@@ -107,13 +107,13 @@ export const ComparisonChart = ({ title, data, formatValue = (v) => v.toLocaleSt
               name="Meta" 
               fill="hsl(var(--chart-meta))" 
               radius={[6, 6, 0, 0]}
-              maxBarSize={40}
+              maxBarSize={45}
             />
             <Bar 
               dataKey="realizado" 
               name="Realizado" 
               radius={[6, 6, 0, 0]}
-              maxBarSize={40}
+              maxBarSize={45}
             >
               {data.map((entry, index) => (
                 <Cell 
