@@ -5,6 +5,7 @@ export interface MonthData {
   realizadoVendas: number;
   metaFaturamento: number;
   realizadoFaturamento: number;
+  ticketRealizado: number; // Valor por venda digitado pelo usuário
   metaPrimeiraReuniao: number;
   realizadoPrimeiraReuniao: number;
   metaSegundaReuniao: number;
@@ -60,6 +61,7 @@ export const createEmptyMonthData = (monthIndex: number): MonthData => ({
   realizadoVendas: 0,
   metaFaturamento: METAS_FIXAS[monthIndex].vendas * VALOR_POR_VENDA,
   realizadoFaturamento: 0,
+  ticketRealizado: VALOR_POR_VENDA, // Começa com o valor padrão
   metaPrimeiraReuniao: METAS_FIXAS[monthIndex].primeiraReuniao,
   realizadoPrimeiraReuniao: 0,
   metaSegundaReuniao: METAS_FIXAS[monthIndex].segundaReuniao,

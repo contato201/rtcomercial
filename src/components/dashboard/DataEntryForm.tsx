@@ -29,10 +29,6 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }:
     return value.toLocaleString('pt-BR');
   };
 
-  const ticketMedio = currentData.realizadoVendas > 0 
-    ? currentData.realizadoFaturamento / currentData.realizadoVendas 
-    : 0;
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -48,16 +44,8 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }:
     return { percent, status: 'danger' };
   };
 
-  // Grupos de entrada - apenas campos REALIZADOS são editáveis
+  // Grupos de entrada - apenas campos REALIZADOS são editáveis (Vendas movido para seção de Faturamento)
   const inputGroups = [
-    {
-      title: 'Vendas',
-      icon: Target,
-      color: 'primary',
-      meta: currentData.metaVendas,
-      realizadoField: 'realizadoVendas' as keyof MonthData,
-      realizadoValue: currentData.realizadoVendas
-    },
     {
       title: '1ª Reuniões',
       icon: Users,
@@ -204,7 +192,7 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }:
         })}
       </div>
 
-      {/* Faturamento - Agora editável */}
+      {/* Faturamento - Quantidade + Valor por Venda */}
       <div className="mt-6 p-5 bg-gradient-to-r from-primary/5 to-accent rounded-xl border border-primary/20">
         <div className="flex items-center gap-2 mb-4">
           <div className="bg-primary/10 p-2 rounded-lg">
@@ -212,11 +200,43 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }:
           </div>
           <div>
             <h3 className="font-semibold text-foreground">💰 Faturamento</h3>
-            <p className="text-xs text-muted-foreground">Digite o valor total de vendas do mês</p>
+            <p className="text-xs text-muted-foreground">Digite quantidade de vendas e valor por venda</p>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Quantidade de Vendas */}
+          <div className="bg-card rounded-xl p-4 border-2 border-border hover:border-primary/30 transition-all">
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Quantidade de Vendas</p>
+            <input
+              type="number"
+              min="0"
+              value={currentData.realizadoVendas || ''}
+              onChange={(e) => handleInputChange('realizadoVendas', e.target.value)}
+              placeholder="0"
+              className="input-field text-center text-2xl font-bold"
+            />
+          </div>
+
+          {/* Valor por Venda (Ticket) */}
+          <div className="bg-card rounded-xl p-4 border-2 border-border hover:border-primary/30 transition-all">
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Valor por Venda (Ticket)</p>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">R$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatCurrencyInput(currentData.ticketRealizado)}
+                onChange={(e) => handleCurrencyChange('ticketRealizado', e.target.value)}
+                placeholder="2.700"
+                className="input-field text-right text-xl font-bold pl-12"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 text-center">
+              Meta: {formatCurrency(VALOR_POR_VENDA)}
+            </p>
+          </div>
+
           {/* Meta de Faturamento */}
           <div className="bg-card rounded-xl p-4 border border-primary/20">
             <div className="flex items-center gap-1 mb-2">
@@ -226,38 +246,30 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }:
             <p className="text-2xl font-bold text-primary">{formatCurrency(currentData.metaFaturamento)}</p>
           </div>
 
-          {/* Faturamento Realizado - EDITÁVEL */}
-          <div className={`bg-card rounded-xl p-4 border-2 transition-all ${
-            currentData.realizadoFaturamento >= currentData.metaFaturamento 
+          {/* Faturamento Calculado */}
+          <div className={`relative bg-card rounded-xl p-4 border-2 transition-all ${
+            currentData.realizadoFaturamento >= currentData.metaFaturamento && currentData.realizadoFaturamento > 0
               ? 'border-[hsl(var(--success))]/50 shadow-[0_0_20px_hsl(var(--success)/0.1)]' 
-              : currentData.realizadoFaturamento > 0 
-                ? 'border-primary/50' 
-                : 'border-border'
+              : 'border-border'
           }`}>
-            {/* Indicador de meta atingida */}
             {currentData.realizadoFaturamento >= currentData.metaFaturamento && currentData.realizadoFaturamento > 0 && (
               <div className="absolute -top-2 -right-2 bg-[hsl(var(--success))] rounded-full p-1 shadow-lg">
                 <CheckCircle2 className="w-4 h-4 text-white" />
               </div>
             )}
-            <p className="text-xs text-muted-foreground mb-2 font-medium">Faturamento Realizado</p>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">R$</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formatCurrencyInput(currentData.realizadoFaturamento)}
-                onChange={(e) => handleCurrencyChange('realizadoFaturamento', e.target.value)}
-                placeholder="0"
-                className={`input-field text-right text-xl font-bold pl-12 transition-all ${
-                  currentData.realizadoFaturamento >= currentData.metaFaturamento && currentData.realizadoFaturamento > 0
-                    ? 'border-[hsl(var(--success))] bg-[hsl(var(--success))]/5 text-[hsl(var(--success))]' 
-                    : ''
-                }`}
-              />
-            </div>
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Faturamento Total</p>
+            <p className={`text-2xl font-bold ${
+              currentData.realizadoFaturamento >= currentData.metaFaturamento && currentData.realizadoFaturamento > 0
+                ? 'text-[hsl(var(--success))]' 
+                : 'text-foreground'
+            }`}>
+              {formatCurrency(currentData.realizadoFaturamento)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              = {currentData.realizadoVendas} × {formatCurrency(currentData.ticketRealizado)}
+            </p>
             {currentData.realizadoFaturamento > 0 && (
-              <p className={`text-xs mt-2 font-medium ${
+              <p className={`text-xs mt-1 font-medium ${
                 currentData.realizadoFaturamento >= currentData.metaFaturamento 
                   ? 'text-[hsl(var(--success))]' 
                   : 'text-destructive'
@@ -266,34 +278,6 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }:
                   `Faltam ${formatCurrency(currentData.metaFaturamento - currentData.realizadoFaturamento)}`
                 }
               </p>
-            )}
-          </div>
-
-          {/* Ticket Médio */}
-          <div className="bg-card rounded-xl p-4 border border-border">
-            <div className="flex items-center gap-1 mb-2">
-              <AlertCircle className="w-3 h-3 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground font-medium">Ticket Médio</p>
-            </div>
-            {currentData.realizadoVendas > 0 ? (
-              <>
-                <p className="text-2xl font-bold text-foreground">{formatCurrency(ticketMedio)}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Comparado com meta: {formatCurrency(VALOR_POR_VENDA)}
-                  {ticketMedio > VALOR_POR_VENDA && (
-                    <span className="text-[hsl(var(--success))] ml-1">
-                      (+{((ticketMedio / VALOR_POR_VENDA - 1) * 100).toFixed(0)}%)
-                    </span>
-                  )}
-                  {ticketMedio < VALOR_POR_VENDA && (
-                    <span className="text-destructive ml-1">
-                      ({((ticketMedio / VALOR_POR_VENDA - 1) * 100).toFixed(0)}%)
-                    </span>
-                  )}
-                </p>
-              </>
-            ) : (
-              <p className="text-lg text-muted-foreground">Sem vendas</p>
             )}
           </div>
         </div>
