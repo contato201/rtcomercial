@@ -15,7 +15,8 @@ const loadFromStorage = (): MonthData[] => {
       return initialData.map((month, index) => ({
         ...month, // Metas fixas sempre preservadas
         realizadoVendas: savedData[index]?.realizadoVendas || 0,
-        realizadoFaturamento: savedData[index]?.realizadoFaturamento || 0, // Agora independente
+        realizadoFaturamento: savedData[index]?.realizadoFaturamento || 0,
+        ticketRealizado: savedData[index]?.ticketRealizado || VALOR_POR_VENDA,
         realizadoPrimeiraReuniao: savedData[index]?.realizadoPrimeiraReuniao || 0,
         realizadoSegundaReuniao: savedData[index]?.realizadoSegundaReuniao || 0,
         realizadoFechamentos: savedData[index]?.realizadoFechamentos || 0
@@ -33,7 +34,8 @@ const saveToStorage = (data: MonthData[]) => {
   try {
     const realizados = data.map(month => ({
       realizadoVendas: month.realizadoVendas,
-      realizadoFaturamento: month.realizadoFaturamento, // Agora salvo independentemente
+      realizadoFaturamento: month.realizadoFaturamento,
+      ticketRealizado: month.ticketRealizado,
       realizadoPrimeiraReuniao: month.realizadoPrimeiraReuniao,
       realizadoSegundaReuniao: month.realizadoSegundaReuniao,
       realizadoFechamentos: month.realizadoFechamentos
@@ -54,7 +56,14 @@ export const useDashboardData = () => {
     setData(prevData => {
       const newData = [...prevData];
       const currentMonth = { ...newData[monthIndex], ...updates };
-      // Faturamento agora é editado independentemente, não calculado automaticamente
+      
+      // Recalcula faturamento quando vendas ou ticket mudam
+      if (updates.realizadoVendas !== undefined || updates.ticketRealizado !== undefined) {
+        const vendas = updates.realizadoVendas ?? currentMonth.realizadoVendas;
+        const ticket = updates.ticketRealizado ?? currentMonth.ticketRealizado;
+        currentMonth.realizadoFaturamento = vendas * ticket;
+      }
+      
       newData[monthIndex] = currentMonth;
       saveToStorage(newData);
       return newData;
@@ -86,6 +95,7 @@ export const useDashboardData = () => {
       realizadoVendas: acc.realizadoVendas + month.realizadoVendas,
       metaFaturamento: acc.metaFaturamento + month.metaFaturamento,
       realizadoFaturamento: acc.realizadoFaturamento + month.realizadoFaturamento,
+      ticketRealizado: VALOR_POR_VENDA, // Ticket padrão para agregados
       metaPrimeiraReuniao: acc.metaPrimeiraReuniao + month.metaPrimeiraReuniao,
       realizadoPrimeiraReuniao: acc.realizadoPrimeiraReuniao + month.realizadoPrimeiraReuniao,
       metaSegundaReuniao: acc.metaSegundaReuniao + month.metaSegundaReuniao,
