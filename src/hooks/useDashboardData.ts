@@ -18,8 +18,7 @@ const loadFromStorage = (): MonthData[] => {
         realizadoFaturamento: savedData[index]?.realizadoFaturamento || 0,
         ticketRealizado: savedData[index]?.ticketRealizado || VALOR_POR_VENDA,
         realizadoPrimeiraReuniao: savedData[index]?.realizadoPrimeiraReuniao || 0,
-        realizadoSegundaReuniao: savedData[index]?.realizadoSegundaReuniao || 0,
-        realizadoFechamentos: savedData[index]?.realizadoFechamentos || 0
+        realizadoSegundaReuniao: savedData[index]?.realizadoSegundaReuniao || 0
       }));
     }
   } catch (e) {
@@ -37,8 +36,7 @@ const saveToStorage = (data: MonthData[]) => {
       realizadoFaturamento: month.realizadoFaturamento,
       ticketRealizado: month.ticketRealizado,
       realizadoPrimeiraReuniao: month.realizadoPrimeiraReuniao,
-      realizadoSegundaReuniao: month.realizadoSegundaReuniao,
-      realizadoFechamentos: month.realizadoFechamentos
+      realizadoSegundaReuniao: month.realizadoSegundaReuniao
     }));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(realizados));
   } catch (e) {
@@ -99,9 +97,7 @@ export const useDashboardData = () => {
       metaPrimeiraReuniao: acc.metaPrimeiraReuniao + month.metaPrimeiraReuniao,
       realizadoPrimeiraReuniao: acc.realizadoPrimeiraReuniao + month.realizadoPrimeiraReuniao,
       metaSegundaReuniao: acc.metaSegundaReuniao + month.metaSegundaReuniao,
-      realizadoSegundaReuniao: acc.realizadoSegundaReuniao + month.realizadoSegundaReuniao,
-      metaFechamentos: acc.metaFechamentos + month.metaFechamentos,
-      realizadoFechamentos: acc.realizadoFechamentos + month.realizadoFechamentos
+      realizadoSegundaReuniao: acc.realizadoSegundaReuniao + month.realizadoSegundaReuniao
     }), createInitialData()[0]);
   }, [filteredData, filterType, selectedQuarter]);
 

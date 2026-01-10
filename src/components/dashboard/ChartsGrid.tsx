@@ -50,10 +50,6 @@ export const ChartsGrid = ({ filteredData, aggregatedData, filterType }: ChartsG
     {
       title: '2ª Reuniões',
       data: createChartData('metaSegundaReuniao', 'realizadoSegundaReuniao')
-    },
-    {
-      title: 'Fechamentos',
-      data: createChartData('metaFechamentos', 'realizadoFechamentos')
     }
   ];
 
