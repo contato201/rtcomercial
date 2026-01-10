@@ -1,25 +1,45 @@
 import { useState, useCallback, useMemo } from 'react';
-import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData } from '@/types/dashboard';
+import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, METAS_FIXAS } from '@/types/dashboard';
 
-const STORAGE_KEY = 'dashboard_comercial_data';
+const STORAGE_KEY = 'dashboard_realizados_v2';
 
+// Carrega APENAS os realizados do storage, sempre usando metas fixas
 const loadFromStorage = (): MonthData[] => {
+  const initialData = createInitialData(); // Sempre usa metas fixas
+  
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const savedData = JSON.parse(stored);
+      // Mesclar apenas os valores REALIZADOS com as metas fixas
+      return initialData.map((month, index) => ({
+        ...month, // Metas fixas sempre preservadas
+        realizadoVendas: savedData[index]?.realizadoVendas || 0,
+        realizadoFaturamento: (savedData[index]?.realizadoVendas || 0) * VALOR_POR_VENDA,
+        realizadoPrimeiraReuniao: savedData[index]?.realizadoPrimeiraReuniao || 0,
+        realizadoSegundaReuniao: savedData[index]?.realizadoSegundaReuniao || 0,
+        realizadoFechamentos: savedData[index]?.realizadoFechamentos || 0
+      }));
     }
   } catch (e) {
-    console.error('Error loading data from storage:', e);
+    console.error('Erro ao carregar dados:', e);
   }
-  return createInitialData();
+  
+  return initialData;
 };
 
+// Salva apenas os realizados
 const saveToStorage = (data: MonthData[]) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const realizados = data.map(month => ({
+      realizadoVendas: month.realizadoVendas,
+      realizadoPrimeiraReuniao: month.realizadoPrimeiraReuniao,
+      realizadoSegundaReuniao: month.realizadoSegundaReuniao,
+      realizadoFechamentos: month.realizadoFechamentos
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(realizados));
   } catch (e) {
-    console.error('Error saving data to storage:', e);
+    console.error('Erro ao salvar dados:', e);
   }
 };
 
@@ -34,10 +54,7 @@ export const useDashboardData = () => {
       const newData = [...prevData];
       const currentMonth = { ...newData[monthIndex], ...updates };
       
-      // Calcular faturamento automaticamente
-      if (updates.metaVendas !== undefined) {
-        currentMonth.metaFaturamento = updates.metaVendas * VALOR_POR_VENDA;
-      }
+      // Recalcula faturamento realizado baseado nas vendas
       if (updates.realizadoVendas !== undefined) {
         currentMonth.realizadoFaturamento = updates.realizadoVendas * VALOR_POR_VENDA;
       }
