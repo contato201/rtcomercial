@@ -35,18 +35,23 @@ const Index = () => {
           setSelectedQuarter={setSelectedQuarter}
         />
 
+        {/* Formulário de entrada PRIMEIRO - mais visível */}
+        <div className="mb-8">
+          <DataEntryForm
+            selectedMonth={selectedMonth}
+            currentData={data[selectedMonth]}
+            onUpdate={updateMonthData}
+            onReset={resetData}
+          />
+        </div>
+
+        {/* Cards de estatísticas */}
         <StatsOverview
           data={aggregatedData}
           calculateVariation={calculateVariation}
         />
 
-        <DataEntryForm
-          selectedMonth={selectedMonth}
-          currentData={data[selectedMonth]}
-          onUpdate={updateMonthData}
-          onReset={resetData}
-        />
-
+        {/* Gráficos comparativos */}
         <ChartsGrid
           filteredData={filteredData}
           aggregatedData={aggregatedData}
