@@ -14,7 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      dados_realizados: {
+        Row: {
+          created_at: string
+          id: string
+          month: string
+          realizado_faturamento: number
+          realizado_primeira_reuniao: number
+          realizado_segunda_reuniao: number
+          realizado_vendas: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: string
+          realizado_faturamento?: number
+          realizado_primeira_reuniao?: number
+          realizado_segunda_reuniao?: number
+          realizado_vendas?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: string
+          realizado_faturamento?: number
+          realizado_primeira_reuniao?: number
+          realizado_segunda_reuniao?: number
+          realizado_vendas?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
