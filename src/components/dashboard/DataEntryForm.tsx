@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { MonthData, MONTHS, VALOR_POR_VENDA } from '@/types/dashboard';
-import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2 } from 'lucide-react';
+import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2, History } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface DataEntryFormProps {
   selectedMonth: number;
   currentData: MonthData;
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
   onReset: () => void;
+  onOpenHistory: () => void;
 }
 
-export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }: DataEntryFormProps) => {
+export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, onOpenHistory }: DataEntryFormProps) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handleInputChange = (field: keyof MonthData, value: string) => {
@@ -80,34 +82,46 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset }:
           </div>
         </div>
         
-        {!showResetConfirm ? (
-          <button
-            onClick={() => setShowResetConfirm(true)}
-            className="text-sm text-muted-foreground hover:text-destructive flex items-center gap-2 transition-colors px-3 py-2 rounded-lg hover:bg-destructive/10"
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenHistory}
+            className="text-muted-foreground hover:text-primary"
           >
-            <RefreshCw className="w-4 h-4" />
-            Resetar
-          </button>
-        ) : (
-          <div className="flex items-center gap-2 bg-destructive/10 px-4 py-2 rounded-lg">
-            <span className="text-sm text-destructive font-medium">Confirmar reset?</span>
+            <History className="w-4 h-4 mr-2" />
+            Histórico
+          </Button>
+          
+          {!showResetConfirm ? (
             <button
-              onClick={() => {
-                onReset();
-                setShowResetConfirm(false);
-              }}
-              className="text-sm bg-destructive text-destructive-foreground px-3 py-1 rounded-md hover:opacity-90 font-medium"
+              onClick={() => setShowResetConfirm(true)}
+              className="text-sm text-muted-foreground hover:text-destructive flex items-center gap-2 transition-colors px-3 py-2 rounded-lg hover:bg-destructive/10"
             >
-              Sim
+              <RefreshCw className="w-4 h-4" />
+              Resetar
             </button>
-            <button
-              onClick={() => setShowResetConfirm(false)}
-              className="text-sm bg-secondary text-secondary-foreground px-3 py-1 rounded-md hover:bg-muted font-medium"
-            >
-              Não
-            </button>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center gap-2 bg-destructive/10 px-4 py-2 rounded-lg">
+              <span className="text-sm text-destructive font-medium">Confirmar reset?</span>
+              <button
+                onClick={() => {
+                  onReset();
+                  setShowResetConfirm(false);
+                }}
+                className="text-sm bg-destructive text-destructive-foreground px-3 py-1 rounded-md hover:opacity-90 font-medium"
+              >
+                Sim
+              </button>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="text-sm bg-secondary text-secondary-foreground px-3 py-1 rounded-md hover:bg-muted font-medium"
+              >
+                Não
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Cards de entrada */}
