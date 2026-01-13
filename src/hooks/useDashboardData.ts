@@ -25,11 +25,12 @@ export const useDashboardData = () => {
         const initialData = createInitialData();
         const updatedData = initialData.map(month => {
           const dbMonth = dbData.find(d => d.month === month.month);
-          if (dbMonth) {
+        if (dbMonth) {
             return {
               ...month,
               realizadoVendas: dbMonth.realizado_vendas || 0,
               realizadoFaturamento: Number(dbMonth.realizado_faturamento) || 0,
+              ticketRealizado: Number(dbMonth.ticket_realizado) || VALOR_POR_VENDA,
               realizadoPrimeiraReuniao: dbMonth.realizado_primeira_reuniao || 0,
               realizadoSegundaReuniao: dbMonth.realizado_segunda_reuniao || 0
             };
@@ -86,6 +87,7 @@ export const useDashboardData = () => {
       realizadoFaturamento: 'realizado_faturamento',
       realizadoPrimeiraReuniao: 'realizado_primeira_reuniao',
       realizadoSegundaReuniao: 'realizado_segunda_reuniao',
+      ticketRealizado: 'ticket_realizado',
     };
 
     const dbField = dbFieldMap[field];
@@ -137,6 +139,9 @@ export const useDashboardData = () => {
     }
     if (updates.realizadoSegundaReuniao !== undefined) {
       dbUpdates.realizado_segunda_reuniao = updates.realizadoSegundaReuniao;
+    }
+    if (updates.ticketRealizado !== undefined) {
+      dbUpdates.ticket_realizado = updates.ticketRealizado;
     }
 
     // Recalcula faturamento se necessário
@@ -245,7 +250,8 @@ export const useDashboardData = () => {
           realizado_vendas: 0,
           realizado_faturamento: 0,
           realizado_primeira_reuniao: 0,
-          realizado_segunda_reuniao: 0
+          realizado_segunda_reuniao: 0,
+          ticket_realizado: VALOR_POR_VENDA
         })
         .eq('month', month);
     }

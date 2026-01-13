@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MonthData, MONTHS, VALOR_POR_VENDA } from '@/types/dashboard';
 import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2, History, ShieldOff } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 
@@ -241,7 +242,12 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Quantidade de Vendas */}
           <div className="bg-card rounded-xl p-4 border-2 border-border hover:border-primary/30 transition-all">
-            <p className="text-xs text-muted-foreground mb-2 font-medium">Quantidade de Vendas</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-muted-foreground font-medium">Quantidade de Vendas</p>
+              <Badge variant="outline" className="text-primary border-primary/30 text-xs">
+                Meta: {currentData.metaVendas}
+              </Badge>
+            </div>
             <input
               type="number"
               min="0"
@@ -251,6 +257,27 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
               disabled={!canEdit}
               className={`input-field text-center text-2xl font-bold ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}`}
             />
+            {/* Mini barra de progresso de vendas */}
+            <div className="mt-2">
+              <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    currentData.realizadoVendas >= currentData.metaVendas && currentData.realizadoVendas > 0
+                      ? 'bg-[hsl(var(--success))]' 
+                      : currentData.realizadoVendas >= currentData.metaVendas * 0.7 
+                        ? 'bg-warning' 
+                        : 'bg-destructive'
+                  }`}
+                  style={{ width: `${Math.min((currentData.realizadoVendas / currentData.metaVendas) * 100, 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-center text-muted-foreground mt-1">
+                {currentData.metaVendas > 0 
+                  ? `${((currentData.realizadoVendas / currentData.metaVendas) * 100).toFixed(0)}% da meta`
+                  : '0% da meta'
+                }
+              </p>
+            </div>
           </div>
 
           {/* Valor por Venda (Ticket) */}

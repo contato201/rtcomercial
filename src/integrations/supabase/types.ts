@@ -23,6 +23,7 @@ export type Database = {
           realizado_primeira_reuniao: number
           realizado_segunda_reuniao: number
           realizado_vendas: number
+          ticket_realizado: number | null
           updated_at: string
         }
         Insert: {
@@ -33,6 +34,7 @@ export type Database = {
           realizado_primeira_reuniao?: number
           realizado_segunda_reuniao?: number
           realizado_vendas?: number
+          ticket_realizado?: number | null
           updated_at?: string
         }
         Update: {
@@ -43,6 +45,7 @@ export type Database = {
           realizado_primeira_reuniao?: number
           realizado_segunda_reuniao?: number
           realizado_vendas?: number
+          ticket_realizado?: number | null
           updated_at?: string
         }
         Relationships: []
