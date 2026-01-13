@@ -15,7 +15,8 @@ export const ComparisonChart = ({ title, data, formatValue = (v) => v.toLocaleSt
   const isPositive = totalRealizado >= totalMeta;
   const progressPercent = totalMeta > 0 ? Math.min((totalRealizado / totalMeta) * 100, 150) : 0;
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Custom tooltip - renderizado inline para evitar warning de ref
+  const renderCustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const meta = payload.find((p: any) => p.dataKey === 'meta')?.value || 0;
       const realizado = payload.find((p: any) => p.dataKey === 'realizado')?.value || 0;
@@ -101,7 +102,7 @@ export const ComparisonChart = ({ title, data, formatValue = (v) => v.toLocaleSt
                 return value;
               }}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--accent))', opacity: 0.3 }} />
+            <Tooltip content={renderCustomTooltip} cursor={{ fill: 'hsl(var(--accent))', opacity: 0.3 }} />
             <Bar 
               dataKey="meta" 
               name="Meta" 

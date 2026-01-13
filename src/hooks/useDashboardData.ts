@@ -200,19 +200,32 @@ export const useDashboardData = () => {
       return filteredData[0];
     }
     
-    return filteredData.reduce((acc, month) => ({
+    // Valor inicial zerado para evitar duplicar as metas
+    const initialValue: MonthData = {
       month: filterType === 'quarter' ? `${selectedQuarter}` : 'Anual',
       monthIndex: -1,
+      metaVendas: 0,
+      realizadoVendas: 0,
+      metaFaturamento: 0,
+      realizadoFaturamento: 0,
+      ticketRealizado: VALOR_POR_VENDA,
+      metaPrimeiraReuniao: 0,
+      realizadoPrimeiraReuniao: 0,
+      metaSegundaReuniao: 0,
+      realizadoSegundaReuniao: 0
+    };
+    
+    return filteredData.reduce((acc, month) => ({
+      ...acc,
       metaVendas: acc.metaVendas + month.metaVendas,
       realizadoVendas: acc.realizadoVendas + month.realizadoVendas,
       metaFaturamento: acc.metaFaturamento + month.metaFaturamento,
       realizadoFaturamento: acc.realizadoFaturamento + month.realizadoFaturamento,
-      ticketRealizado: VALOR_POR_VENDA,
       metaPrimeiraReuniao: acc.metaPrimeiraReuniao + month.metaPrimeiraReuniao,
       realizadoPrimeiraReuniao: acc.realizadoPrimeiraReuniao + month.realizadoPrimeiraReuniao,
       metaSegundaReuniao: acc.metaSegundaReuniao + month.metaSegundaReuniao,
       realizadoSegundaReuniao: acc.realizadoSegundaReuniao + month.realizadoSegundaReuniao
-    }), createInitialData()[0]);
+    }), initialValue);
   }, [filteredData, filterType, selectedQuarter]);
 
   const calculateVariation = useCallback((meta: number, realizado: number): number => {
