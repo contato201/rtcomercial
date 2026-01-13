@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/dashboard/Header';
 import { FilterBar } from '@/components/dashboard/FilterBar';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
@@ -9,6 +10,7 @@ import { HistoryPanel } from '@/components/dashboard/HistoryPanel';
 
 const Index = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const { canEdit } = useAuth();
   
   const {
     data,
@@ -48,6 +50,7 @@ const Index = () => {
             onUpdate={updateMonthData}
             onReset={resetData}
             onOpenHistory={() => setIsHistoryOpen(true)}
+            canEdit={canEdit}
           />
         </div>
 
