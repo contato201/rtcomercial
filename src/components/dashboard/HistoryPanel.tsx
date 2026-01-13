@@ -66,6 +66,11 @@ const FIELD_CONFIG: Record<string, { label: string; icon: React.ReactNode; color
     icon: <Calendar className="h-4 w-4" />, 
     color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' 
   },
+  ticket_realizado: { 
+    label: 'Valor por Venda', 
+    icon: <DollarSign className="h-4 w-4" />, 
+    color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' 
+  },
 };
 
 export function HistoryPanel({ isOpen, onClose, onRevert }: HistoryPanelProps) {
@@ -114,6 +119,7 @@ export function HistoryPanel({ isOpen, onClose, onRevert }: HistoryPanelProps) {
         realizado_faturamento: 'realizadoFaturamento',
         realizado_primeira_reuniao: 'realizadoPrimeiraReuniao',
         realizado_segunda_reuniao: 'realizadoSegundaReuniao',
+        ticket_realizado: 'ticketRealizado',
       };
 
       const mappedField = fieldMap[record.campo_alterado];
@@ -132,7 +138,7 @@ export function HistoryPanel({ isOpen, onClose, onRevert }: HistoryPanelProps) {
   };
 
   const formatValue = (field: string, value: number) => {
-    if (field === 'realizado_faturamento') {
+    if (field === 'realizado_faturamento' || field === 'ticket_realizado') {
       return new Intl.NumberFormat('pt-BR', { 
         style: 'currency', 
         currency: 'BRL' 
