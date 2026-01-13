@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +22,7 @@ import {
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { History, RotateCcw, TrendingUp, Users, DollarSign, Calendar } from 'lucide-react';
+import { History, RotateCcw, TrendingUp, Users, DollarSign, Calendar, ShieldOff } from 'lucide-react';
 
 interface HistoryRecord {
   id: string;
@@ -68,6 +69,7 @@ const FIELD_CONFIG: Record<string, { label: string; icon: React.ReactNode; color
 };
 
 export function HistoryPanel({ isOpen, onClose, onRevert }: HistoryPanelProps) {
+  const { canEdit } = useAuth();
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
@@ -226,15 +228,22 @@ export function HistoryPanel({ isOpen, onClose, onRevert }: HistoryPanelProps) {
                           </span>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmRevert(record)}
-                        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Reverter
-                      </Button>
+                      {canEdit ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmRevert(record)}
+                          className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Reverter
+                        </Button>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          <ShieldOff className="h-3 w-3 mr-1" />
+                          Somente leitura
+                        </Badge>
+                      )}
                     </div>
                   );
                 })}

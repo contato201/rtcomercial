@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { MonthData, MONTHS, VALOR_POR_VENDA } from '@/types/dashboard';
-import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2, History } from 'lucide-react';
+import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2, History, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 interface DataEntryFormProps {
   selectedMonth: number;
@@ -9,22 +10,26 @@ interface DataEntryFormProps {
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
   onReset: () => void;
   onOpenHistory: () => void;
+  canEdit: boolean;
 }
 
-export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, onOpenHistory }: DataEntryFormProps) => {
+export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, onOpenHistory, canEdit }: DataEntryFormProps) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handleInputChange = (field: keyof MonthData, value: string) => {
+    if (!canEdit) return;
     const numValue = parseInt(value) || 0;
     onUpdate(selectedMonth, { [field]: numValue });
   };
 
   const handleCurrencyChange = (field: keyof MonthData, value: string) => {
+    if (!canEdit) return;
     // Remove formatação e converte para número
     const cleanValue = value.replace(/\D/g, '');
     const numValue = parseInt(cleanValue) || 0;
     onUpdate(selectedMonth, { [field]: numValue });
   };
+
 
   const formatCurrencyInput = (value: number) => {
     if (value === 0) return '';
@@ -68,6 +73,23 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
 
   return (
     <div className="dashboard-card p-6 border-2 border-primary/20 bg-gradient-to-br from-card to-accent/20">
+      {/* Banner de aviso quando não pode editar */}
+      {!canEdit && (
+        <div className="mb-4 p-3 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldOff className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <span className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+              Modo visualização — Faça login com o email autorizado para editar
+            </span>
+          </div>
+          <Link to="/auth">
+            <Button variant="outline" size="sm" className="border-amber-500 text-amber-700 hover:bg-amber-200 dark:hover:bg-amber-800">
+              Fazer Login
+            </Button>
+          </Link>
+        </div>
+      )}
+      
       {/* Header destacado */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -77,7 +99,7 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
           <div>
             <h2 className="text-xl font-bold text-foreground">📝 Entrada de Dados</h2>
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-primary">{MONTHS[selectedMonth]}</span> — Digite os valores realizados
+              <span className="font-semibold text-primary">{MONTHS[selectedMonth]}</span> — {canEdit ? 'Digite os valores realizados' : 'Visualização apenas'}
             </p>
           </div>
         </div>
@@ -93,33 +115,37 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
             Histórico
           </Button>
           
-          {!showResetConfirm ? (
-            <button
-              onClick={() => setShowResetConfirm(true)}
-              className="text-sm text-muted-foreground hover:text-destructive flex items-center gap-2 transition-colors px-3 py-2 rounded-lg hover:bg-destructive/10"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Resetar
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 bg-destructive/10 px-4 py-2 rounded-lg">
-              <span className="text-sm text-destructive font-medium">Confirmar reset?</span>
-              <button
-                onClick={() => {
-                  onReset();
-                  setShowResetConfirm(false);
-                }}
-                className="text-sm bg-destructive text-destructive-foreground px-3 py-1 rounded-md hover:opacity-90 font-medium"
-              >
-                Sim
-              </button>
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                className="text-sm bg-secondary text-secondary-foreground px-3 py-1 rounded-md hover:bg-muted font-medium"
-              >
-                Não
-              </button>
-            </div>
+          {canEdit && (
+            <>
+              {!showResetConfirm ? (
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  className="text-sm text-muted-foreground hover:text-destructive flex items-center gap-2 transition-colors px-3 py-2 rounded-lg hover:bg-destructive/10"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Resetar
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 bg-destructive/10 px-4 py-2 rounded-lg">
+                  <span className="text-sm text-destructive font-medium">Confirmar reset?</span>
+                  <button
+                    onClick={() => {
+                      onReset();
+                      setShowResetConfirm(false);
+                    }}
+                    className="text-sm bg-destructive text-destructive-foreground px-3 py-1 rounded-md hover:opacity-90 font-medium"
+                  >
+                    Sim
+                  </button>
+                  <button
+                    onClick={() => setShowResetConfirm(false)}
+                    className="text-sm bg-secondary text-secondary-foreground px-3 py-1 rounded-md hover:bg-muted font-medium"
+                  >
+                    Não
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -170,7 +196,9 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
                   value={group.realizadoValue || ''}
                   onChange={(e) => handleInputChange(group.realizadoField, e.target.value)}
                   placeholder="Digite aqui..."
+                  disabled={!canEdit}
                   className={`input-field text-center text-xl font-bold transition-all ${
+                    !canEdit ? 'cursor-not-allowed opacity-60' :
                     isComplete 
                       ? 'border-[hsl(var(--success))] bg-[hsl(var(--success))]/5 text-[hsl(var(--success))]' 
                       : group.realizadoValue > 0 ? 'border-primary/50' : ''
@@ -220,7 +248,8 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
               value={currentData.realizadoVendas || ''}
               onChange={(e) => handleInputChange('realizadoVendas', e.target.value)}
               placeholder="0"
-              className="input-field text-center text-2xl font-bold"
+              disabled={!canEdit}
+              className={`input-field text-center text-2xl font-bold ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}`}
             />
           </div>
 
@@ -235,7 +264,8 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
                 value={formatCurrencyInput(currentData.ticketRealizado)}
                 onChange={(e) => handleCurrencyChange('ticketRealizado', e.target.value)}
                 placeholder="2.700"
-                className="input-field text-right text-xl font-bold pl-12"
+                disabled={!canEdit}
+                className={`input-field text-right text-xl font-bold pl-12 ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}`}
               />
             </div>
             <p className="text-xs text-muted-foreground mt-1 text-center">
