@@ -1,11 +1,15 @@
+import { useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { Header } from '@/components/dashboard/Header';
 import { FilterBar } from '@/components/dashboard/FilterBar';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { DataEntryForm } from '@/components/dashboard/DataEntryForm';
 import { ChartsGrid } from '@/components/dashboard/ChartsGrid';
+import { HistoryPanel } from '@/components/dashboard/HistoryPanel';
 
 const Index = () => {
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  
   const {
     data,
     filteredData,
@@ -18,7 +22,8 @@ const Index = () => {
     setSelectedQuarter,
     updateMonthData,
     calculateVariation,
-    resetData
+    resetData,
+    revertToValue
   } = useDashboardData();
 
   return (
@@ -42,6 +47,7 @@ const Index = () => {
             currentData={data[selectedMonth]}
             onUpdate={updateMonthData}
             onReset={resetData}
+            onOpenHistory={() => setIsHistoryOpen(true)}
           />
         </div>
 
@@ -58,6 +64,13 @@ const Index = () => {
           filterType={filterType}
         />
       </div>
+
+      {/* Painel de Histórico */}
+      <HistoryPanel
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        onRevert={revertToValue}
+      />
     </div>
   );
 };

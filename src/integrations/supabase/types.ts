@@ -47,6 +47,44 @@ export type Database = {
         }
         Relationships: []
       }
+      historico_alteracoes: {
+        Row: {
+          campo_alterado: string
+          created_at: string
+          dados_realizados_id: string
+          id: string
+          month: string
+          valor_anterior: number
+          valor_novo: number
+        }
+        Insert: {
+          campo_alterado: string
+          created_at?: string
+          dados_realizados_id: string
+          id?: string
+          month: string
+          valor_anterior?: number
+          valor_novo?: number
+        }
+        Update: {
+          campo_alterado?: string
+          created_at?: string
+          dados_realizados_id?: string
+          id?: string
+          month?: string
+          valor_anterior?: number
+          valor_novo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_alteracoes_dados_realizados_id_fkey"
+            columns: ["dados_realizados_id"]
+            isOneToOne: false
+            referencedRelation: "dados_realizados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

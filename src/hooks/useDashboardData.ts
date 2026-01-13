@@ -61,7 +61,6 @@ export const useDashboardData = () => {
         },
         (payload) => {
           console.log('Realtime update:', payload);
-          // Recarrega todos os dados quando há mudança
           loadFromDatabase();
         }
       )
@@ -72,8 +71,42 @@ export const useDashboardData = () => {
     };
   }, [loadFromDatabase]);
 
+  // Salva alteração no histórico
+  const saveToHistory = useCallback(async (
+    dadosRealizadosId: string,
+    monthName: string,
+    field: string,
+    oldValue: number,
+    newValue: number
+  ) => {
+    if (oldValue === newValue) return;
+
+    const dbFieldMap: Record<string, string> = {
+      realizadoVendas: 'realizado_vendas',
+      realizadoFaturamento: 'realizado_faturamento',
+      realizadoPrimeiraReuniao: 'realizado_primeira_reuniao',
+      realizadoSegundaReuniao: 'realizado_segunda_reuniao',
+    };
+
+    const dbField = dbFieldMap[field];
+    if (!dbField) return;
+
+    try {
+      await supabase.from('historico_alteracoes').insert({
+        dados_realizados_id: dadosRealizadosId,
+        month: monthName,
+        campo_alterado: dbField,
+        valor_anterior: oldValue,
+        valor_novo: newValue,
+      });
+    } catch (error) {
+      console.error('Erro ao salvar histórico:', error);
+    }
+  }, []);
+
   const updateMonthData = useCallback(async (monthIndex: number, updates: Partial<MonthData>) => {
     const monthName = MONTHS[monthIndex];
+    const currentMonthData = data[monthIndex];
     
     // Atualiza estado local imediatamente para UX responsiva
     setData(prevData => {
@@ -108,22 +141,46 @@ export const useDashboardData = () => {
 
     // Recalcula faturamento se necessário
     if (updates.realizadoVendas !== undefined || updates.ticketRealizado !== undefined) {
-      const currentData = data[monthIndex];
-      const vendas = updates.realizadoVendas ?? currentData.realizadoVendas;
-      const ticket = updates.ticketRealizado ?? currentData.ticketRealizado;
+      const vendas = updates.realizadoVendas ?? currentMonthData.realizadoVendas;
+      const ticket = updates.ticketRealizado ?? currentMonthData.ticketRealizado;
       dbUpdates.realizado_faturamento = vendas * ticket;
     }
 
-    // Salva no banco
-    const { error } = await supabase
-      .from('dados_realizados')
-      .update(dbUpdates)
-      .eq('month', monthName);
+    // Busca ID do registro e salva histórico
+    try {
+      const { data: existingRecord } = await supabase
+        .from('dados_realizados')
+        .select('id')
+        .eq('month', monthName)
+        .single();
 
-    if (error) {
+      if (existingRecord) {
+        // Salva cada campo alterado no histórico
+        for (const [field, newValue] of Object.entries(updates)) {
+          const oldValue = currentMonthData[field as keyof MonthData];
+          if (typeof oldValue === 'number' && typeof newValue === 'number') {
+            await saveToHistory(existingRecord.id, monthName, field, oldValue, newValue);
+          }
+        }
+
+        // Atualiza o registro
+        await supabase
+          .from('dados_realizados')
+          .update(dbUpdates)
+          .eq('month', monthName);
+      }
+    } catch (error) {
       console.error('Erro ao salvar dados:', error);
     }
-  }, [data]);
+  }, [data, saveToHistory]);
+
+  // Reverte para um valor anterior do histórico
+  const revertToValue = useCallback(async (month: string, field: string, value: number) => {
+    const monthIndex = MONTHS.indexOf(month);
+    if (monthIndex === -1) return;
+    
+    await updateMonthData(monthIndex, { [field]: value } as Partial<MonthData>);
+  }, [updateMonthData]);
 
   const filteredData = useMemo(() => {
     switch (filterType) {
@@ -194,6 +251,7 @@ export const useDashboardData = () => {
     updateMonthData,
     calculateVariation,
     resetData,
+    revertToValue,
     isLoading
   };
 };
