@@ -12,8 +12,8 @@ export const ChartsGrid = ({ filteredData, aggregatedData, filterType }: ChartsG
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      notation: 'compact',
-      maximumFractionDigits: 1
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(value);
   };
 
