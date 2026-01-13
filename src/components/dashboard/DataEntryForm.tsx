@@ -154,7 +154,9 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
       {/* Cards de entrada */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {inputGroups.map((group) => {
-          const progress = getProgressStatus(group.meta, group.realizadoValue);
+          const realizadoValue = group.realizadoValue || 0;
+          const metaValue = group.meta || 1;
+          const progress = getProgressStatus(metaValue, realizadoValue);
           const isComplete = progress.percent >= 100;
           
           return (
@@ -219,7 +221,7 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
                   />
                 </div>
                 <p className="text-xs text-center text-muted-foreground mt-1">
-                  {progress.percent.toFixed(0)}% da meta
+                  {metaValue > 0 ? `${((realizadoValue / metaValue) * 100).toFixed(0)}% da meta` : '0% da meta'}
                 </p>
               </div>
             </div>
