@@ -203,6 +203,7 @@ export const useGrowthData = () => {
     setActiveFilters({ campaign: null, adset: null, status: null });
   }, []);
 
+  // Load from database on mount
   useEffect(() => {
     loadFromDatabase();
 
@@ -219,6 +220,29 @@ export const useGrowthData = () => {
       supabase.removeChannel(channel);
     };
   }, [loadFromDatabase]);
+
+  // Auto-sync from Google Sheets on mount (only if authenticated)
+  useEffect(() => {
+    let mounted = true;
+    
+    const autoSync = async () => {
+      // Check if user is authenticated before auto-syncing
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session && mounted && !isSyncing) {
+        console.log('Auto-syncing from Google Sheets...');
+        syncFromSheets();
+      }
+    };
+
+    // Small delay to ensure component is fully mounted
+    const timeoutId = setTimeout(autoSync, 500);
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, []); // Only run on mount
 
   const currentMonthData = useMemo(() => {
     const baseData = data[selectedMonth];
