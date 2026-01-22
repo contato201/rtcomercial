@@ -6,6 +6,7 @@ import { GrowthFunnel } from '@/components/growth/GrowthFunnel';
 import { GrowthDataForm } from '@/components/growth/GrowthDataForm';
 import { GrowthFiltersComponent } from '@/components/growth/GrowthFilters';
 import { CampaignsTable } from '@/components/growth/CampaignsTable';
+import { SyncStatusBanner } from '@/components/growth/SyncStatusBanner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -89,6 +90,14 @@ const Growth = () => {
             </Button>
           </div>
         </div>
+
+        {/* Banner de Status de Sincronização */}
+        <SyncStatusBanner
+          lastSyncTime={lastSyncTime}
+          onSync={syncFromSheets}
+          isSyncing={isSyncing}
+          hasData={hasData}
+        />
 
         {/* Filtros */}
         {campaigns.length > 0 && (
