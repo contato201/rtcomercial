@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   GrowthData, 
@@ -46,6 +46,7 @@ export const useGrowthData = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const hasAutoSynced = useRef(false);
 
   // Campanhas filtradas
   const filteredCampaigns = useMemo(() => {
@@ -223,13 +224,17 @@ export const useGrowthData = () => {
 
   // Auto-sync from Google Sheets on mount (only if authenticated)
   useEffect(() => {
+    // Skip if already auto-synced
+    if (hasAutoSynced.current) return;
+    
     let mounted = true;
     
     const autoSync = async () => {
       // Check if user is authenticated before auto-syncing
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (session && mounted && !isSyncing) {
+      if (session && mounted) {
+        hasAutoSynced.current = true;
         console.log('Auto-syncing from Google Sheets...');
         syncFromSheets();
       }
@@ -242,7 +247,7 @@ export const useGrowthData = () => {
       mounted = false;
       clearTimeout(timeoutId);
     };
-  }, []); // Only run on mount
+  }, [syncFromSheets]);
 
   const currentMonthData = useMemo(() => {
     const baseData = data[selectedMonth];
