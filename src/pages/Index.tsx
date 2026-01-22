@@ -16,6 +16,7 @@ const Index = () => {
     data,
     filteredData,
     aggregatedData,
+    unitSalesByMonth,
     filterType,
     setFilterType,
     selectedMonth,
@@ -23,6 +24,9 @@ const Index = () => {
     selectedQuarter,
     setSelectedQuarter,
     updateMonthData,
+    addUnitSale,
+    updateUnitSale,
+    deleteUnitSale,
     calculateVariation,
     resetData,
     revertToValue
@@ -47,7 +51,11 @@ const Index = () => {
           <DataEntryForm
             selectedMonth={selectedMonth}
             currentData={data[selectedMonth]}
+            unitSales={unitSalesByMonth[data[selectedMonth].month] ?? []}
             onUpdate={updateMonthData}
+            onAddUnitSale={addUnitSale}
+            onUpdateUnitSale={updateUnitSale}
+            onDeleteUnitSale={deleteUnitSale}
             onReset={resetData}
             onOpenHistory={() => setIsHistoryOpen(true)}
             canEdit={canEdit}
