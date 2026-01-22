@@ -80,6 +80,54 @@ export type Database = {
         }
         Relationships: []
       }
+      dados_trafego: {
+        Row: {
+          cliques: number
+          cpc: number
+          created_at: string
+          id: string
+          impressoes: number
+          investimento: number
+          leads_qualificados: number
+          leads_total: number
+          month: string
+          reunioes_agendadas: number
+          updated_at: string
+          valor_vendas: number
+          vendas_fechadas: number
+        }
+        Insert: {
+          cliques?: number
+          cpc?: number
+          created_at?: string
+          id?: string
+          impressoes?: number
+          investimento?: number
+          leads_qualificados?: number
+          leads_total?: number
+          month: string
+          reunioes_agendadas?: number
+          updated_at?: string
+          valor_vendas?: number
+          vendas_fechadas?: number
+        }
+        Update: {
+          cliques?: number
+          cpc?: number
+          created_at?: string
+          id?: string
+          impressoes?: number
+          investimento?: number
+          leads_qualificados?: number
+          leads_total?: number
+          month?: string
+          reunioes_agendadas?: number
+          updated_at?: string
+          valor_vendas?: number
+          vendas_fechadas?: number
+        }
+        Relationships: []
+      }
       historico_alteracoes: {
         Row: {
           campo_alterado: string
