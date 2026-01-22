@@ -21,6 +21,18 @@ export const Header = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          {/* Link para Dashboard de Growth */}
+          <Link to="/growth">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent border-gold/30 text-gold hover:bg-gold/20 hover:text-gold"
+            >
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Growth
+            </Button>
+          </Link>
+          
           {canEdit && (
             <div className="flex items-center gap-1 bg-green-600/20 px-3 py-1.5 rounded-lg border border-green-500/30">
               <Shield className="w-4 h-4 text-green-400" />
