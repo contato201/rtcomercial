@@ -179,7 +179,7 @@ serve(async (req) => {
     // Filtros disponíveis
     const uniqueCampaigns = [...new Set(finalCampaigns.map(c => c.campaignName).filter(Boolean))];
     const uniqueAdsets = [...new Set(finalCampaigns.map(c => c.adsetName).filter(Boolean))];
-    const uniqueAds = [...new Set(finalCampaigns.map(c => c.adName).filter(Boolean))];
+    const uniqueStatuses = [...new Set(finalCampaigns.map(c => c.status).filter(Boolean))];
     
     return new Response(
       JSON.stringify({
@@ -189,7 +189,7 @@ serve(async (req) => {
         filters: {
           campaigns: uniqueCampaigns,
           adsets: uniqueAdsets,
-          ads: uniqueAds,
+          statuses: uniqueStatuses,
         },
         count: finalCampaigns.length,
         debug: {

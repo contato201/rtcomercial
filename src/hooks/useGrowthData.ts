@@ -222,19 +222,32 @@ export const useGrowthData = () => {
 
   const currentMonthData = useMemo(() => {
     const baseData = data[selectedMonth];
-    // Sobrescrever com dados filtrados do Sheets se houver
-    if (filteredCampaigns.length > 0) {
+    // Sobrescrever com dados do Sheets se houver sync
+    if (lastSyncTime && campaigns.length > 0) {
+      // Usar totais filtrados se houver filtros ativos, senão usar todos
+      const hasActiveFilters = activeFilters.campaign || activeFilters.adset || activeFilters.status;
+      const totalsToUse = hasActiveFilters ? filteredTotals : {
+        investimento: campaigns.reduce((sum, c) => sum + c.amountSpent, 0),
+        impressoes: campaigns.reduce((sum, c) => sum + c.impressions, 0),
+        cliques: campaigns.reduce((sum, c) => sum + c.clicks, 0),
+        leads: campaigns.reduce((sum, c) => sum + c.leads, 0),
+        cpc: 0,
+        cpl: 0,
+      };
+      totalsToUse.cpc = totalsToUse.cliques > 0 ? totalsToUse.investimento / totalsToUse.cliques : 0;
+      totalsToUse.cpl = totalsToUse.leads > 0 ? totalsToUse.investimento / totalsToUse.leads : 0;
+      
       return calculateMetrics({
         ...baseData,
-        investimento: filteredTotals.investimento,
-        impressoes: filteredTotals.impressoes,
-        cliques: filteredTotals.cliques,
-        cpc: filteredTotals.cpc,
-        leadsTotal: filteredTotals.leads,
+        investimento: totalsToUse.investimento,
+        impressoes: totalsToUse.impressoes,
+        cliques: totalsToUse.cliques,
+        cpc: totalsToUse.cpc,
+        leadsTotal: totalsToUse.leads,
       });
     }
     return baseData;
-  }, [data, selectedMonth, filteredCampaigns, filteredTotals]);
+  }, [data, selectedMonth, lastSyncTime, campaigns, activeFilters, filteredTotals]);
 
   // Indica se já houve sincronização (para distinguir "sem dados" de "zerado")
   const hasData = lastSyncTime !== null;
