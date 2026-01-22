@@ -41,13 +41,23 @@ export const GrowthFunnel = ({
   const taxaFechamento = reunioes > 0 ? (vendas / reunioes) * 100 : 0;
   const ticketMedio = vendas > 0 ? data.valorVendas / vendas : 0;
 
-  // Etapas do funil
+  // Paleta de cores coerente: Verde → Vermelho (representa volume do funil)
+  // Verde = maior volume (topo) | Vermelho = menor volume (fundo)
+  const FUNNEL_COLORS = {
+    leads: '#10B981',      // Verde - Emerald 500
+    mqls: '#FBBF24',       // Amarelo - Amber 400
+    proposta: '#F59E0B',   // Amarelo-Laranja - Amber 500
+    reunioes: '#F97316',   // Laranja - Orange 500
+    vendas: '#EF4444',     // Vermelho - Red 500
+  };
+
+  // Etapas do funil com cores coerentes
   const stages = [
-    { label: 'LEADS', value: data.leadsTotal, color: '#E91E63' },
-    { label: 'MQLs', value: mqls, color: '#FFC107' },
-    { label: 'PROPOSTA', value: propostas, color: '#FF9800' },
-    { label: 'REUNIÕES', value: reunioes, color: '#F44336' },
-    { label: 'VENDAS', value: vendas, color: '#26A69A' },
+    { label: 'LEADS', value: data.leadsTotal, color: FUNNEL_COLORS.leads },
+    { label: 'MQLs', value: mqls, color: FUNNEL_COLORS.mqls },
+    { label: 'PROPOSTA', value: propostas, color: FUNNEL_COLORS.proposta },
+    { label: 'REUNIÕES', value: reunioes, color: FUNNEL_COLORS.reunioes },
+    { label: 'VENDAS', value: vendas, color: FUNNEL_COLORS.vendas },
   ];
 
   // Calcular taxas de conversão
@@ -67,13 +77,13 @@ export const GrowthFunnel = ({
     { icon: Receipt, label: 'Ticket Médio', value: ticketMedio, formatter: formatCurrency, color: '#4CAF50' },
   ];
 
-  // KPIs da direita (custos)
+  // KPIs da direita (custos) - cores correspondentes ao funil
   const rightKPIs = [
-    { icon: Users, label: 'CPL', value: data.cpl, formatter: formatCurrency, borderColor: '#E91E63' },
-    { icon: Users, label: 'Custo MQL', value: custoMQL, formatter: formatCurrency, borderColor: '#FFC107' },
-    { icon: Calendar, label: 'Custo Proposta', value: custoProposta, formatter: formatCurrency, borderColor: '#FF9800' },
-    { icon: Handshake, label: 'Custo Reunião', value: custoReuniao, formatter: formatCurrency, borderColor: '#F44336' },
-    { icon: ShoppingCart, label: 'CPA', value: cpa, formatter: formatCurrency, borderColor: '#26A69A' },
+    { icon: Users, label: 'CPL', value: data.cpl, formatter: formatCurrency, borderColor: FUNNEL_COLORS.leads },
+    { icon: Users, label: 'Custo MQL', value: custoMQL, formatter: formatCurrency, borderColor: FUNNEL_COLORS.mqls },
+    { icon: Calendar, label: 'Custo Proposta', value: custoProposta, formatter: formatCurrency, borderColor: FUNNEL_COLORS.proposta },
+    { icon: Handshake, label: 'Custo Reunião', value: custoReuniao, formatter: formatCurrency, borderColor: FUNNEL_COLORS.reunioes },
+    { icon: ShoppingCart, label: 'CPA', value: cpa, formatter: formatCurrency, borderColor: FUNNEL_COLORS.vendas },
   ];
 
   // Larguras das barras do funil (decrescente)
@@ -164,6 +174,25 @@ export const GrowthFunnel = ({
                 </div>
               </div>
             ))}
+
+            {/* Legenda do funil */}
+            <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-border/50">
+              <div className="flex items-center gap-1.5">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: FUNNEL_COLORS.leads }}
+                />
+                <span className="text-xs text-muted-foreground">Maior volume</span>
+              </div>
+              <div className="text-muted-foreground/40">→</div>
+              <div className="flex items-center gap-1.5">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: FUNNEL_COLORS.vendas }}
+                />
+                <span className="text-xs text-muted-foreground">Conversão final</span>
+              </div>
+            </div>
           </div>
 
           {/* Right KPIs - Costs per stage */}
