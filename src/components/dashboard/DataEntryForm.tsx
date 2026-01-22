@@ -170,8 +170,20 @@ export const DataEntryForm = ({
         </div>
       </div>
 
-      {/* Cards de entrada */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 1. AGENDAMENTOS - Primeiro do funil */}
+      <div className="mb-6">
+        <AgendamentosEditor
+          selectedMonth={selectedMonth}
+          agendamentos={agendamentos}
+          metaAgendamentos={metaAgendamentos}
+          onAddAgendamento={onAddAgendamento}
+          onDeleteAgendamento={onDeleteAgendamento}
+          canEdit={canEdit}
+        />
+      </div>
+
+      {/* 2. REUNIÕES - 1ª e 2ª */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {inputGroups.map((group) => {
           const realizadoValue = group.realizadoValue || 0;
           const metaValue = group.meta || 1;
@@ -248,8 +260,8 @@ export const DataEntryForm = ({
         })}
       </div>
 
-      {/* Faturamento - Quantidade + Valor por Venda */}
-      <div className="mt-6 p-5 bg-gradient-to-r from-primary/5 to-accent rounded-xl border border-primary/20">
+      {/* 3. FATURAMENTO - Final do funil */}
+      <div className="p-5 bg-gradient-to-r from-primary/5 to-accent rounded-xl border border-primary/20">
         <div className="flex items-center gap-2 mb-4">
           <div className="bg-primary/10 p-2 rounded-lg">
             <DollarSign className="w-5 h-5 text-primary" />
@@ -396,18 +408,6 @@ export const DataEntryForm = ({
             }
           </p>
         </div>
-      </div>
-
-      {/* Seção de Agendamentos */}
-      <div className="mt-6">
-        <AgendamentosEditor
-          selectedMonth={selectedMonth}
-          agendamentos={agendamentos}
-          metaAgendamentos={metaAgendamentos}
-          onAddAgendamento={onAddAgendamento}
-          onDeleteAgendamento={onDeleteAgendamento}
-          canEdit={canEdit}
-        />
       </div>
     </div>
   );

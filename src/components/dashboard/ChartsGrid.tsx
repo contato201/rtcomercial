@@ -66,15 +66,11 @@ export const ChartsGrid = ({ filteredData, aggregatedData, filterType, agendamen
     });
   };
 
+  // Ordem do funil: Agendamentos → 1ª Reuniões → 2ª Reuniões → Vendas → Faturamento
   const charts = [
     {
-      title: 'Vendas',
-      data: createChartData('metaVendas', 'realizadoVendas')
-    },
-    {
-      title: 'Faturamento (R$)',
-      data: createChartData('metaFaturamento', 'realizadoFaturamento'),
-      formatValue: formatCurrency
+      title: 'Agendamentos',
+      data: createAgendamentosChartData()
     },
     {
       title: '1ª Reuniões',
@@ -85,8 +81,13 @@ export const ChartsGrid = ({ filteredData, aggregatedData, filterType, agendamen
       data: createChartData('metaSegundaReuniao', 'realizadoSegundaReuniao')
     },
     {
-      title: 'Agendamentos',
-      data: createAgendamentosChartData()
+      title: 'Vendas',
+      data: createChartData('metaVendas', 'realizadoVendas')
+    },
+    {
+      title: 'Faturamento (R$)',
+      data: createChartData('metaFaturamento', 'realizadoFaturamento'),
+      formatValue: formatCurrency
     }
   ];
 
