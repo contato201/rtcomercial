@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Users, Calendar, ShoppingCart, DollarSign, Save, Loader2, Check, X, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -220,73 +221,103 @@ export const GrowthDataForm = ({ data, onUpdate, canEdit }: GrowthDataFormProps)
   const ButtonIcon = buttonConfig.icon;
 
   return (
-    <Card>
-      <CardHeader className="pb-2 sm:pb-3">
-        <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-          Dados Manuais - {data.month}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 sm:space-y-4">
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          {fields.map((field) => {
-            const error = errors[field.key];
-            const hasError = error !== null;
-            
-            return (
-              <div key={field.key} className="space-y-1.5 sm:space-y-2">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <div className={`p-1 sm:p-1.5 rounded-md ${field.bgColor}`}>
-                    <field.icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${field.color}`} />
-                  </div>
-                  <Label className="text-[10px] sm:text-xs font-medium truncate">{field.label}</Label>
-                </div>
-                <div className="relative">
-                  <Input
-                    type={field.isCurrency ? 'text' : 'number'}
-                    value={field.isCurrency ? formData[field.key] : formData[field.key]}
-                    onChange={(e) => handleChange(field.key, e.target.value)}
-                    disabled={!canEdit}
-                    className={`h-9 sm:h-10 min-h-[44px] sm:min-h-0 text-sm ${hasError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                    placeholder={field.isCurrency ? 'R$ 0,00' : '0'}
-                    min={0}
-                    max={field.isCurrency ? 1000000 : 10000}
-                  />
-                  {hasError && (
-                    <div className="absolute -bottom-4 sm:-bottom-5 left-0 flex items-center gap-1 text-[9px] sm:text-[10px] text-destructive">
-                      <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                      <span className="truncate">{error}</span>
+    <TooltipProvider>
+      <Card>
+        <CardHeader className="pb-2 sm:pb-3">
+          <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+            Dados Manuais - {data.month}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {fields.map((field) => {
+              const error = errors[field.key];
+              const hasError = error !== null;
+              
+              return (
+                <div key={field.key} className="space-y-1.5 sm:space-y-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <div className={`p-1 sm:p-1.5 rounded-md ${field.bgColor} flex-shrink-0`}>
+                      <field.icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${field.color}`} />
                     </div>
-                  )}
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <Label 
+                          className="text-[10px] sm:text-xs font-medium truncate cursor-help leading-relaxed block max-w-full"
+                          style={{ lineHeight: '1.5' }}
+                        >
+                          {field.label}
+                        </Label>
+                      </TooltipTrigger>
+                      <TooltipContent 
+                        side="top" 
+                        className="bg-popover text-popover-foreground border-border max-w-[200px]"
+                      >
+                        <p className="text-xs font-medium">{field.label}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type={field.isCurrency ? 'text' : 'number'}
+                      value={field.isCurrency ? formData[field.key] : formData[field.key]}
+                      onChange={(e) => handleChange(field.key, e.target.value)}
+                      disabled={!canEdit}
+                      className={`h-9 sm:h-10 min-h-[44px] sm:min-h-0 text-sm ${hasError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      placeholder={field.isCurrency ? 'R$ 0,00' : '0'}
+                      min={0}
+                      max={field.isCurrency ? 1000000 : 10000}
+                    />
+                    {hasError && (
+                      <div className="absolute -bottom-4 sm:-bottom-5 left-0 flex items-center gap-1 text-[9px] sm:text-[10px] text-destructive">
+                        <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                        <span className="truncate max-w-[120px]">{error}</span>
+                      </div>
+                    )}
+                  </div>
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <p 
+                        className={`text-[9px] sm:text-[10px] text-muted-foreground truncate cursor-help ${hasError ? 'mt-3 sm:mt-4' : ''}`}
+                        style={{ lineHeight: '1.5' }}
+                      >
+                        {field.sublabel}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent 
+                      side="bottom" 
+                      className="bg-popover text-popover-foreground border-border"
+                    >
+                      <p className="text-xs">{field.sublabel}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
-                <p className={`text-[9px] sm:text-[10px] text-muted-foreground ${hasError ? 'mt-3 sm:mt-4' : ''}`}>
-                  {field.sublabel}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-
-        {canEdit && (
-          <div className="space-y-2 pt-1 sm:pt-2">
-            <Button 
-              onClick={handleSave} 
-              className={`w-full min-h-[44px] sm:min-h-0 ${buttonConfig.className}`} 
-              size="sm"
-              disabled={buttonConfig.disabled}
-            >
-              <ButtonIcon className={`w-4 h-4 mr-2 ${buttonConfig.iconClassName}`} />
-              <span className="text-sm">{buttonConfig.text}</span>
-            </Button>
-            
-            {lastSaved && (
-              <p className="text-[9px] sm:text-[10px] text-center text-muted-foreground">
-                Última atualização: {formatTimestamp(lastSaved)}
-              </p>
-            )}
+              );
+            })}
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {canEdit && (
+            <div className="space-y-2 pt-1 sm:pt-2">
+              <Button 
+                onClick={handleSave} 
+                className={`w-full min-h-[44px] sm:min-h-0 ${buttonConfig.className}`} 
+                size="sm"
+                disabled={buttonConfig.disabled}
+              >
+                <ButtonIcon className={`w-4 h-4 mr-2 ${buttonConfig.iconClassName}`} />
+                <span className="text-sm">{buttonConfig.text}</span>
+              </Button>
+              
+              {lastSaved && (
+                <p className="text-[9px] sm:text-[10px] text-center text-muted-foreground">
+                  Última atualização: {formatTimestamp(lastSaved)}
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 };
