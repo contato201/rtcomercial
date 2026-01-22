@@ -38,12 +38,10 @@ export const GrowthFunnel = ({
 }: GrowthFunnelProps) => {
   // Calcular métricas derivadas
   const mqls = data.leadsQualificados || 0;
-  const propostas = Math.round(mqls * 0.6);
   const reunioes = data.reunioesAgendadas || 0;
   const vendas = data.vendasFechadas || 0;
   
   const custoMQL = mqls > 0 ? data.investimento / mqls : 0;
-  const custoProposta = propostas > 0 ? data.investimento / propostas : 0;
   const custoReuniao = reunioes > 0 ? data.investimento / reunioes : 0;
   const cpa = vendas > 0 ? data.investimento / vendas : 0;
   
@@ -55,16 +53,14 @@ export const GrowthFunnel = ({
   const FUNNEL_COLORS = {
     leads: '#10B981',      // Verde - Emerald 500
     mqls: '#FBBF24',       // Amarelo - Amber 400
-    proposta: '#F59E0B',   // Amarelo-Laranja - Amber 500
     reunioes: '#F97316',   // Laranja - Orange 500
     vendas: '#EF4444',     // Vermelho - Red 500
   };
 
-  // Etapas do funil com cores coerentes
+  // Etapas do funil com cores coerentes (sem PROPOSTA)
   const stages = [
     { label: 'LEADS', value: data.leadsTotal, color: FUNNEL_COLORS.leads, hasTooltip: false },
     { label: 'MQLs', value: mqls, color: FUNNEL_COLORS.mqls, hasTooltip: true, tooltipKey: 'MQL' },
-    { label: 'PROPOSTA', value: propostas, color: FUNNEL_COLORS.proposta, hasTooltip: false },
     { label: 'REUNIÕES', value: reunioes, color: FUNNEL_COLORS.reunioes, hasTooltip: false },
     { label: 'VENDAS', value: vendas, color: FUNNEL_COLORS.vendas, hasTooltip: false },
   ];
@@ -86,17 +82,16 @@ export const GrowthFunnel = ({
     { icon: Receipt, label: 'Ticket Médio', value: ticketMedio, formatter: formatCurrency, tooltipKey: '' },
   ];
 
-  // KPIs da direita (custos) - ícones monocromáticos, borda colorida mantida para correspondência visual
+  // KPIs da direita (custos) - ícones monocromáticos, borda colorida mantida para correspondência visual (sem Custo Proposta)
   const rightKPIs = [
     { icon: Users, label: 'CPL', value: data.cpl, formatter: formatCurrency, borderColor: FUNNEL_COLORS.leads, tooltipKey: 'CPL' },
     { icon: Users, label: 'Custo MQL', value: custoMQL, formatter: formatCurrency, borderColor: FUNNEL_COLORS.mqls, tooltipKey: 'MQL' },
-    { icon: Calendar, label: 'Custo Proposta', value: custoProposta, formatter: formatCurrency, borderColor: FUNNEL_COLORS.proposta, tooltipKey: '' },
     { icon: Handshake, label: 'Custo Reunião', value: custoReuniao, formatter: formatCurrency, borderColor: FUNNEL_COLORS.reunioes, tooltipKey: '' },
     { icon: ShoppingCart, label: 'CPA', value: cpa, formatter: formatCurrency, borderColor: FUNNEL_COLORS.vendas, tooltipKey: 'CPA' },
   ];
 
-  // Larguras das barras do funil (decrescente)
-  const widths = ['100%', '82%', '64%', '48%', '32%'];
+  // Larguras das barras do funil (decrescente) - ajustado para 4 etapas
+  const widths = ['100%', '75%', '50%', '30%'];
 
   return (
     <TooltipProvider>
