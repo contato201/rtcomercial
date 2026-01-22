@@ -7,6 +7,18 @@ const corsHeaders = {
 
 const SHEET_ID = '1eHadRBjkkm7d2yq5-MKDcVtC6naXrz26FVn7OObUejI';
 
+interface CampaignData {
+  campaignName: string;
+  adsetName: string;
+  adName: string;
+  amountSpent: number;
+  impressions: number;
+  clicks: number;
+  linkClicks: number;
+  leads: number;
+  status: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -28,31 +40,81 @@ serve(async (req) => {
     const lines = csvText.split('\n');
     const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
     
-    const data = [];
+    console.log('Headers encontrados:', headers);
+    
+    // Mapear índices das colunas
+    const columnIndexes = {
+      campaignName: headers.findIndex(h => h.toLowerCase().includes('campaign') && h.toLowerCase().includes('name')),
+      adsetName: headers.findIndex(h => h.toLowerCase().includes('adset') && h.toLowerCase().includes('name')),
+      adName: headers.findIndex(h => h.toLowerCase().includes('ad') && h.toLowerCase().includes('name') && !h.toLowerCase().includes('campaign') && !h.toLowerCase().includes('adset')),
+      amountSpent: headers.findIndex(h => h.toLowerCase().includes('amount') && h.toLowerCase().includes('spent')),
+      impressions: headers.findIndex(h => h.toLowerCase() === 'impressions'),
+      clicks: headers.findIndex(h => h.toLowerCase() === 'clicks'),
+      linkClicks: headers.findIndex(h => h.toLowerCase().includes('link') && h.toLowerCase().includes('click')),
+      leads: headers.findIndex(h => h.toLowerCase() === 'leads'),
+      status: headers.findIndex(h => h.toLowerCase() === 'status'),
+    };
+    
+    console.log('Índices das colunas:', columnIndexes);
+
+    const allCampaigns: CampaignData[] = [];
+    
     for (let i = 1; i < lines.length; i++) {
       if (!lines[i].trim()) continue;
       
-      // Handle CSV with quoted fields
       const values = parseCSVLine(lines[i]);
-      const row: Record<string, string | number> = {};
       
-      headers.forEach((header, index) => {
-        const value = values[index] || '';
-        // Try to parse as number
-        const numValue = parseFloat(value.replace(/[R$,.\s]/g, '').replace(',', '.'));
-        row[header] = isNaN(numValue) ? value : numValue;
-      });
+      const campaignName = values[columnIndexes.campaignName] || '';
       
-      data.push(row);
+      // FILTRAR APENAS CAMPANHAS COM "CAPTACAO"
+      if (!campaignName.toUpperCase().includes('CAPTACAO')) {
+        continue;
+      }
+      
+      const campaign: CampaignData = {
+        campaignName: campaignName,
+        adsetName: values[columnIndexes.adsetName] || '',
+        adName: values[columnIndexes.adName] || '',
+        amountSpent: parseNumber(values[columnIndexes.amountSpent]),
+        impressions: parseNumber(values[columnIndexes.impressions]),
+        clicks: parseNumber(values[columnIndexes.clicks]),
+        linkClicks: parseNumber(values[columnIndexes.linkClicks]),
+        leads: parseNumber(values[columnIndexes.leads]),
+        status: values[columnIndexes.status] || '',
+      };
+      
+      allCampaigns.push(campaign);
     }
 
-    // Agregar dados por mês
-    const monthlyData = aggregateByMonth(data);
+    // Agregar totais
+    const totals = {
+      investimento: allCampaigns.reduce((sum, c) => sum + c.amountSpent, 0),
+      impressoes: allCampaigns.reduce((sum, c) => sum + c.impressions, 0),
+      cliques: allCampaigns.reduce((sum, c) => sum + c.clicks, 0),
+      linkClicks: allCampaigns.reduce((sum, c) => sum + c.linkClicks, 0),
+      leads: allCampaigns.reduce((sum, c) => sum + c.leads, 0),
+      cpc: 0,
+      cpl: 0,
+    };
+    
+    totals.cpc = totals.cliques > 0 ? totals.investimento / totals.cliques : 0;
+    totals.cpl = totals.leads > 0 ? totals.investimento / totals.leads : 0;
+
+    // Extrair listas únicas para filtros
+    const uniqueCampaigns = [...new Set(allCampaigns.map(c => c.campaignName))].filter(Boolean);
+    const uniqueAdsets = [...new Set(allCampaigns.map(c => c.adsetName))].filter(Boolean);
+    const uniqueStatuses = [...new Set(allCampaigns.map(c => c.status))].filter(Boolean);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      data: monthlyData,
-      rawCount: data.length
+      campaigns: allCampaigns,
+      totals,
+      filters: {
+        campaigns: uniqueCampaigns,
+        adsets: uniqueAdsets,
+        statuses: uniqueStatuses,
+      },
+      count: allCampaigns.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -69,6 +131,14 @@ serve(async (req) => {
     });
   }
 });
+
+function parseNumber(value: string | undefined): number {
+  if (!value) return 0;
+  // Remove currency symbols, spaces, and handle comma as decimal separator
+  const cleaned = value.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -89,53 +159,5 @@ function parseCSVLine(line: string): string[] {
   }
   
   result.push(current.trim().replace(/^"|"$/g, ''));
-  return result;
-}
-
-function aggregateByMonth(data: Record<string, string | number>[]): Record<string, { investimento: number; impressoes: number; cliques: number; leads: number; cpc: number }> {
-  const monthMap: Record<string, {
-    investimento: number;
-    impressoes: number;
-    cliques: number;
-    leads: number;
-  }> = {};
-
-  // Mapear nomes de colunas possíveis
-  const columnMappings = {
-    investimento: ['Amount Spent', 'amount_spent', 'Investimento', 'Gasto'],
-    impressoes: ['Impressions', 'impressions', 'Impressões'],
-    cliques: ['Clicks', 'clicks', 'Link Clicks', 'link_clicks', 'Cliques'],
-    leads: ['Leads', 'leads', 'Lead'],
-  };
-
-  data.forEach(row => {
-    // Tentar extrair mês do dado (pode precisar ajustar baseado na estrutura real)
-    // Por enquanto, agregar tudo em um mês genérico ou usar data atual
-    const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long' });
-    const monthKey = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
-
-    if (!monthMap[monthKey]) {
-      monthMap[monthKey] = { investimento: 0, impressoes: 0, cliques: 0, leads: 0 };
-    }
-
-    // Encontrar e somar valores
-    Object.entries(columnMappings).forEach(([key, possibleNames]) => {
-      possibleNames.forEach(name => {
-        if (row[name] !== undefined && typeof row[name] === 'number') {
-          monthMap[monthKey][key as keyof typeof monthMap[typeof monthKey]] += row[name] as number;
-        }
-      });
-    });
-  });
-
-  // Calcular CPC
-  const result: Record<string, { investimento: number; impressoes: number; cliques: number; leads: number; cpc: number }> = {};
-  Object.entries(monthMap).forEach(([month, values]) => {
-    result[month] = {
-      ...values,
-      cpc: values.cliques > 0 ? values.investimento / values.cliques : 0,
-    };
-  });
-
   return result;
 }

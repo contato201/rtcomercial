@@ -1,9 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { GrowthData, MONTHS, createEmptyGrowthData, calculateMetrics } from '@/types/growth';
+import { 
+  GrowthData, 
+  CampaignData, 
+  GrowthFilters, 
+  ActiveFilters, 
+  MONTHS, 
+  createEmptyGrowthData, 
+  calculateMetrics 
+} from '@/types/growth';
 import { toast } from 'sonner';
 
-// Interface para os dados do banco (antes de gerar os types)
 interface DadosTrafego {
   id: string;
   month: string;
@@ -24,9 +31,46 @@ export const useGrowthData = () => {
   const [data, setData] = useState<GrowthData[]>(() => 
     MONTHS.map((_, index) => createEmptyGrowthData(index))
   );
+  const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
+  const [availableFilters, setAvailableFilters] = useState<GrowthFilters>({
+    campaigns: [],
+    adsets: [],
+    statuses: [],
+  });
+  const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
+    campaign: null,
+    adset: null,
+    status: null,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
+
+  // Campanhas filtradas
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter(c => {
+      if (activeFilters.campaign && c.campaignName !== activeFilters.campaign) return false;
+      if (activeFilters.adset && c.adsetName !== activeFilters.adset) return false;
+      if (activeFilters.status && c.status !== activeFilters.status) return false;
+      return true;
+    });
+  }, [campaigns, activeFilters]);
+
+  // Totais filtrados
+  const filteredTotals = useMemo(() => {
+    const totals = {
+      investimento: filteredCampaigns.reduce((sum, c) => sum + c.amountSpent, 0),
+      impressoes: filteredCampaigns.reduce((sum, c) => sum + c.impressions, 0),
+      cliques: filteredCampaigns.reduce((sum, c) => sum + c.clicks, 0),
+      linkClicks: filteredCampaigns.reduce((sum, c) => sum + c.linkClicks, 0),
+      leads: filteredCampaigns.reduce((sum, c) => sum + c.leads, 0),
+      cpc: 0,
+      cpl: 0,
+    };
+    totals.cpc = totals.cliques > 0 ? totals.investimento / totals.cliques : 0;
+    totals.cpl = totals.leads > 0 ? totals.investimento / totals.leads : 0;
+    return totals;
+  }, [filteredCampaigns]);
 
   const loadFromDatabase = useCallback(async () => {
     try {
@@ -38,7 +82,6 @@ export const useGrowthData = () => {
 
       setData(prevData => {
         const newData = [...prevData];
-        
         
         dbData?.forEach(row => {
           const monthIndex = MONTHS.indexOf(row.month);
@@ -82,31 +125,33 @@ export const useGrowthData = () => {
 
       if (error) throw error;
 
-      if (response?.success && response?.data) {
-        // Atualizar dados no banco com os dados do Sheets
-        for (const [month, values] of Object.entries(response.data)) {
-          const sheetsData = values as { investimento: number; impressoes: number; cliques: number; leads: number; cpc: number };
-          
-          const { error: upsertError } = await supabase
-            .from('dados_trafego' as any)
-            .upsert({
-              month,
-              investimento: sheetsData.investimento || 0,
-              impressoes: sheetsData.impressoes || 0,
-              cliques: sheetsData.cliques || 0,
-              cpc: sheetsData.cpc || 0,
-              leads_total: sheetsData.leads || 0,
-            }, {
-              onConflict: 'month'
-            });
+      if (response?.success) {
+        setCampaigns(response.campaigns || []);
+        setAvailableFilters(response.filters || { campaigns: [], adsets: [], statuses: [] });
+        
+        // Salvar totais no banco para o mês atual
+        const monthName = MONTHS[selectedMonth];
+        const totals = response.totals;
+        
+        const { error: upsertError } = await supabase
+          .from('dados_trafego' as any)
+          .upsert({
+            month: monthName,
+            investimento: totals.investimento || 0,
+            impressoes: totals.impressoes || 0,
+            cliques: totals.cliques || 0,
+            cpc: totals.cpc || 0,
+            leads_total: totals.leads || 0,
+          }, {
+            onConflict: 'month'
+          });
 
-          if (upsertError) {
-            console.error('Erro ao salvar dados:', upsertError);
-          }
+        if (upsertError) {
+          console.error('Erro ao salvar dados:', upsertError);
         }
 
         await loadFromDatabase();
-        toast.success('Dados sincronizados com sucesso!');
+        toast.success(`${response.count} campanhas de CAPTAÇÃO carregadas!`);
       }
     } catch (error) {
       console.error('Erro ao sincronizar:', error);
@@ -114,7 +159,7 @@ export const useGrowthData = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, [loadFromDatabase]);
+  }, [loadFromDatabase, selectedMonth]);
 
   const updateManualData = useCallback(async (
     monthIndex: number,
@@ -123,7 +168,6 @@ export const useGrowthData = () => {
     const monthName = MONTHS[monthIndex];
     
     try {
-      // Mapear campos para snake_case do banco
       const dbUpdates: Record<string, number> = {};
       if (updates.leadsQualificados !== undefined) dbUpdates.leads_qualificados = updates.leadsQualificados;
       if (updates.reunioesAgendadas !== undefined) dbUpdates.reunioes_agendadas = updates.reunioesAgendadas;
@@ -157,6 +201,10 @@ export const useGrowthData = () => {
     }
   }, []);
 
+  const clearFilters = useCallback(() => {
+    setActiveFilters({ campaign: null, adset: null, status: null });
+  }, []);
+
   useEffect(() => {
     loadFromDatabase();
 
@@ -174,11 +222,32 @@ export const useGrowthData = () => {
     };
   }, [loadFromDatabase]);
 
-  const currentMonthData = data[selectedMonth];
+  const currentMonthData = useMemo(() => {
+    const baseData = data[selectedMonth];
+    // Sobrescrever com dados filtrados do Sheets se houver
+    if (filteredCampaigns.length > 0) {
+      return calculateMetrics({
+        ...baseData,
+        investimento: filteredTotals.investimento,
+        impressoes: filteredTotals.impressoes,
+        cliques: filteredTotals.cliques,
+        cpc: filteredTotals.cpc,
+        leadsTotal: filteredTotals.leads,
+      });
+    }
+    return baseData;
+  }, [data, selectedMonth, filteredCampaigns, filteredTotals]);
 
   return {
     data,
     currentMonthData,
+    campaigns,
+    filteredCampaigns,
+    filteredTotals,
+    availableFilters,
+    activeFilters,
+    setActiveFilters,
+    clearFilters,
     selectedMonth,
     setSelectedMonth,
     isLoading,

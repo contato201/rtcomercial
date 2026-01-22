@@ -4,12 +4,20 @@ import { GrowthHeader } from '@/components/growth/GrowthHeader';
 import { GrowthMetricsCards } from '@/components/growth/GrowthMetricsCards';
 import { GrowthFunnel } from '@/components/growth/GrowthFunnel';
 import { GrowthDataForm } from '@/components/growth/GrowthDataForm';
+import { GrowthFiltersComponent } from '@/components/growth/GrowthFilters';
+import { CampaignsTable } from '@/components/growth/CampaignsTable';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const Growth = () => {
   const { canEdit } = useAuth();
   const {
     currentMonthData,
+    campaigns,
+    filteredCampaigns,
+    availableFilters,
+    activeFilters,
+    setActiveFilters,
+    clearFilters,
     selectedMonth,
     setSelectedMonth,
     isLoading,
@@ -44,6 +52,18 @@ const Growth = () => {
       />
 
       <main className="p-6 space-y-6">
+        {/* Filtros */}
+        {campaigns.length > 0 && (
+          <GrowthFiltersComponent
+            availableFilters={availableFilters}
+            activeFilters={activeFilters}
+            onFilterChange={setActiveFilters}
+            onClearFilters={clearFilters}
+            campaignCount={campaigns.length}
+            filteredCount={filteredCampaigns.length}
+          />
+        )}
+
         {/* Métricas Principais */}
         <GrowthMetricsCards data={currentMonthData} />
 
@@ -59,36 +79,8 @@ const Growth = () => {
           />
         </div>
 
-        {/* Dados do Sheets */}
-        <div className="bg-card rounded-xl p-6 border border-border">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Dados do Tráfego (Google Sheets)</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="text-center p-4 bg-muted/30 rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{currentMonthData.impressoes.toLocaleString('pt-BR')}</p>
-              <p className="text-sm text-muted-foreground">Impressões</p>
-            </div>
-            <div className="text-center p-4 bg-muted/30 rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{currentMonthData.cliques.toLocaleString('pt-BR')}</p>
-              <p className="text-sm text-muted-foreground">Cliques</p>
-            </div>
-            <div className="text-center p-4 bg-muted/30 rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{currentMonthData.leadsTotal.toLocaleString('pt-BR')}</p>
-              <p className="text-sm text-muted-foreground">Leads Totais</p>
-            </div>
-            <div className="text-center p-4 bg-muted/30 rounded-lg">
-              <p className="text-2xl font-bold text-foreground">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentMonthData.cpc)}
-              </p>
-              <p className="text-sm text-muted-foreground">CPC Médio</p>
-            </div>
-            <div className="text-center p-4 bg-muted/30 rounded-lg">
-              <p className="text-2xl font-bold text-foreground">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentMonthData.investimento)}
-              </p>
-              <p className="text-sm text-muted-foreground">Investimento</p>
-            </div>
-          </div>
-        </div>
+        {/* Tabela de Campanhas */}
+        <CampaignsTable campaigns={filteredCampaigns} />
       </main>
     </div>
   );
