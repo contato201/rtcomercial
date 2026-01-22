@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, LogIn, LogOut, Shield } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, LogIn, LogOut, Pencil } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -57,10 +58,19 @@ export const AppNavbar = () => {
           {/* Ações */}
           <div className="flex items-center gap-3">
             {canEdit && (
-              <div className="flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
-                <Shield className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs text-emerald-600 font-medium hidden sm:block">Editor</span>
-              </div>
+              <TooltipProvider>
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 cursor-default">
+                      <Pencil className="w-4 h-4 text-primary" />
+                      <span className="text-xs text-primary font-medium hidden sm:block">Editar Layout</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="bg-popover text-popover-foreground border-border">
+                    <p className="text-xs">Editar layout do dashboard</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
 
             {isAuthenticated ? (
