@@ -1,14 +1,24 @@
 import { GrowthData } from '@/types/growth';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { DollarSign, TrendingUp, Percent, Target, Receipt, Users, Calendar, Handshake, ShoppingCart, ArrowDown } from 'lucide-react';
-import { formatCurrency, formatNumber, formatDateTime } from '@/lib/formatters';
+import { formatCurrency, formatNumber } from '@/lib/formatters';
+import { MetricValue } from '@/components/dashboard/MetricValue';
 
 interface GrowthFunnelProps {
   data: GrowthData;
   lastSyncTime?: Date | null;
+  isLoading?: boolean;
+  isSyncing?: boolean;
+  hasData?: boolean;
 }
 
-export const GrowthFunnel = ({ data, lastSyncTime }: GrowthFunnelProps) => {
+export const GrowthFunnel = ({ 
+  data, 
+  lastSyncTime,
+  isLoading = false,
+  isSyncing = false,
+  hasData = true,
+}: GrowthFunnelProps) => {
   // Calcular métricas derivadas
   const mqls = data.leadsQualificados || 0;
   const propostas = Math.round(mqls * 0.6);
@@ -43,61 +53,24 @@ export const GrowthFunnel = ({ data, lastSyncTime }: GrowthFunnelProps) => {
 
   // KPIs da esquerda
   const leftKPIs = [
-    { icon: DollarSign, label: 'Investimento', value: formatCurrency(data.investimento), color: '#4CAF50', showSyncTooltip: true },
-    { icon: TrendingUp, label: 'Valor de Vendas', value: formatCurrency(data.valorVendas), color: '#4CAF50' },
-    { icon: Target, label: 'ROAS Real', value: `${roas.toFixed(2)}x`, color: '#2196F3' },
-    { icon: Percent, label: 'Tx. Fechamento', value: `${taxaFechamento.toFixed(1)}%`, color: '#9C27B0' },
-    { icon: Receipt, label: 'Ticket Médio', value: formatCurrency(ticketMedio), color: '#4CAF50' },
+    { icon: DollarSign, label: 'Investimento', value: data.investimento, formatter: formatCurrency, color: '#4CAF50', showSyncTooltip: true },
+    { icon: TrendingUp, label: 'Valor de Vendas', value: data.valorVendas, formatter: formatCurrency, color: '#4CAF50' },
+    { icon: Target, label: 'ROAS Real', value: roas, formatter: (v: number) => `${v.toFixed(2)}x`, color: '#2196F3' },
+    { icon: Percent, label: 'Tx. Fechamento', value: taxaFechamento, formatter: (v: number) => `${v.toFixed(1)}%`, color: '#9C27B0' },
+    { icon: Receipt, label: 'Ticket Médio', value: ticketMedio, formatter: formatCurrency, color: '#4CAF50' },
   ];
 
   // KPIs da direita (custos)
   const rightKPIs = [
-    { icon: Users, label: 'CPL', value: formatCurrency(data.cpl), borderColor: '#E91E63' },
-    { icon: Users, label: 'Custo MQL', value: formatCurrency(custoMQL), borderColor: '#FFC107' },
-    { icon: Calendar, label: 'Custo Proposta', value: formatCurrency(custoProposta), borderColor: '#FF9800' },
-    { icon: Handshake, label: 'Custo Reunião', value: formatCurrency(custoReuniao), borderColor: '#F44336' },
-    { icon: ShoppingCart, label: 'CPA', value: formatCurrency(cpa), borderColor: '#26A69A' },
+    { icon: Users, label: 'CPL', value: data.cpl, formatter: formatCurrency, borderColor: '#E91E63' },
+    { icon: Users, label: 'Custo MQL', value: custoMQL, formatter: formatCurrency, borderColor: '#FFC107' },
+    { icon: Calendar, label: 'Custo Proposta', value: custoProposta, formatter: formatCurrency, borderColor: '#FF9800' },
+    { icon: Handshake, label: 'Custo Reunião', value: custoReuniao, formatter: formatCurrency, borderColor: '#F44336' },
+    { icon: ShoppingCart, label: 'CPA', value: cpa, formatter: formatCurrency, borderColor: '#26A69A' },
   ];
 
   // Larguras das barras do funil (decrescente)
   const widths = ['100%', '82%', '64%', '48%', '32%'];
-
-  const renderLeftKPI = (kpi: typeof leftKPIs[0], idx: number) => {
-    const kpiContent = (
-      <div 
-        className="flex items-center gap-3 bg-muted/40 rounded-lg px-4 py-3 border border-border/50"
-      >
-        <div 
-          className="w-10 h-10 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: `${kpi.color}15` }}
-        >
-          <kpi.icon className="w-5 h-5" style={{ color: kpi.color }} />
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
-          <p className="text-lg font-bold text-foreground">{kpi.value}</p>
-        </div>
-      </div>
-    );
-
-    if (kpi.showSyncTooltip && lastSyncTime) {
-      return (
-        <Tooltip key={idx}>
-          <TooltipTrigger asChild>
-            <div className="cursor-help">
-              {kpiContent}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="text-xs">
-            <p>Sincronizado em {formatDateTime(lastSyncTime)}</p>
-            <p className="text-muted-foreground">(fonte: Google Sheets)</p>
-          </TooltipContent>
-        </Tooltip>
-      );
-    }
-
-    return <div key={idx}>{kpiContent}</div>;
-  };
 
   return (
     <TooltipProvider>
@@ -120,7 +93,31 @@ export const GrowthFunnel = ({ data, lastSyncTime }: GrowthFunnelProps) => {
           
           {/* Left KPIs */}
           <div className="space-y-3">
-            {leftKPIs.map(renderLeftKPI)}
+            {leftKPIs.map((kpi, idx) => (
+              <div 
+                key={idx}
+                className="flex items-center gap-3 bg-muted/40 rounded-lg px-4 py-3 border border-border/50"
+              >
+                <div 
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: `${kpi.color}15` }}
+                >
+                  <kpi.icon className="w-5 h-5" style={{ color: kpi.color }} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+                  <MetricValue
+                    value={kpi.value}
+                    formatter={kpi.formatter}
+                    isLoading={isLoading}
+                    isSyncing={isSyncing}
+                    hasData={hasData}
+                    lastSyncTime={lastSyncTime}
+                    showSyncTooltip={kpi.showSyncTooltip}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Center Funnel - Clean horizontal bars */}
@@ -131,7 +128,7 @@ export const GrowthFunnel = ({ data, lastSyncTime }: GrowthFunnelProps) => {
                 {idx > 0 && (
                   <div className="flex items-center gap-1.5 py-2">
                     <ArrowDown className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
                       {getRate(idx).toFixed(1)}%
                     </span>
                   </div>
@@ -175,7 +172,14 @@ export const GrowthFunnel = ({ data, lastSyncTime }: GrowthFunnelProps) => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
-                  <p className="text-lg font-bold text-foreground">{kpi.value}</p>
+                  <MetricValue
+                    value={kpi.value}
+                    formatter={kpi.formatter}
+                    isLoading={isLoading}
+                    isSyncing={isSyncing}
+                    hasData={hasData}
+                    lastSyncTime={lastSyncTime}
+                  />
                 </div>
               </div>
             ))}

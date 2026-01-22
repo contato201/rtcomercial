@@ -240,6 +240,9 @@ export const useGrowthData = () => {
     return baseData;
   }, [data, selectedMonth, filteredCampaigns, filteredTotals]);
 
+  // Indica se já houve sincronização (para distinguir "sem dados" de "zerado")
+  const hasData = lastSyncTime !== null;
+
   return {
     data,
     currentMonthData,
@@ -255,6 +258,7 @@ export const useGrowthData = () => {
     isLoading,
     isSyncing,
     lastSyncTime,
+    hasData,
     syncFromSheets,
     updateManualData,
   };
