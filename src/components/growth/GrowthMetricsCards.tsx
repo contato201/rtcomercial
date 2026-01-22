@@ -1,21 +1,15 @@
 import { GrowthData } from '@/types/growth';
 import { Card, CardContent } from '@/components/ui/card';
-import { DollarSign, Users, Target, TrendingUp, MousePointer, Eye } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DollarSign, Users, Target, TrendingUp, MousePointer } from 'lucide-react';
+import { formatCurrency, formatDateTime } from '@/lib/formatters';
 
 interface GrowthMetricsCardsProps {
   data: GrowthData;
+  lastSyncTime?: Date | null;
 }
 
-export const GrowthMetricsCards = ({ data }: GrowthMetricsCardsProps) => {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
-
+export const GrowthMetricsCards = ({ data, lastSyncTime }: GrowthMetricsCardsProps) => {
   const metrics = [
     {
       title: 'Investimento',
@@ -23,6 +17,7 @@ export const GrowthMetricsCards = ({ data }: GrowthMetricsCardsProps) => {
       icon: DollarSign,
       color: 'text-red-500',
       bgColor: 'bg-red-500/10',
+      showSyncTooltip: true,
     },
     {
       title: 'CPL',
@@ -66,32 +61,56 @@ export const GrowthMetricsCards = ({ data }: GrowthMetricsCardsProps) => {
     },
   ];
 
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-      {metrics.map((metric) => (
-        <Card key={metric.title} className="relative overflow-hidden">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  {metric.title}
+  const renderMetricCard = (metric: typeof metrics[0]) => {
+    const cardContent = (
+      <Card className="relative overflow-hidden">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                {metric.title}
+              </p>
+              {metric.subtitle && (
+                <p className="text-[10px] text-muted-foreground">
+                  {metric.subtitle}
                 </p>
-                {metric.subtitle && (
-                  <p className="text-[10px] text-muted-foreground">
-                    {metric.subtitle}
-                  </p>
-                )}
-                <p className={`text-lg font-bold ${metric.color}`}>
-                  {metric.value}
-                </p>
-              </div>
-              <div className={`p-2 rounded-lg ${metric.bgColor}`}>
-                <metric.icon className={`w-4 h-4 ${metric.color}`} />
-              </div>
+              )}
+              <p className={`text-lg font-bold ${metric.color}`}>
+                {metric.value}
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+            <div className={`p-2 rounded-lg ${metric.bgColor}`}>
+              <metric.icon className={`w-4 h-4 ${metric.color}`} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+    if (metric.showSyncTooltip && lastSyncTime) {
+      return (
+        <Tooltip key={metric.title}>
+          <TooltipTrigger asChild>
+            <div className="cursor-help">
+              {cardContent}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            <p>Sincronizado em {formatDateTime(lastSyncTime)}</p>
+            <p className="text-muted-foreground">(fonte: Google Sheets)</p>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return <div key={metric.title}>{cardContent}</div>;
+  };
+
+  return (
+    <TooltipProvider>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {metrics.map(renderMetricCard)}
+      </div>
+    </TooltipProvider>
   );
 };
