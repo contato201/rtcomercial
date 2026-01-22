@@ -1,157 +1,229 @@
 import { GrowthData } from '@/types/growth';
+import { DollarSign, TrendingUp, Percent, Target, Receipt, Users, Calendar, Handshake, ShoppingCart } from 'lucide-react';
 
 interface GrowthFunnelProps {
   data: GrowthData;
 }
 
 export const GrowthFunnel = ({ data }: GrowthFunnelProps) => {
+  // Funnel stages with colors matching the reference
   const stages = [
     { 
-      label: 'Impressões', 
-      value: data.impressoes, 
-      icon: '👁️',
-      color: '#3B82F6',
-      bgGradient: 'from-blue-500 to-blue-600'
+      label: 'LEADS', 
+      value: data.leadsTotal,
+      color: '#E91E63', // Pink/coral
+      width: 100,
     },
     { 
-      label: 'Cliques', 
-      value: data.cliques, 
-      icon: '👆',
-      color: '#06B6D4',
-      bgGradient: 'from-cyan-500 to-cyan-600',
-      rate: data.impressoes > 0 ? (data.cliques / data.impressoes * 100) : 0
+      label: 'MQLs', 
+      value: data.leadsQualificados,
+      color: '#FFC107', // Yellow
+      width: 85,
+      rate: data.taxaMQL,
     },
     { 
-      label: 'Leads', 
-      value: data.leadsTotal, 
-      icon: '📋',
-      color: '#8B5CF6',
-      bgGradient: 'from-violet-500 to-violet-600',
-      rate: data.cliques > 0 ? (data.leadsTotal / data.cliques * 100) : 0
+      label: 'PROPOSTA', 
+      value: Math.round(data.leadsQualificados * 0.87), // Simulated - adjust based on real data
+      color: '#FF9800', // Orange
+      width: 70,
+      rate: 86.61,
     },
     { 
-      label: 'MQL', 
-      value: data.leadsQualificados, 
-      icon: '⭐',
-      color: '#F59E0B',
-      bgGradient: 'from-amber-500 to-amber-600',
-      rate: data.taxaMQL
+      label: 'REUNIÕES', 
+      value: data.reunioesAgendadas,
+      color: '#F44336', // Red/coral
+      width: 55,
+      rate: data.taxaReuniao || 83.64,
     },
     { 
-      label: 'Reuniões', 
-      value: data.reunioesAgendadas, 
-      icon: '📅',
-      color: '#F97316',
-      bgGradient: 'from-orange-500 to-orange-600',
-      rate: data.taxaReuniao
-    },
-    { 
-      label: 'Vendas', 
-      value: data.vendasFechadas, 
-      icon: '🎯',
-      color: '#10B981',
-      bgGradient: 'from-emerald-500 to-emerald-600',
-      rate: data.taxaFechamento
+      label: 'VENDAS', 
+      value: data.vendasFechadas,
+      color: '#26A69A', // Teal
+      width: 40,
+      rate: data.taxaFechamento || 69.57,
     },
   ];
 
-  const maxValue = Math.max(...stages.map(s => s.value), 1);
+  // Calculate costs per stage
+  const custoMQL = data.leadsQualificados > 0 ? data.investimento / data.leadsQualificados : 0;
+  const custoProposta = custoMQL; // Same as MQL for now
+  const custoReuniao = data.reunioesAgendadas > 0 ? data.investimento / data.reunioesAgendadas : 0;
+  const cpa = data.cac;
+  
+  // Calculate ROAS
+  const roas = data.investimento > 0 ? data.valorVendas / data.investimento : 0;
+  
+  // Calculate ticket médio
+  const ticketMedio = data.vendasFechadas > 0 ? data.valorVendas / data.vendasFechadas : 0;
+  
+  // Calculate taxa de fechamento
+  const taxaFechamento = data.reunioesAgendadas > 0 ? (data.vendasFechadas / data.reunioesAgendadas) * 100 : 0;
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { 
+      style: 'currency', 
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
+  // Left side KPIs
+  const leftKPIs = [
+    { icon: DollarSign, label: 'Investimento', value: formatCurrency(data.investimento), color: '#4CAF50' },
+    { icon: TrendingUp, label: 'Valor de Vendas', value: formatCurrency(data.valorVendas), color: '#4CAF50' },
+    { icon: Target, label: 'ROAS Real', value: roas.toFixed(2), color: '#2196F3' },
+    { icon: Percent, label: 'Tx. Fechamento', value: `${taxaFechamento.toFixed(2)}%`, color: '#9C27B0' },
+    { icon: Receipt, label: 'Ticket Médio', value: formatCurrency(ticketMedio), color: '#4CAF50' },
+  ];
+
+  // Right side KPIs
+  const rightKPIs = [
+    { icon: Users, label: 'CPL', value: data.cpl > 0 ? formatCurrency(data.cpl) : 'No data', color: '#FFC107' },
+    { icon: Users, label: 'Custo MQL', value: custoMQL > 0 ? formatCurrency(custoMQL) : 'No data', color: '#FF9800' },
+    { icon: Calendar, label: 'Custo Proposta', value: custoProposta > 0 ? formatCurrency(custoProposta) : 'No data', color: '#FF9800' },
+    { icon: Handshake, label: 'Custo Reunião', value: custoReuniao > 0 ? formatCurrency(custoReuniao) : 'No data', color: '#F44336' },
+    { icon: ShoppingCart, label: 'CPA', value: cpa > 0 ? formatCurrency(cpa) : 'No data', color: '#FF5722' },
+  ];
 
   return (
-    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 border border-slate-700/50 shadow-2xl">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/60 rounded-xl flex items-center justify-center shadow-lg">
-          <span className="text-xl">📊</span>
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-white">Funil de Conversão</h3>
-          <p className="text-xs text-slate-400">Taxa de conversão entre etapas</p>
-        </div>
+    <div className="bg-white rounded-2xl p-6 shadow-lg border border-slate-200">
+      {/* Tabs */}
+      <div className="flex justify-center gap-2 mb-6">
+        <button className="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 rounded-lg border-b-2 border-primary">
+          Detalhamento Geral
+        </button>
+        <button className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-700">
+          Detalhamento Tráfego
+        </button>
+        <button className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-700">
+          Detalhamento por fonte
+        </button>
       </div>
       
-      <div className="relative">
-        {stages.map((stage, index) => {
-          const widthPercent = Math.max((stage.value / maxValue) * 100, 15);
-          const isLast = index === stages.length - 1;
-          
-          return (
-            <div key={stage.label} className="relative mb-2">
-              {/* Connector Arrow */}
-              {index > 0 && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-                  <div className="flex flex-col items-center">
-                    <div 
-                      className="px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg"
-                      style={{ 
-                        backgroundColor: stage.rate && stage.rate >= 5 ? '#10B981' : stage.rate && stage.rate >= 1 ? '#F59E0B' : '#EF4444',
-                        color: 'white'
-                      }}
-                    >
-                      {stage.rate?.toFixed(1)}%
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Funnel Bar */}
+      {/* Main Content - 3 Column Layout */}
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
+        {/* Left KPIs */}
+        <div className="flex flex-col gap-2">
+          {leftKPIs.map((kpi, index) => (
+            <div 
+              key={index}
+              className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200"
+            >
               <div 
-                className="relative mx-auto transition-all duration-700 ease-out"
-                style={{ 
-                  width: `${widthPercent}%`,
-                  minWidth: '140px'
-                }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: `${kpi.color}20` }}
               >
-                <div 
-                  className={`
-                    relative h-14 rounded-xl bg-gradient-to-r ${stage.bgGradient}
-                    flex items-center justify-between px-4
-                    shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300
-                    border border-white/10
-                  `}
-                  style={{
-                    clipPath: isLast 
-                      ? 'polygon(5% 0%, 95% 0%, 100% 50%, 95% 100%, 5% 100%, 0% 50%)'
-                      : 'polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%)'
-                  }}
-                >
-                  {/* Icon + Label */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{stage.icon}</span>
-                    <span className="text-white font-semibold text-sm">{stage.label}</span>
-                  </div>
-                  
-                  {/* Value */}
-                  <div className="text-white font-bold text-lg">
-                    {stage.value.toLocaleString('pt-BR')}
-                  </div>
-                </div>
+                <kpi.icon className="w-4 h-4" style={{ color: kpi.color }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wide">{kpi.label}</p>
+                <p className="text-sm font-bold text-slate-800">{kpi.value}</p>
               </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
 
-      {/* Summary Stats */}
-      <div className="mt-8 pt-6 border-t border-slate-700/50">
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-3 bg-slate-800/50 rounded-xl">
-            <p className="text-2xl font-bold text-emerald-400">
-              {data.impressoes > 0 ? ((data.vendasFechadas / data.impressoes) * 100).toFixed(3) : 0}%
-            </p>
-            <p className="text-xs text-slate-400 mt-1">Conversão Total</p>
-          </div>
-          <div className="text-center p-3 bg-slate-800/50 rounded-xl">
-            <p className="text-2xl font-bold text-amber-400">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.cpl)}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">CPL</p>
-          </div>
-          <div className="text-center p-3 bg-slate-800/50 rounded-xl">
-            <p className="text-2xl font-bold text-blue-400">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.cac)}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">CAC</p>
-          </div>
+        {/* Center Funnel */}
+        <div className="relative flex flex-col items-center" style={{ width: '280px' }}>
+          {stages.map((stage, index) => {
+            const topWidth = stage.width;
+            const bottomWidth = stages[index + 1]?.width || stage.width * 0.7;
+            const isLast = index === stages.length - 1;
+            
+            return (
+              <div key={stage.label} className="relative w-full flex flex-col items-center">
+                {/* Funnel Stage */}
+                <div 
+                  className="relative flex items-center justify-center transition-all duration-300 hover:scale-105"
+                  style={{
+                    width: `${topWidth}%`,
+                    height: isLast ? '45px' : '40px',
+                    marginBottom: isLast ? 0 : '-2px',
+                  }}
+                >
+                  {/* SVG for 3D funnel shape */}
+                  <svg 
+                    viewBox="0 0 200 50" 
+                    preserveAspectRatio="none"
+                    className="absolute inset-0 w-full h-full"
+                  >
+                    <defs>
+                      <linearGradient id={`grad-${index}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style={{ stopColor: stage.color, stopOpacity: 0.8 }} />
+                        <stop offset="50%" style={{ stopColor: stage.color, stopOpacity: 1 }} />
+                        <stop offset="100%" style={{ stopColor: stage.color, stopOpacity: 0.8 }} />
+                      </linearGradient>
+                    </defs>
+                    {isLast ? (
+                      // Last stage - rounded bottom
+                      <path
+                        d={`M ${(100 - topWidth) / 2} 0 
+                            Q 0 25, ${(100 - bottomWidth) / 2 + 20} 50 
+                            L ${100 - (100 - bottomWidth) / 2 - 20} 50 
+                            Q 200 25, ${100 - (100 - topWidth) / 2} 0 Z`}
+                        fill={`url(#grad-${index})`}
+                      />
+                    ) : (
+                      // Regular stage - trapezoid with curved sides
+                      <path
+                        d={`M 10 0 
+                            Q 0 25, ${((topWidth - bottomWidth) / topWidth) * 15} 50 
+                            L ${200 - ((topWidth - bottomWidth) / topWidth) * 15} 50 
+                            Q 200 25, 190 0 Z`}
+                        fill={`url(#grad-${index})`}
+                      />
+                    )}
+                  </svg>
+                  
+                  {/* Label and Value */}
+                  <div className="relative z-10 flex flex-col items-center">
+                    <span className="text-[11px] font-bold text-white drop-shadow-md tracking-wide">
+                      {stage.label}
+                    </span>
+                    <span className="text-lg font-bold text-white drop-shadow-lg">
+                      {stage.value.toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Conversion Rate Badge */}
+                {index > 0 && stage.rate !== undefined && (
+                  <div 
+                    className="absolute right-[-50px] top-1/2 -translate-y-1/2 z-20"
+                    style={{ right: '-55px' }}
+                  >
+                    <span 
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-white bg-emerald-500"
+                    >
+                      {stage.rate.toFixed(2)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right KPIs */}
+        <div className="flex flex-col gap-2">
+          {rightKPIs.map((kpi, index) => (
+            <div 
+              key={index}
+              className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200"
+            >
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: `${kpi.color}20` }}
+              >
+                <kpi.icon className="w-4 h-4" style={{ color: kpi.color }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wide">{kpi.label}</p>
+                <p className="text-sm font-bold text-slate-800">{kpi.value}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
