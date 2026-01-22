@@ -124,18 +124,18 @@ export const GrowthMetricsCards = ({
   const renderMetricCard = (metric: typeof performanceMetrics[0] & { subtitle?: string; showSyncTooltip?: boolean }, isLarge = false) => (
     <Card 
       key={metric.title} 
-      className={`relative overflow-hidden border ${metric.category.border} ${isLarge ? 'col-span-2' : ''}`}
+      className={`relative overflow-hidden border ${metric.category.border} ${isLarge ? 'col-span-2 sm:col-span-2' : ''}`}
     >
-      <CardContent className={`${isLarge ? 'p-6' : 'p-4'}`}>
+      <CardContent className={`${isLarge ? 'p-4 sm:p-6' : 'p-3 sm:p-4'}`}>
         <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className={`font-medium text-muted-foreground uppercase tracking-wide ${isLarge ? 'text-sm' : 'text-xs'}`}>
+          <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+            <p className={`font-medium text-muted-foreground uppercase tracking-wide ${isLarge ? 'text-xs sm:text-sm' : 'text-[10px] sm:text-xs'}`}>
               <MetricTooltip label={metric.title}>
                 {metric.title}
               </MetricTooltip>
             </p>
             {metric.subtitle && (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[9px] sm:text-[10px] text-muted-foreground truncate">
                 {metric.subtitle}
               </p>
             )}
@@ -147,11 +147,11 @@ export const GrowthMetricsCards = ({
               hasData={hasData}
               lastSyncTime={lastSyncTime}
               showSyncTooltip={metric.showSyncTooltip}
-              className={`${metric.category.text} ${isLarge ? 'text-3xl font-bold' : 'text-lg font-semibold'}`}
+              className={`${metric.category.text} ${isLarge ? 'text-xl sm:text-3xl font-bold' : 'text-base sm:text-lg font-semibold'}`}
             />
           </div>
-          <div className={`${isLarge ? 'p-3' : 'p-2'} rounded-lg ${metric.category.bg}`}>
-            <metric.icon className={`${isLarge ? 'w-6 h-6' : 'w-4 h-4'} ${metric.category.text}`} />
+          <div className={`${isLarge ? 'p-2 sm:p-3' : 'p-1.5 sm:p-2'} rounded-lg ${metric.category.bg} flex-shrink-0`}>
+            <metric.icon className={`${isLarge ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-3.5 h-3.5 sm:w-4 sm:h-4'} ${metric.category.text}`} />
           </div>
         </div>
       </CardContent>
@@ -160,24 +160,24 @@ export const GrowthMetricsCards = ({
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Card Destaque: INVESTIMENTO */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {renderMetricCard(investmentMetric, true)}
         </div>
 
         {/* Performance: ROI & ROAS */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {performanceMetrics.map((metric) => renderMetricCard(metric))}
         </div>
 
         {/* Custos: CPL & CPC */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {costsMetrics.map((metric) => renderMetricCard(metric))}
         </div>
 
         {/* Resultados: FATURAMENTO & CAC */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {resultsMetrics.map((metric) => renderMetricCard(metric))}
         </div>
       </div>

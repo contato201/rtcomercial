@@ -221,25 +221,25 @@ export const GrowthDataForm = ({ data, onUpdate, canEdit }: GrowthDataFormProps)
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Users className="w-5 h-5 text-primary" />
+      <CardHeader className="pb-2 sm:pb-3">
+        <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
           Dados Manuais - {data.month}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <CardContent className="space-y-3 sm:space-y-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {fields.map((field) => {
             const error = errors[field.key];
             const hasError = error !== null;
             
             return (
-              <div key={field.key} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className={`p-1.5 rounded-md ${field.bgColor}`}>
-                    <field.icon className={`w-3.5 h-3.5 ${field.color}`} />
+              <div key={field.key} className="space-y-1.5 sm:space-y-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className={`p-1 sm:p-1.5 rounded-md ${field.bgColor}`}>
+                    <field.icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${field.color}`} />
                   </div>
-                  <Label className="text-xs font-medium">{field.label}</Label>
+                  <Label className="text-[10px] sm:text-xs font-medium truncate">{field.label}</Label>
                 </div>
                 <div className="relative">
                   <Input
@@ -247,19 +247,19 @@ export const GrowthDataForm = ({ data, onUpdate, canEdit }: GrowthDataFormProps)
                     value={field.isCurrency ? formData[field.key] : formData[field.key]}
                     onChange={(e) => handleChange(field.key, e.target.value)}
                     disabled={!canEdit}
-                    className={`h-9 ${hasError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    className={`h-9 sm:h-10 min-h-[44px] sm:min-h-0 text-sm ${hasError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                     placeholder={field.isCurrency ? 'R$ 0,00' : '0'}
                     min={0}
                     max={field.isCurrency ? 1000000 : 10000}
                   />
                   {hasError && (
-                    <div className="absolute -bottom-5 left-0 flex items-center gap-1 text-[10px] text-destructive">
-                      <AlertTriangle className="w-3 h-3" />
-                      <span>{error}</span>
+                    <div className="absolute -bottom-4 sm:-bottom-5 left-0 flex items-center gap-1 text-[9px] sm:text-[10px] text-destructive">
+                      <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                      <span className="truncate">{error}</span>
                     </div>
                   )}
                 </div>
-                <p className={`text-[10px] text-muted-foreground ${hasError ? 'mt-4' : ''}`}>
+                <p className={`text-[9px] sm:text-[10px] text-muted-foreground ${hasError ? 'mt-3 sm:mt-4' : ''}`}>
                   {field.sublabel}
                 </p>
               </div>
@@ -268,19 +268,19 @@ export const GrowthDataForm = ({ data, onUpdate, canEdit }: GrowthDataFormProps)
         </div>
 
         {canEdit && (
-          <div className="space-y-2 pt-2">
+          <div className="space-y-2 pt-1 sm:pt-2">
             <Button 
               onClick={handleSave} 
-              className={`w-full ${buttonConfig.className}`} 
+              className={`w-full min-h-[44px] sm:min-h-0 ${buttonConfig.className}`} 
               size="sm"
               disabled={buttonConfig.disabled}
             >
               <ButtonIcon className={`w-4 h-4 mr-2 ${buttonConfig.iconClassName}`} />
-              {buttonConfig.text}
+              <span className="text-sm">{buttonConfig.text}</span>
             </Button>
             
             {lastSaved && (
-              <p className="text-[10px] text-center text-muted-foreground">
+              <p className="text-[9px] sm:text-[10px] text-center text-muted-foreground">
                 Última atualização: {formatTimestamp(lastSaved)}
               </p>
             )}
