@@ -1,9 +1,26 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { z } from 'zod';
 import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS } from '@/types/dashboard';
 import { supabase } from '@/integrations/supabase/client';
 
+type UnitSaleRow = {
+  id: string;
+  month: string;
+  valor: number;
+  created_at: string;
+  updated_at: string;
+};
+
+const monthSchema = z.enum(MONTHS as [string, ...string[]]);
+const valorSchema = z
+  .number({ invalid_type_error: 'Valor inválido' })
+  .finite()
+  .positive('Valor precisa ser maior que zero')
+  .max(1_000_000, 'Valor muito alto');
+
 export const useDashboardData = () => {
   const [data, setData] = useState<MonthData[]>(createInitialData());
+  const [unitSalesByMonth, setUnitSalesByMonth] = useState<Record<string, UnitSaleRow[]>>({});
   const [filterType, setFilterType] = useState<FilterType>('month');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedQuarter, setSelectedQuarter] = useState<QuarterType>('Q1');
@@ -12,30 +29,71 @@ export const useDashboardData = () => {
   // Carrega dados do banco
   const loadFromDatabase = useCallback(async () => {
     try {
-      const { data: dbData, error } = await supabase
-        .from('dados_realizados')
-        .select('*');
+      const [{ data: dbData, error }, { data: unitData, error: unitError }] = await Promise.all([
+        supabase.from('dados_realizados').select('*'),
+        supabase
+          .from('vendas_unitarias')
+          .select('*')
+          .order('created_at', { ascending: true }),
+      ]);
 
       if (error) {
         console.error('Erro ao carregar dados:', error);
         return;
       }
 
+      if (unitError) {
+        console.error('Erro ao carregar vendas unitárias:', unitError);
+      }
+
+      const groupedUnitSales = (unitData ?? []).reduce<Record<string, UnitSaleRow[]>>((acc, row) => {
+        const month = String(row.month);
+        acc[month] = acc[month] ?? [];
+        acc[month].push({
+          id: row.id,
+          month,
+          valor: Number(row.valor || 0),
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        });
+        return acc;
+      }, {});
+      setUnitSalesByMonth(groupedUnitSales);
+
+      const unitAgg = MONTHS.reduce<Record<string, { count: number; sum: number; avg: number }>>(
+        (acc, m) => {
+          const list = groupedUnitSales[m] ?? [];
+          const count = list.length;
+          const sum = list.reduce((s, it) => s + Number(it.valor || 0), 0);
+          const avg = count > 0 ? sum / count : 0;
+          acc[m] = { count, sum, avg };
+          return acc;
+        },
+        {}
+      );
+
       if (dbData) {
         const initialData = createInitialData();
         const updatedData = initialData.map(month => {
           const dbMonth = dbData.find(d => d.month === month.month);
+          const agg = unitAgg[month.month] ?? { count: 0, sum: 0, avg: 0 };
         if (dbMonth) {
             return {
               ...month,
-              realizadoVendas: dbMonth.realizado_vendas || 0,
-              realizadoFaturamento: Number(dbMonth.realizado_faturamento) || 0,
-              ticketRealizado: Number(dbMonth.ticket_realizado) || VALOR_POR_VENDA,
+              // Fonte de verdade: vendas unitárias
+              realizadoVendas: agg.count,
+              realizadoFaturamento: agg.sum,
+              ticketRealizado: agg.count > 0 ? agg.avg : (Number(dbMonth.ticket_realizado) || VALOR_POR_VENDA),
               realizadoPrimeiraReuniao: dbMonth.realizado_primeira_reuniao || 0,
               realizadoSegundaReuniao: dbMonth.realizado_segunda_reuniao || 0
             };
           }
-          return month;
+          return {
+            ...month,
+            realizadoVendas: agg.count,
+            realizadoFaturamento: agg.sum,
+            ticketRealizado: agg.count > 0 ? agg.avg : VALOR_POR_VENDA,
+          };
         });
         setData(updatedData);
       }
@@ -52,16 +110,20 @@ export const useDashboardData = () => {
 
     // Configurar listener de realtime
     const channel = supabase
-      .channel('dados_realizados_changes')
+      .channel('dashboard_changes')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'dados_realizados'
-        },
+        { event: '*', schema: 'public', table: 'dados_realizados' },
         (payload) => {
-          console.log('Realtime update:', payload);
+          console.log('Realtime update (dados_realizados):', payload);
+          loadFromDatabase();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vendas_unitarias' },
+        (payload) => {
+          console.log('Realtime update (vendas_unitarias):', payload);
           loadFromDatabase();
         }
       )
@@ -109,18 +171,20 @@ export const useDashboardData = () => {
   const updateMonthData = useCallback(async (monthIndex: number, updates: Partial<MonthData>) => {
     const monthName = MONTHS[monthIndex];
     const currentMonthData = data[monthIndex];
+
+    // Com vendas unitárias como fonte de verdade, não permitimos sobrescrever
+    // vendas/faturamento/ticket manualmente por aqui.
+    const sanitizedUpdates: Partial<MonthData> = { ...updates };
+    delete (sanitizedUpdates as Partial<MonthData>).realizadoVendas;
+    delete (sanitizedUpdates as Partial<MonthData>).realizadoFaturamento;
+    delete (sanitizedUpdates as Partial<MonthData>).ticketRealizado;
+
+    if (Object.keys(sanitizedUpdates).length === 0) return;
     
     // Atualiza estado local imediatamente para UX responsiva
     setData(prevData => {
       const newData = [...prevData];
-      const currentMonth = { ...newData[monthIndex], ...updates };
-      
-      // Recalcula faturamento quando vendas ou ticket mudam
-      if (updates.realizadoVendas !== undefined || updates.ticketRealizado !== undefined) {
-        const vendas = updates.realizadoVendas ?? currentMonth.realizadoVendas;
-        const ticket = updates.ticketRealizado ?? currentMonth.ticketRealizado;
-        currentMonth.realizadoFaturamento = vendas * ticket;
-      }
+      const currentMonth = { ...newData[monthIndex], ...sanitizedUpdates };
       
       newData[monthIndex] = currentMonth;
       return newData;
@@ -128,40 +192,24 @@ export const useDashboardData = () => {
 
     // Prepara dados para o banco
     const dbUpdates: Record<string, number> = {};
-    if (updates.realizadoVendas !== undefined) {
-      dbUpdates.realizado_vendas = updates.realizadoVendas;
+    if (sanitizedUpdates.realizadoPrimeiraReuniao !== undefined) {
+      dbUpdates.realizado_primeira_reuniao = sanitizedUpdates.realizadoPrimeiraReuniao;
     }
-    if (updates.realizadoFaturamento !== undefined) {
-      dbUpdates.realizado_faturamento = updates.realizadoFaturamento;
-    }
-    if (updates.realizadoPrimeiraReuniao !== undefined) {
-      dbUpdates.realizado_primeira_reuniao = updates.realizadoPrimeiraReuniao;
-    }
-    if (updates.realizadoSegundaReuniao !== undefined) {
-      dbUpdates.realizado_segunda_reuniao = updates.realizadoSegundaReuniao;
-    }
-    if (updates.ticketRealizado !== undefined) {
-      dbUpdates.ticket_realizado = updates.ticketRealizado;
-    }
-
-    // Recalcula faturamento se necessário
-    if (updates.realizadoVendas !== undefined || updates.ticketRealizado !== undefined) {
-      const vendas = updates.realizadoVendas ?? currentMonthData.realizadoVendas;
-      const ticket = updates.ticketRealizado ?? currentMonthData.ticketRealizado;
-      dbUpdates.realizado_faturamento = vendas * ticket;
+    if (sanitizedUpdates.realizadoSegundaReuniao !== undefined) {
+      dbUpdates.realizado_segunda_reuniao = sanitizedUpdates.realizadoSegundaReuniao;
     }
 
     // Busca ID do registro e salva histórico
     try {
-      const { data: existingRecord } = await supabase
+        const { data: existingRecord } = await supabase
         .from('dados_realizados')
         .select('id')
         .eq('month', monthName)
-        .single();
+          .maybeSingle();
 
       if (existingRecord) {
         // Salva cada campo alterado no histórico
-        for (const [field, newValue] of Object.entries(updates)) {
+        for (const [field, newValue] of Object.entries(sanitizedUpdates)) {
           const oldValue = currentMonthData[field as keyof MonthData];
           if (typeof oldValue === 'number' && typeof newValue === 'number') {
             await saveToHistory(existingRecord.id, monthName, field, oldValue, newValue);
@@ -178,6 +226,35 @@ export const useDashboardData = () => {
       console.error('Erro ao salvar dados:', error);
     }
   }, [data, saveToHistory]);
+
+  const addUnitSale = useCallback(async (monthIndex: number, valor: number) => {
+    const monthName = MONTHS[monthIndex];
+    const m = monthSchema.safeParse(monthName);
+    const v = valorSchema.safeParse(valor);
+    if (!m.success || !v.success) return;
+
+    const { error } = await supabase.from('vendas_unitarias').insert({
+      month: m.data,
+      valor: v.data,
+    });
+    if (error) console.error('Erro ao inserir venda unitária:', error);
+  }, []);
+
+  const updateUnitSale = useCallback(async (id: string, valor: number) => {
+    const v = valorSchema.safeParse(valor);
+    if (!v.success) return;
+
+    const { error } = await supabase
+      .from('vendas_unitarias')
+      .update({ valor: v.data })
+      .eq('id', id);
+    if (error) console.error('Erro ao atualizar venda unitária:', error);
+  }, []);
+
+  const deleteUnitSale = useCallback(async (id: string) => {
+    const { error } = await supabase.from('vendas_unitarias').delete().eq('id', id);
+    if (error) console.error('Erro ao excluir venda unitária:', error);
+  }, []);
 
   // Reverte para um valor anterior do histórico
   const revertToValue = useCallback(async (month: string, field: string, value: number) => {
@@ -241,6 +318,14 @@ export const useDashboardData = () => {
   const resetData = useCallback(async () => {
     const initial = createInitialData();
     setData(initial);
+    setUnitSalesByMonth({});
+
+    // Limpa vendas unitárias
+    try {
+      await supabase.from('vendas_unitarias').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    } catch (e) {
+      console.error('Erro ao limpar vendas unitárias:', e);
+    }
     
     // Reset no banco para todos os meses
     for (const month of MONTHS) {
@@ -259,6 +344,7 @@ export const useDashboardData = () => {
 
   return {
     data,
+    unitSalesByMonth,
     filteredData,
     aggregatedData,
     filterType,
@@ -268,6 +354,9 @@ export const useDashboardData = () => {
     selectedQuarter,
     setSelectedQuarter,
     updateMonthData,
+    addUnitSale,
+    updateUnitSale,
+    deleteUnitSale,
     calculateVariation,
     resetData,
     revertToValue,

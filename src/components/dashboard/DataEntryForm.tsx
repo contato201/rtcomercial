@@ -4,17 +4,33 @@ import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2, Histo
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { UnitSalesEditor, type UnitSale } from '@/components/dashboard/UnitSalesEditor';
 
 interface DataEntryFormProps {
   selectedMonth: number;
   currentData: MonthData;
+  unitSales: UnitSale[];
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
+  onAddUnitSale: (monthIndex: number, valor: number) => Promise<void> | void;
+  onUpdateUnitSale: (id: string, valor: number) => Promise<void> | void;
+  onDeleteUnitSale: (id: string) => Promise<void> | void;
   onReset: () => void;
   onOpenHistory: () => void;
   canEdit: boolean;
 }
 
-export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, onOpenHistory, canEdit }: DataEntryFormProps) => {
+export const DataEntryForm = ({
+  selectedMonth,
+  currentData,
+  unitSales,
+  onUpdate,
+  onAddUnitSale,
+  onUpdateUnitSale,
+  onDeleteUnitSale,
+  onReset,
+  onOpenHistory,
+  canEdit,
+}: DataEntryFormProps) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handleInputChange = (field: keyof MonthData, value: string) => {
@@ -23,13 +39,7 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
     onUpdate(selectedMonth, { [field]: numValue });
   };
 
-  const handleCurrencyChange = (field: keyof MonthData, value: string) => {
-    if (!canEdit) return;
-    // Remove formatação e converte para número
-    const cleanValue = value.replace(/\D/g, '');
-    const numValue = parseInt(cleanValue) || 0;
-    onUpdate(selectedMonth, { [field]: numValue });
-  };
+  // vendas/ticket agora são calculados pelas vendas unitárias
 
 
   const formatCurrencyInput = (value: number) => {
@@ -237,8 +247,19 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
           </div>
           <div>
             <h3 className="font-semibold text-foreground">💰 Faturamento</h3>
-            <p className="text-xs text-muted-foreground">Digite quantidade de vendas e valor por venda</p>
+            <p className="text-xs text-muted-foreground">Calculado automaticamente pelas vendas unitárias</p>
           </div>
+        </div>
+
+        <div className="mb-4">
+          <UnitSalesEditor
+            monthLabel={MONTHS[selectedMonth]}
+            sales={unitSales}
+            canEdit={canEdit}
+            onAdd={(valor) => onAddUnitSale(selectedMonth, valor)}
+            onUpdate={onUpdateUnitSale}
+            onDelete={onDeleteUnitSale}
+          />
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -254,10 +275,9 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
               type="number"
               min="0"
               value={currentData.realizadoVendas || ''}
-              onChange={(e) => handleInputChange('realizadoVendas', e.target.value)}
               placeholder="0"
-              disabled={!canEdit}
-              className={`input-field text-center text-2xl font-bold ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}`}
+              disabled
+              className="input-field text-center text-2xl font-bold cursor-not-allowed opacity-60"
             />
             {/* Mini barra de progresso de vendas */}
             <div className="mt-2">
@@ -284,21 +304,20 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
 
           {/* Valor por Venda (Ticket) */}
           <div className="bg-card rounded-xl p-4 border-2 border-border hover:border-primary/30 transition-all">
-            <p className="text-xs text-muted-foreground mb-2 font-medium">Valor por Venda (Ticket)</p>
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Ticket médio (calculado)</p>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">R$</span>
               <input
                 type="text"
                 inputMode="numeric"
                 value={formatCurrencyInput(currentData.ticketRealizado)}
-                onChange={(e) => handleCurrencyChange('ticketRealizado', e.target.value)}
                 placeholder="2.700"
-                disabled={!canEdit}
-                className={`input-field text-right text-xl font-bold pl-12 ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}`}
+                disabled
+                className="input-field text-right text-xl font-bold pl-12 cursor-not-allowed opacity-60"
               />
             </div>
             <p className="text-xs text-muted-foreground mt-1 text-center">
-              Meta: {formatCurrency(VALOR_POR_VENDA)}
+              Referência: {formatCurrency(VALOR_POR_VENDA)}
             </p>
           </div>
 
@@ -331,7 +350,7 @@ export const DataEntryForm = ({ selectedMonth, currentData, onUpdate, onReset, o
               {formatCurrency(currentData.realizadoFaturamento)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              = {currentData.realizadoVendas} × {formatCurrency(currentData.ticketRealizado)}
+              Soma das vendas unitárias ({currentData.realizadoVendas} vendas)
             </p>
             {currentData.realizadoFaturamento > 0 && (
               <p className={`text-xs mt-1 font-medium ${
