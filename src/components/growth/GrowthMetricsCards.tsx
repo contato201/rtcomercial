@@ -14,32 +14,19 @@ interface GrowthMetricsCardsProps {
   hasData?: boolean;
 }
 
-// Cores por categoria
-const CATEGORY_COLORS = {
-  investment: {
-    primary: '#3B82F6', // Azul
-    bg: 'bg-blue-500/10',
-    text: 'text-blue-500',
-    border: 'border-blue-500/30',
-  },
-  performance: {
-    primary: '#10B981', // Verde
-    bg: 'bg-emerald-500/10',
-    text: 'text-emerald-500',
-    border: 'border-emerald-500/30',
-  },
-  costs: {
-    primary: '#EF4444', // Vermelho
-    bg: 'bg-red-500/10',
-    text: 'text-red-500',
-    border: 'border-red-500/30',
-  },
-  results: {
-    primary: '#6B7280', // Cinza
-    bg: 'bg-gray-500/10',
-    text: 'text-gray-500',
-    border: 'border-gray-500/30',
-  },
+// Estilo monocromático padronizado para todos os ícones
+const ICON_STYLE = {
+  color: '#374151', // Cinza escuro
+  size: 'w-5 h-5 sm:w-6 sm:h-6',
+  sizeSmall: 'w-4 h-4 sm:w-5 sm:h-5',
+  strokeWidth: 2,
+  bg: 'bg-gray-100 dark:bg-gray-800',
+};
+
+// Estilo visual monocromático para cards
+const CARD_STYLE = {
+  border: 'border-border',
+  iconBg: 'bg-gray-100 dark:bg-gray-800',
 };
 
 export const GrowthMetricsCards = ({ 
@@ -63,7 +50,6 @@ export const GrowthMetricsCards = ({
     value: data.investimento,
     formatter: formatCurrency,
     icon: DollarSign,
-    category: CATEGORY_COLORS.investment,
     showSyncTooltip: true,
   };
 
@@ -73,14 +59,12 @@ export const GrowthMetricsCards = ({
       value: roi,
       formatter: (v: number) => `${v.toFixed(1)}%`,
       icon: Percent,
-      category: roi >= 0 ? CATEGORY_COLORS.performance : CATEGORY_COLORS.costs,
     },
     {
       title: 'ROAS',
       value: roas,
       formatter: (v: number) => `${v.toFixed(2)}x`,
       icon: TrendingUp,
-      category: roas >= 1 ? CATEGORY_COLORS.performance : CATEGORY_COLORS.costs,
     },
   ];
 
@@ -91,7 +75,6 @@ export const GrowthMetricsCards = ({
       value: data.cpl,
       formatter: formatCurrency,
       icon: Target,
-      category: CATEGORY_COLORS.costs,
     },
     {
       title: 'CPC',
@@ -99,7 +82,6 @@ export const GrowthMetricsCards = ({
       value: data.cpc,
       formatter: formatCurrency,
       icon: MousePointer,
-      category: CATEGORY_COLORS.costs,
     },
   ];
 
@@ -109,7 +91,6 @@ export const GrowthMetricsCards = ({
       value: data.valorVendas,
       formatter: formatCurrency,
       icon: TrendingUp,
-      category: data.valorVendas > 0 ? CATEGORY_COLORS.performance : CATEGORY_COLORS.results,
     },
     {
       title: 'CAC',
@@ -117,14 +98,13 @@ export const GrowthMetricsCards = ({
       value: data.cac,
       formatter: formatCurrency,
       icon: Users,
-      category: CATEGORY_COLORS.costs,
     },
   ];
 
   const renderMetricCard = (metric: typeof performanceMetrics[0] & { subtitle?: string; showSyncTooltip?: boolean }, isLarge = false) => (
     <Card 
       key={metric.title} 
-      className={`relative overflow-hidden border ${metric.category.border} ${isLarge ? 'col-span-2 sm:col-span-2' : ''}`}
+      className={`relative overflow-hidden border ${CARD_STYLE.border} ${isLarge ? 'col-span-2 sm:col-span-2' : ''}`}
     >
       <CardContent className={`${isLarge ? 'p-4 sm:p-6' : 'p-3 sm:p-4'}`}>
         <div className="flex items-start justify-between">
@@ -147,11 +127,15 @@ export const GrowthMetricsCards = ({
               hasData={hasData}
               lastSyncTime={lastSyncTime}
               showSyncTooltip={metric.showSyncTooltip}
-              className={`${metric.category.text} ${isLarge ? 'text-xl sm:text-3xl font-bold' : 'text-base sm:text-lg font-semibold'}`}
+              className={`text-foreground ${isLarge ? 'text-xl sm:text-3xl font-bold' : 'text-base sm:text-lg font-semibold'}`}
             />
           </div>
-          <div className={`${isLarge ? 'p-2 sm:p-3' : 'p-1.5 sm:p-2'} rounded-lg ${metric.category.bg} flex-shrink-0`}>
-            <metric.icon className={`${isLarge ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-3.5 h-3.5 sm:w-4 sm:h-4'} ${metric.category.text}`} />
+          <div className={`${isLarge ? 'p-2 sm:p-3' : 'p-1.5 sm:p-2'} rounded-lg ${CARD_STYLE.iconBg} flex-shrink-0`}>
+            <metric.icon 
+              className={isLarge ? ICON_STYLE.size : ICON_STYLE.sizeSmall} 
+              style={{ color: ICON_STYLE.color }}
+              strokeWidth={ICON_STYLE.strokeWidth}
+            />
           </div>
         </div>
       </CardContent>
