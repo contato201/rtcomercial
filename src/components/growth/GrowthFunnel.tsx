@@ -4,6 +4,7 @@ import { DollarSign, TrendingUp, Percent, Target, Receipt, Users, Calendar, Hand
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { MetricValue } from '@/components/dashboard/MetricValue';
 import { DashboardTab, TabState } from './DashboardTab';
+import { MetricTooltip } from './MetricTooltip';
 
 interface TabConfig {
   label: string;
@@ -53,11 +54,11 @@ export const GrowthFunnel = ({
 
   // Etapas do funil com cores coerentes
   const stages = [
-    { label: 'LEADS', value: data.leadsTotal, color: FUNNEL_COLORS.leads },
-    { label: 'MQLs', value: mqls, color: FUNNEL_COLORS.mqls },
-    { label: 'PROPOSTA', value: propostas, color: FUNNEL_COLORS.proposta },
-    { label: 'REUNIÕES', value: reunioes, color: FUNNEL_COLORS.reunioes },
-    { label: 'VENDAS', value: vendas, color: FUNNEL_COLORS.vendas },
+    { label: 'LEADS', value: data.leadsTotal, color: FUNNEL_COLORS.leads, hasTooltip: false },
+    { label: 'MQLs', value: mqls, color: FUNNEL_COLORS.mqls, hasTooltip: true, tooltipKey: 'MQL' },
+    { label: 'PROPOSTA', value: propostas, color: FUNNEL_COLORS.proposta, hasTooltip: false },
+    { label: 'REUNIÕES', value: reunioes, color: FUNNEL_COLORS.reunioes, hasTooltip: false },
+    { label: 'VENDAS', value: vendas, color: FUNNEL_COLORS.vendas, hasTooltip: false },
   ];
 
   // Calcular taxas de conversão
@@ -70,20 +71,20 @@ export const GrowthFunnel = ({
 
   // KPIs da esquerda
   const leftKPIs = [
-    { icon: DollarSign, label: 'Investimento', value: data.investimento, formatter: formatCurrency, color: '#4CAF50', showSyncTooltip: true },
-    { icon: TrendingUp, label: 'Valor de Vendas', value: data.valorVendas, formatter: formatCurrency, color: '#4CAF50' },
-    { icon: Target, label: 'ROAS Real', value: roas, formatter: (v: number) => `${v.toFixed(2)}x`, color: '#2196F3' },
-    { icon: Percent, label: 'Tx. Fechamento', value: taxaFechamento, formatter: (v: number) => `${v.toFixed(1)}%`, color: '#9C27B0' },
-    { icon: Receipt, label: 'Ticket Médio', value: ticketMedio, formatter: formatCurrency, color: '#4CAF50' },
+    { icon: DollarSign, label: 'Investimento', value: data.investimento, formatter: formatCurrency, color: '#4CAF50', showSyncTooltip: true, tooltipKey: '' },
+    { icon: TrendingUp, label: 'Valor de Vendas', value: data.valorVendas, formatter: formatCurrency, color: '#4CAF50', tooltipKey: '' },
+    { icon: Target, label: 'ROAS Real', value: roas, formatter: (v: number) => `${v.toFixed(2)}x`, color: '#2196F3', tooltipKey: 'ROAS' },
+    { icon: Percent, label: 'Tx. Fechamento', value: taxaFechamento, formatter: (v: number) => `${v.toFixed(1)}%`, color: '#9C27B0', tooltipKey: '' },
+    { icon: Receipt, label: 'Ticket Médio', value: ticketMedio, formatter: formatCurrency, color: '#4CAF50', tooltipKey: '' },
   ];
 
   // KPIs da direita (custos) - cores correspondentes ao funil
   const rightKPIs = [
-    { icon: Users, label: 'CPL', value: data.cpl, formatter: formatCurrency, borderColor: FUNNEL_COLORS.leads },
-    { icon: Users, label: 'Custo MQL', value: custoMQL, formatter: formatCurrency, borderColor: FUNNEL_COLORS.mqls },
-    { icon: Calendar, label: 'Custo Proposta', value: custoProposta, formatter: formatCurrency, borderColor: FUNNEL_COLORS.proposta },
-    { icon: Handshake, label: 'Custo Reunião', value: custoReuniao, formatter: formatCurrency, borderColor: FUNNEL_COLORS.reunioes },
-    { icon: ShoppingCart, label: 'CPA', value: cpa, formatter: formatCurrency, borderColor: FUNNEL_COLORS.vendas },
+    { icon: Users, label: 'CPL', value: data.cpl, formatter: formatCurrency, borderColor: FUNNEL_COLORS.leads, tooltipKey: 'CPL' },
+    { icon: Users, label: 'Custo MQL', value: custoMQL, formatter: formatCurrency, borderColor: FUNNEL_COLORS.mqls, tooltipKey: 'MQL' },
+    { icon: Calendar, label: 'Custo Proposta', value: custoProposta, formatter: formatCurrency, borderColor: FUNNEL_COLORS.proposta, tooltipKey: '' },
+    { icon: Handshake, label: 'Custo Reunião', value: custoReuniao, formatter: formatCurrency, borderColor: FUNNEL_COLORS.reunioes, tooltipKey: '' },
+    { icon: ShoppingCart, label: 'CPA', value: cpa, formatter: formatCurrency, borderColor: FUNNEL_COLORS.vendas, tooltipKey: 'CPA' },
   ];
 
   // Larguras das barras do funil (decrescente)
@@ -125,7 +126,15 @@ export const GrowthFunnel = ({
                   <kpi.icon className="w-5 h-5" style={{ color: kpi.color }} />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                    {kpi.tooltipKey ? (
+                      <MetricTooltip label={kpi.tooltipKey}>
+                        {kpi.label}
+                      </MetricTooltip>
+                    ) : (
+                      kpi.label
+                    )}
+                  </p>
                   <MetricValue
                     value={kpi.value}
                     formatter={kpi.formatter}
@@ -148,7 +157,7 @@ export const GrowthFunnel = ({
                 {idx > 0 && (
                   <div className="flex items-center gap-1.5 py-2">
                     <ArrowDown className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                       {getRate(idx).toFixed(1)}%
                     </span>
                   </div>
@@ -163,12 +172,18 @@ export const GrowthFunnel = ({
                     minHeight: '64px'
                   }}
                 >
-                  <div className="text-center">
+                <div className="text-center">
                     <p className="text-white font-bold text-xl leading-none drop-shadow-sm">
                       {formatNumber(stage.value)}
                     </p>
                     <p className="text-white/90 text-xs font-semibold mt-1 tracking-wide">
-                      {stage.label}
+                      {stage.hasTooltip && stage.tooltipKey ? (
+                        <MetricTooltip label={stage.tooltipKey} showIcon={false} className="text-white/90">
+                          {stage.label}
+                        </MetricTooltip>
+                      ) : (
+                        stage.label
+                      )}
                     </p>
                   </div>
                 </div>
@@ -210,7 +225,15 @@ export const GrowthFunnel = ({
                   <kpi.icon className="w-5 h-5" style={{ color: kpi.borderColor }} />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                    {kpi.tooltipKey ? (
+                      <MetricTooltip label={kpi.tooltipKey}>
+                        {kpi.label}
+                      </MetricTooltip>
+                    ) : (
+                      kpi.label
+                    )}
+                  </p>
                   <MetricValue
                     value={kpi.value}
                     formatter={kpi.formatter}

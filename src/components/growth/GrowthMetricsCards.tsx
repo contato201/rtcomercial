@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { DollarSign, Users, Target, TrendingUp, MousePointer, Percent } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { MetricValue } from '@/components/dashboard/MetricValue';
+import { MetricTooltip } from './MetricTooltip';
 
 interface GrowthMetricsCardsProps {
   data: GrowthData;
@@ -129,7 +130,9 @@ export const GrowthMetricsCards = ({
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <p className={`font-medium text-muted-foreground uppercase tracking-wide ${isLarge ? 'text-sm' : 'text-xs'}`}>
-              {metric.title}
+              <MetricTooltip label={metric.title}>
+                {metric.title}
+              </MetricTooltip>
             </p>
             {metric.subtitle && (
               <p className="text-[10px] text-muted-foreground">
