@@ -1,8 +1,9 @@
-import { TrendingUp, LogIn, LogOut, Shield } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import logo from '@/assets/logo.png';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const Header = () => {
   const { user, signOut, canEdit, isAuthenticated } = useAuth();
@@ -34,10 +35,19 @@ export const Header = () => {
           </Link>
           
           {canEdit && (
-            <div className="flex items-center gap-1 bg-green-600/20 px-3 py-1.5 rounded-lg border border-green-500/30">
-              <Shield className="w-4 h-4 text-green-400" />
-              <span className="text-xs text-green-300 font-medium">Editor</span>
-            </div>
+            <TooltipProvider>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 bg-gold/20 px-3 py-1.5 rounded-lg border border-gold/30 cursor-default">
+                    <Pencil className="w-4 h-4 text-gold" />
+                    <span className="text-xs text-gold font-medium">Editar Layout</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-popover text-popover-foreground border-border">
+                  <p className="text-xs">Editar layout do dashboard</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
           
           <div className="flex items-center gap-2 bg-gold/20 px-4 py-2 rounded-lg backdrop-blur-sm border border-gold/30">
