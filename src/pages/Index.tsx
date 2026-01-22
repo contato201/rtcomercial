@@ -17,6 +17,7 @@ const Index = () => {
     filteredData,
     aggregatedData,
     unitSalesByMonth,
+    agendamentos,
     filterType,
     setFilterType,
     selectedMonth,
@@ -27,6 +28,9 @@ const Index = () => {
     addUnitSale,
     updateUnitSale,
     deleteUnitSale,
+    addAgendamento,
+    deleteAgendamento,
+    getMetaAgendamentos,
     calculateVariation,
     resetData,
     revertToValue
@@ -52,10 +56,14 @@ const Index = () => {
             selectedMonth={selectedMonth}
             currentData={data[selectedMonth]}
             unitSales={unitSalesByMonth[data[selectedMonth].month] ?? []}
+            agendamentos={agendamentos}
+            metaAgendamentos={getMetaAgendamentos(selectedMonth)}
             onUpdate={updateMonthData}
             onAddUnitSale={addUnitSale}
             onUpdateUnitSale={updateUnitSale}
             onDeleteUnitSale={deleteUnitSale}
+            onAddAgendamento={addAgendamento}
+            onDeleteAgendamento={deleteAgendamento}
             onReset={resetData}
             onOpenHistory={() => setIsHistoryOpen(true)}
             canEdit={canEdit}
@@ -73,6 +81,7 @@ const Index = () => {
           filteredData={filteredData}
           aggregatedData={aggregatedData}
           filterType={filterType}
+          agendamentos={agendamentos}
         />
       </div>
 
