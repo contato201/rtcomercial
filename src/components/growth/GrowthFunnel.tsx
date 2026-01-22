@@ -6,6 +6,15 @@ import { MetricValue } from '@/components/dashboard/MetricValue';
 import { DashboardTab, TabState } from './DashboardTab';
 import { MetricTooltip } from './MetricTooltip';
 
+// Estilo monocromático padronizado para todos os ícones
+const ICON_STYLE = {
+  color: '#374151', // Cinza escuro
+  size: 'w-5 h-5 sm:w-6 sm:h-6',
+  sizeSmall: 'w-4 h-4 sm:w-5 sm:h-5',
+  strokeWidth: 2,
+  bg: 'bg-gray-100 dark:bg-gray-800',
+};
+
 interface TabConfig {
   label: string;
   state: TabState;
@@ -42,8 +51,7 @@ export const GrowthFunnel = ({
   const taxaFechamento = reunioes > 0 ? (vendas / reunioes) * 100 : 0;
   const ticketMedio = vendas > 0 ? data.valorVendas / vendas : 0;
 
-  // Paleta de cores coerente: Verde → Vermelho (representa volume do funil)
-  // Verde = maior volume (topo) | Vermelho = menor volume (fundo)
+  // Paleta de cores coerente para o funil (mantida para as barras)
   const FUNNEL_COLORS = {
     leads: '#10B981',      // Verde - Emerald 500
     mqls: '#FBBF24',       // Amarelo - Amber 400
@@ -69,16 +77,16 @@ export const GrowthFunnel = ({
     return prev > 0 ? (curr / prev) * 100 : 0;
   };
 
-  // KPIs da esquerda
+  // KPIs da esquerda - ícones monocromáticos
   const leftKPIs = [
-    { icon: DollarSign, label: 'Investimento', value: data.investimento, formatter: formatCurrency, color: '#4CAF50', showSyncTooltip: true, tooltipKey: '' },
-    { icon: TrendingUp, label: 'Valor de Vendas', value: data.valorVendas, formatter: formatCurrency, color: '#4CAF50', tooltipKey: '' },
-    { icon: Target, label: 'ROAS Real', value: roas, formatter: (v: number) => `${v.toFixed(2)}x`, color: '#2196F3', tooltipKey: 'ROAS' },
-    { icon: Percent, label: 'Tx. Fechamento', value: taxaFechamento, formatter: (v: number) => `${v.toFixed(1)}%`, color: '#9C27B0', tooltipKey: '' },
-    { icon: Receipt, label: 'Ticket Médio', value: ticketMedio, formatter: formatCurrency, color: '#4CAF50', tooltipKey: '' },
+    { icon: DollarSign, label: 'Investimento', value: data.investimento, formatter: formatCurrency, showSyncTooltip: true, tooltipKey: '' },
+    { icon: TrendingUp, label: 'Valor de Vendas', value: data.valorVendas, formatter: formatCurrency, tooltipKey: '' },
+    { icon: Target, label: 'ROAS Real', value: roas, formatter: (v: number) => `${v.toFixed(2)}x`, tooltipKey: 'ROAS' },
+    { icon: Percent, label: 'Tx. Fechamento', value: taxaFechamento, formatter: (v: number) => `${v.toFixed(1)}%`, tooltipKey: '' },
+    { icon: Receipt, label: 'Ticket Médio', value: ticketMedio, formatter: formatCurrency, tooltipKey: '' },
   ];
 
-  // KPIs da direita (custos) - cores correspondentes ao funil
+  // KPIs da direita (custos) - ícones monocromáticos, borda colorida mantida para correspondência visual
   const rightKPIs = [
     { icon: Users, label: 'CPL', value: data.cpl, formatter: formatCurrency, borderColor: FUNNEL_COLORS.leads, tooltipKey: 'CPL' },
     { icon: Users, label: 'Custo MQL', value: custoMQL, formatter: formatCurrency, borderColor: FUNNEL_COLORS.mqls, tooltipKey: 'MQL' },
@@ -121,10 +129,13 @@ export const GrowthFunnel = ({
                 className="flex items-center gap-2 sm:gap-3 bg-muted/40 rounded-lg px-3 sm:px-4 py-2 sm:py-3 border border-border/50"
               >
                 <div 
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${kpi.color}15` }}
+                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${ICON_STYLE.bg}`}
                 >
-                  <kpi.icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: kpi.color }} />
+                  <kpi.icon 
+                    className={ICON_STYLE.sizeSmall} 
+                    style={{ color: ICON_STYLE.color }} 
+                    strokeWidth={ICON_STYLE.strokeWidth}
+                  />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide truncate">
@@ -221,10 +232,13 @@ export const GrowthFunnel = ({
                 style={{ borderLeftColor: kpi.borderColor }}
               >
                 <div 
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${kpi.borderColor}15` }}
+                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${ICON_STYLE.bg}`}
                 >
-                  <kpi.icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: kpi.borderColor }} />
+                  <kpi.icon 
+                    className={ICON_STYLE.sizeSmall} 
+                    style={{ color: ICON_STYLE.color }} 
+                    strokeWidth={ICON_STYLE.strokeWidth}
+                  />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide truncate">
