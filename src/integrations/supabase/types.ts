@@ -88,6 +88,30 @@ export type Database = {
           },
         ]
       }
+      vendas_unitarias: {
+        Row: {
+          created_at: string
+          id: string
+          month: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
