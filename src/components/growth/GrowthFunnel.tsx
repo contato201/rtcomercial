@@ -3,6 +3,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { DollarSign, TrendingUp, Percent, Target, Receipt, Users, Calendar, Handshake, ShoppingCart, ArrowDown } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { MetricValue } from '@/components/dashboard/MetricValue';
+import { DashboardTab, TabState } from './DashboardTab';
+
+interface TabConfig {
+  label: string;
+  state: TabState;
+  expectedDate?: string;
+}
 
 interface GrowthFunnelProps {
   data: GrowthData;
@@ -75,20 +82,23 @@ export const GrowthFunnel = ({
   return (
     <TooltipProvider>
       <div className="bg-card rounded-xl border border-border p-6">
-        {/* Tabs */}
+        {/* Tabs com estados visuais distintos */}
         <div className="flex justify-center gap-2 mb-8">
-          <button className="px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg">
-            Detalhamento Geral
-          </button>
-          <button className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-            Detalhamento Tráfego
-          </button>
-          <button className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-            Detalhamento por fonte
-          </button>
+          <DashboardTab
+            label="Detalhamento Geral"
+            state="active"
+            isSelected={true}
+          />
+          <DashboardTab
+            label="Detalhamento Tráfego"
+            state="disabled"
+            expectedDate="Q2 2025"
+          />
+          <DashboardTab
+            label="Detalhamento por fonte"
+            state="no-data"
+          />
         </div>
-
-        {/* Main 3-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px_1fr] gap-6 items-start">
           
           {/* Left KPIs */}
