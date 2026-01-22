@@ -58,7 +58,7 @@ export const GrowthFiltersComponent = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as campanhas</SelectItem>
-              {availableFilters.campaigns.map((campaign) => (
+              {(availableFilters?.campaigns ?? []).map((campaign) => (
                 <SelectItem key={campaign} value={campaign}>
                   {campaign.length > 40 ? campaign.slice(0, 40) + '...' : campaign}
                 </SelectItem>
@@ -81,7 +81,7 @@ export const GrowthFiltersComponent = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os conjuntos</SelectItem>
-              {availableFilters.adsets.map((adset) => (
+              {(availableFilters?.adsets ?? []).map((adset) => (
                 <SelectItem key={adset} value={adset}>
                   {adset.length > 40 ? adset.slice(0, 40) + '...' : adset}
                 </SelectItem>
@@ -104,7 +104,7 @@ export const GrowthFiltersComponent = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os status</SelectItem>
-              {availableFilters.statuses.map((status) => (
+              {(availableFilters?.statuses ?? []).map((status) => (
                 <SelectItem key={status} value={status}>
                   {status}
                 </SelectItem>
