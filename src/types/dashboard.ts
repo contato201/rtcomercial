@@ -36,6 +36,9 @@ export const QUARTERS: Record<QuarterType, number[]> = {
 
 export const VALOR_POR_VENDA = 2700;
 
+// Taxa de comparecimento (60% = 40% no-show)
+export const TAXA_COMPARECIMENTO = 0.6;
+
 // METAS FIXAS - Imutáveis (fornecidas pelo usuário)
 export const METAS_FIXAS = [
   { vendas: 10, primeiraReuniao: 86, segundaReuniao: 29 },   // Janeiro

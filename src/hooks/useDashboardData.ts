@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { z } from 'zod';
-import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS } from '@/types/dashboard';
+import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { supabase } from '@/integrations/supabase/client';
 
 type UnitSaleRow = {
@@ -11,6 +11,15 @@ type UnitSaleRow = {
   updated_at: string;
 };
 
+export type AgendamentoRow = {
+  id: string;
+  month: string;
+  pessoa: 'Tadeu' | 'Nicole';
+  quantidade: number;
+  data_lancamento: string;
+  created_at: string;
+};
+
 const monthSchema = z.enum(MONTHS as [string, ...string[]]);
 const valorSchema = z
   .number({ invalid_type_error: 'Valor inválido' })
@@ -18,9 +27,17 @@ const valorSchema = z
   .positive('Valor precisa ser maior que zero')
   .max(1_000_000, 'Valor muito alto');
 
+const pessoaSchema = z.enum(['Tadeu', 'Nicole']);
+const quantidadeSchema = z
+  .number({ invalid_type_error: 'Quantidade inválida' })
+  .int()
+  .positive('Quantidade precisa ser maior que zero')
+  .max(10_000, 'Quantidade muito alta');
+
 export const useDashboardData = () => {
   const [data, setData] = useState<MonthData[]>(createInitialData());
   const [unitSalesByMonth, setUnitSalesByMonth] = useState<Record<string, UnitSaleRow[]>>({});
+  const [agendamentos, setAgendamentos] = useState<AgendamentoRow[]>([]);
   const [filterType, setFilterType] = useState<FilterType>('month');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedQuarter, setSelectedQuarter] = useState<QuarterType>('Q1');
@@ -37,6 +54,12 @@ export const useDashboardData = () => {
           .order('created_at', { ascending: true }),
       ]);
 
+      // Query separada para agendamentos (tabela nova, tipos ainda não gerados)
+      const { data: agendamentosData, error: agendamentosError } = await supabase
+        .from('agendamentos' as any)
+        .select('*')
+        .order('data_lancamento', { ascending: false });
+
       if (error) {
         console.error('Erro ao carregar dados:', error);
         return;
@@ -45,6 +68,21 @@ export const useDashboardData = () => {
       if (unitError) {
         console.error('Erro ao carregar vendas unitárias:', unitError);
       }
+
+      if (agendamentosError) {
+        console.error('Erro ao carregar agendamentos:', agendamentosError);
+      }
+
+      // Processa agendamentos
+      const processedAgendamentos: AgendamentoRow[] = ((agendamentosData as any[]) ?? []).map((row: any) => ({
+        id: row.id,
+        month: row.month,
+        pessoa: row.pessoa as 'Tadeu' | 'Nicole',
+        quantidade: row.quantidade,
+        data_lancamento: row.data_lancamento,
+        created_at: row.created_at,
+      }));
+      setAgendamentos(processedAgendamentos);
 
       const groupedUnitSales = (unitData ?? []).reduce<Record<string, UnitSaleRow[]>>((acc, row) => {
         const month = String(row.month);
@@ -142,6 +180,14 @@ export const useDashboardData = () => {
         { event: '*', schema: 'public', table: 'vendas_unitarias' },
         (payload) => {
           console.log('Realtime update (vendas_unitarias):', payload);
+          loadFromDatabase();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agendamentos' },
+        (payload) => {
+          console.log('Realtime update (agendamentos):', payload);
           loadFromDatabase();
         }
       )
@@ -418,9 +464,63 @@ export const useDashboardData = () => {
     }
   }, []);
 
+  // Funções de agendamentos
+  const addAgendamento = useCallback(async (monthIndex: number, pessoa: 'Tadeu' | 'Nicole', quantidade: number) => {
+    const monthName = MONTHS[monthIndex];
+    const m = monthSchema.safeParse(monthName);
+    const p = pessoaSchema.safeParse(pessoa);
+    const q = quantidadeSchema.safeParse(quantidade);
+    if (!m.success || !p.success || !q.success) return;
+
+    const { data: inserted, error } = await supabase
+      .from('agendamentos' as any)
+      .insert({ month: m.data, pessoa: p.data, quantidade: q.data })
+      .select('*')
+      .single();
+    
+    if (error) {
+      console.error('Erro ao inserir agendamento:', error);
+      return;
+    }
+
+    // Atualização otimista
+    const newRow: AgendamentoRow = {
+      id: (inserted as any).id,
+      month: (inserted as any).month,
+      pessoa: (inserted as any).pessoa,
+      quantidade: (inserted as any).quantidade,
+      data_lancamento: (inserted as any).data_lancamento,
+      created_at: (inserted as any).created_at,
+    };
+    setAgendamentos((prev) => [newRow, ...prev]);
+  }, []);
+
+  const deleteAgendamento = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('agendamentos' as any)
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Erro ao excluir agendamento:', error);
+      return;
+    }
+
+    setAgendamentos((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  // Calcula meta de agendamentos para um mês
+  const getMetaAgendamentos = useCallback((monthIndex: number) => {
+    const monthData = data[monthIndex];
+    if (!monthData) return 0;
+    // Meta de agendamentos = Meta 1ª Reuniões / taxa de comparecimento (60%)
+    return Math.ceil(monthData.metaPrimeiraReuniao / TAXA_COMPARECIMENTO);
+  }, [data]);
+
   return {
     data,
     unitSalesByMonth,
+    agendamentos,
     filteredData,
     aggregatedData,
     filterType,
@@ -433,6 +533,9 @@ export const useDashboardData = () => {
     addUnitSale,
     updateUnitSale,
     deleteUnitSale,
+    addAgendamento,
+    deleteAgendamento,
+    getMetaAgendamentos,
     calculateVariation,
     resetData,
     revertToValue,

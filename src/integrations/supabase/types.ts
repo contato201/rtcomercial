@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      agendamentos: {
+        Row: {
+          created_at: string
+          data_lancamento: string
+          id: string
+          month: string
+          pessoa: string
+          quantidade: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_lancamento?: string
+          id?: string
+          month: string
+          pessoa: string
+          quantidade?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_lancamento?: string
+          id?: string
+          month?: string
+          pessoa?: string
+          quantidade?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dados_realizados: {
         Row: {
           created_at: string

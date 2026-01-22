@@ -5,15 +5,20 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { UnitSalesEditor, type UnitSale } from '@/components/dashboard/UnitSalesEditor';
+import { AgendamentosEditor, type AgendamentoRow } from '@/components/dashboard/AgendamentosEditor';
 
 interface DataEntryFormProps {
   selectedMonth: number;
   currentData: MonthData;
   unitSales: UnitSale[];
+  agendamentos: AgendamentoRow[];
+  metaAgendamentos: number;
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
   onAddUnitSale: (monthIndex: number, valor: number) => Promise<void> | void;
   onUpdateUnitSale: (id: string, valor: number) => Promise<void> | void;
   onDeleteUnitSale: (id: string) => Promise<void> | void;
+  onAddAgendamento: (monthIndex: number, pessoa: 'Tadeu' | 'Nicole', quantidade: number) => Promise<void>;
+  onDeleteAgendamento: (id: string) => Promise<void>;
   onReset: () => void;
   onOpenHistory: () => void;
   canEdit: boolean;
@@ -23,10 +28,14 @@ export const DataEntryForm = ({
   selectedMonth,
   currentData,
   unitSales,
+  agendamentos,
+  metaAgendamentos,
   onUpdate,
   onAddUnitSale,
   onUpdateUnitSale,
   onDeleteUnitSale,
+  onAddAgendamento,
+  onDeleteAgendamento,
   onReset,
   onOpenHistory,
   canEdit,
@@ -387,6 +396,18 @@ export const DataEntryForm = ({
             }
           </p>
         </div>
+      </div>
+
+      {/* Seção de Agendamentos */}
+      <div className="mt-6">
+        <AgendamentosEditor
+          selectedMonth={selectedMonth}
+          agendamentos={agendamentos}
+          metaAgendamentos={metaAgendamentos}
+          onAddAgendamento={onAddAgendamento}
+          onDeleteAgendamento={onDeleteAgendamento}
+          canEdit={canEdit}
+        />
       </div>
     </div>
   );

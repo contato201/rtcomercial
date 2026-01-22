@@ -1,13 +1,15 @@
-import { MonthData, FilterType, MONTHS } from '@/types/dashboard';
+import { MonthData, FilterType, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { ComparisonChart } from './ComparisonChart';
+import type { AgendamentoRow } from '@/hooks/useDashboardData';
 
 interface ChartsGridProps {
   filteredData: MonthData[];
   aggregatedData: MonthData;
   filterType: FilterType;
+  agendamentos?: AgendamentoRow[];
 }
 
-export const ChartsGrid = ({ filteredData, aggregatedData, filterType }: ChartsGridProps) => {
+export const ChartsGrid = ({ filteredData, aggregatedData, filterType, agendamentos = [] }: ChartsGridProps) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -33,6 +35,37 @@ export const ChartsGrid = ({ filteredData, aggregatedData, filterType }: ChartsG
     }));
   };
 
+  // Gráfico de agendamentos
+  const createAgendamentosChartData = () => {
+    if (filterType === 'month') {
+      const monthName = aggregatedData.month;
+      const metaPrimeiraReuniao = aggregatedData.metaPrimeiraReuniao;
+      const metaAgendamentos = Math.ceil(metaPrimeiraReuniao / TAXA_COMPARECIMENTO);
+      const realizadoAgendamentos = agendamentos
+        .filter(a => a.month === monthName)
+        .reduce((sum, a) => sum + a.quantidade, 0);
+      
+      return [{
+        name: monthName,
+        meta: metaAgendamentos,
+        realizado: realizadoAgendamentos
+      }];
+    }
+    
+    return filteredData.map(month => {
+      const metaAgendamentos = Math.ceil(month.metaPrimeiraReuniao / TAXA_COMPARECIMENTO);
+      const realizadoAgendamentos = agendamentos
+        .filter(a => a.month === month.month)
+        .reduce((sum, a) => sum + a.quantidade, 0);
+      
+      return {
+        name: month.month.slice(0, 3),
+        meta: metaAgendamentos,
+        realizado: realizadoAgendamentos
+      };
+    });
+  };
+
   const charts = [
     {
       title: 'Vendas',
@@ -50,6 +83,10 @@ export const ChartsGrid = ({ filteredData, aggregatedData, filterType }: ChartsG
     {
       title: '2ª Reuniões',
       data: createChartData('metaSegundaReuniao', 'realizadoSegundaReuniao')
+    },
+    {
+      title: 'Agendamentos',
+      data: createAgendamentosChartData()
     }
   ];
 
