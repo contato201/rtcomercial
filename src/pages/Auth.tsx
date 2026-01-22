@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,12 +7,18 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, LogIn, Mail, Lock } from 'lucide-react';
 
+const AUTHORIZED_EMAIL = 'contato@allancatao.com.br';
+type LoginMethod = 'password' | 'magic';
+
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('password');
   const navigate = useNavigate();
+
+  const normalizedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
+  const isAuthorizedEmail = normalizedEmail === AUTHORIZED_EMAIL;
 
   useEffect(() => {
     // Verificar se usuário já está logado
@@ -34,52 +40,59 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
-      toast.error('Preencha todos os campos');
+    if (!normalizedEmail) {
+      toast.error('Informe seu email');
+      return;
+    }
+
+    if (!isAuthorizedEmail) {
+      toast.error('Acesso restrito: use o email autorizado');
+      return;
+    }
+
+    if (loginMethod === 'password' && !password) {
+      toast.error('Informe sua senha');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
+      if (loginMethod === 'magic') {
+        const { error } = await supabase.auth.signInWithOtp({
+          email: normalizedEmail,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
           },
         });
 
         if (error) {
-          if (error.message.includes('already registered')) {
-            toast.error('Este email já está cadastrado');
-          } else {
-            toast.error(error.message);
-          }
+          // Caso a opção não esteja habilitada no backend, não quebrar o app.
+          toast.error('Link mágico indisponível no momento. Use senha.');
+          setLoginMethod('password');
           return;
         }
 
-        toast.success('Conta criada com sucesso! Você já pode fazer login.');
-        setIsSignUp(false);
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Email ou senha incorretos');
-          } else {
-            toast.error(error.message);
-          }
-          return;
-        }
-
-        toast.success('Login realizado com sucesso!');
-        navigate('/');
+        toast.success('Enviamos um link de acesso para seu email.');
+        return;
       }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Email ou senha incorretos');
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+
+      toast.success('Login realizado com sucesso!');
+      navigate('/');
     } catch (error) {
       toast.error('Erro ao processar sua solicitação');
     } finally {
@@ -96,13 +109,32 @@ const Auth = () => {
               <LogIn className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-2xl font-bold text-foreground">
-              {isSignUp ? 'Criar Conta' : 'Acessar Dashboard'}
+              Acessar Dashboard
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
-              {isSignUp 
-                ? 'Preencha os dados para criar sua conta' 
-                : 'Entre com suas credenciais para editar dados'}
+              Acesso restrito ao email autorizado
             </p>
+          </div>
+
+          <div className="mb-6 grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={loginMethod === 'password' ? 'default' : 'outline'}
+              onClick={() => setLoginMethod('password')}
+              disabled={isLoading}
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              Senha
+            </Button>
+            <Button
+              type="button"
+              variant={loginMethod === 'magic' ? 'default' : 'outline'}
+              onClick={() => setLoginMethod('magic')}
+              disabled={isLoading}
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Link mágico
+            </Button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -116,26 +148,28 @@ const Auth = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
+                placeholder={AUTHORIZED_EMAIL}
                 disabled={isLoading}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-2">
-                <Lock className="w-4 h-4" />
-                Senha
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={isLoading}
-                minLength={6}
-              />
-            </div>
+            {loginMethod === 'password' && (
+              <div className="space-y-2">
+                <Label htmlFor="password" className="flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  Senha
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={isLoading}
+                  minLength={6}
+                />
+              </div>
+            )}
 
             <Button
               type="submit"
@@ -148,22 +182,10 @@ const Auth = () => {
                   Aguarde...
                 </>
               ) : (
-                isSignUp ? 'Criar Conta' : 'Entrar'
+                loginMethod === 'magic' ? 'Enviar link' : 'Entrar'
               )}
             </Button>
           </form>
-
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-primary hover:underline"
-            >
-              {isSignUp 
-                ? 'Já tem conta? Faça login' 
-                : 'Não tem conta? Cadastre-se'}
-            </button>
-          </div>
         </div>
       </div>
     </div>
