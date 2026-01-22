@@ -1,3 +1,39 @@
+export interface CampaignData {
+  campaignName: string;
+  adsetName: string;
+  adName: string;
+  amountSpent: number;
+  impressions: number;
+  clicks: number;
+  linkClicks: number;
+  leads: number;
+  status: string;
+}
+
+export interface GrowthTotals {
+  investimento: number;
+  impressoes: number;
+  cliques: number;
+  linkClicks: number;
+  leads: number;
+  cpc: number;
+  cpl: number;
+}
+
+export interface GrowthFilters {
+  campaigns: string[];
+  adsets: string[];
+  statuses: string[];
+}
+
+export interface SheetsResponse {
+  success: boolean;
+  campaigns: CampaignData[];
+  totals: GrowthTotals;
+  filters: GrowthFilters;
+  count: number;
+}
+
 export interface GrowthData {
   id?: string;
   month: string;
@@ -14,18 +50,17 @@ export interface GrowthData {
   vendasFechadas: number;
   valorVendas: number;
   // Métricas calculadas
-  cpl: number; // Custo por Lead = investimento / leadsTotal
-  cac: number; // Custo de Aquisição = investimento / vendasFechadas
-  taxaMQL: number; // % MQL = leadsQualificados / leadsTotal
-  taxaReuniao: number; // % Reunião = reunioesAgendadas / leadsQualificados
-  taxaFechamento: number; // % Fechamento = vendasFechadas / reunioesAgendadas
+  cpl: number;
+  cac: number;
+  taxaMQL: number;
+  taxaReuniao: number;
+  taxaFechamento: number;
 }
 
-export interface FunnelStage {
-  label: string;
-  value: number;
-  percentage?: number;
-  color: string;
+export interface ActiveFilters {
+  campaign: string | null;
+  adset: string | null;
+  status: string | null;
 }
 
 export const MONTHS = [
