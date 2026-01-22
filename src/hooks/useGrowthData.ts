@@ -166,41 +166,37 @@ export const useGrowthData = () => {
   const updateManualData = useCallback(async (
     monthIndex: number,
     updates: Partial<Pick<GrowthData, 'leadsQualificados' | 'reunioesAgendadas' | 'vendasFechadas' | 'valorVendas'>>
-  ) => {
+  ): Promise<void> => {
     const monthName = MONTHS[monthIndex];
     
-    try {
-      const dbUpdates: Record<string, number> = {};
-      if (updates.leadsQualificados !== undefined) dbUpdates.leads_qualificados = updates.leadsQualificados;
-      if (updates.reunioesAgendadas !== undefined) dbUpdates.reunioes_agendadas = updates.reunioesAgendadas;
-      if (updates.vendasFechadas !== undefined) dbUpdates.vendas_fechadas = updates.vendasFechadas;
-      if (updates.valorVendas !== undefined) dbUpdates.valor_vendas = updates.valorVendas;
+    const dbUpdates: Record<string, number> = {};
+    if (updates.leadsQualificados !== undefined) dbUpdates.leads_qualificados = updates.leadsQualificados;
+    if (updates.reunioesAgendadas !== undefined) dbUpdates.reunioes_agendadas = updates.reunioesAgendadas;
+    if (updates.vendasFechadas !== undefined) dbUpdates.vendas_fechadas = updates.vendasFechadas;
+    if (updates.valorVendas !== undefined) dbUpdates.valor_vendas = updates.valorVendas;
 
-      const { error } = await supabase
-        .from('dados_trafego' as any)
-        .upsert({
-          month: monthName,
-          ...dbUpdates,
-        }, {
-          onConflict: 'month'
-        });
-
-      if (error) throw error;
-
-      setData(prevData => {
-        const newData = [...prevData];
-        newData[monthIndex] = calculateMetrics({
-          ...newData[monthIndex],
-          ...updates,
-        });
-        return newData;
+    const { error } = await supabase
+      .from('dados_trafego' as any)
+      .upsert({
+        month: monthName,
+        ...dbUpdates,
+      }, {
+        onConflict: 'month'
       });
 
-      toast.success('Dados atualizados!');
-    } catch (error) {
+    if (error) {
       console.error('Erro ao atualizar:', error);
-      toast.error('Erro ao salvar dados');
+      throw new Error('Erro ao salvar dados');
     }
+
+    setData(prevData => {
+      const newData = [...prevData];
+      newData[monthIndex] = calculateMetrics({
+        ...newData[monthIndex],
+        ...updates,
+      });
+      return newData;
+    });
   }, []);
 
   const clearFilters = useCallback(() => {
