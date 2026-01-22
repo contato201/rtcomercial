@@ -45,6 +45,7 @@ export const useGrowthData = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   // Campanhas filtradas
   const filteredCampaigns = useMemo(() => {
@@ -151,6 +152,7 @@ export const useGrowthData = () => {
         }
 
         await loadFromDatabase();
+        setLastSyncTime(new Date());
         toast.success(`${response.count} campanhas de CAPTAÇÃO carregadas!`);
       }
     } catch (error) {
@@ -252,6 +254,7 @@ export const useGrowthData = () => {
     setSelectedMonth,
     isLoading,
     isSyncing,
+    lastSyncTime,
     syncFromSheets,
     updateManualData,
   };

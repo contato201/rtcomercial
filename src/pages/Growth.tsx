@@ -26,6 +26,7 @@ const Growth = () => {
     setSelectedMonth,
     isLoading,
     isSyncing,
+    lastSyncTime,
     syncFromSheets,
     updateManualData,
   } = useGrowthData();
@@ -102,12 +103,12 @@ const Growth = () => {
 
         {/* Métricas Principais */}
         <div className="mb-6">
-          <GrowthMetricsCards data={currentMonthData} />
+          <GrowthMetricsCards data={currentMonthData} lastSyncTime={lastSyncTime} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Funil Visual */}
-          <GrowthFunnel data={currentMonthData} />
+          <GrowthFunnel data={currentMonthData} lastSyncTime={lastSyncTime} />
 
           {/* Formulário de Dados Manuais */}
           <GrowthDataForm
