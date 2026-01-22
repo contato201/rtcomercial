@@ -52,8 +52,10 @@ export const UnitSalesEditor = ({
   onDelete,
 }: UnitSalesEditorProps) => {
   const [newValue, setNewValue] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
@@ -64,13 +66,29 @@ export const UnitSalesEditor = ({
     return { count, sum, avg };
   }, [sales]);
 
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(d);
+  };
+
   const handleAdd = async () => {
     if (!canEdit) return;
     const valor = parseCurrencyToNumber(newValue);
     const parsed = moneySchema.safeParse(valor);
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      setFormError(parsed.error.issues[0]?.message ?? "Valor inválido");
+      return;
+    }
     try {
       setIsAdding(true);
+      setFormError(null);
       await onAdd(parsed.data);
       setNewValue("");
     } finally {
@@ -82,21 +100,27 @@ export const UnitSalesEditor = ({
     if (!canEdit) return;
     setEditingId(sale.id);
     setEditingValue(String(sale.valor ?? ""));
+    setEditError(null);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditingValue("");
+    setEditError(null);
   };
 
   const confirmEdit = async (id: string) => {
     if (!canEdit) return;
     const valor = parseCurrencyToNumber(editingValue);
     const parsed = moneySchema.safeParse(valor);
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      setEditError(parsed.error.issues[0]?.message ?? "Valor inválido");
+      return;
+    }
 
     try {
       setBusyId(id);
+      setEditError(null);
       await onUpdate(id, parsed.data);
       cancelEdit();
     } finally {
@@ -158,6 +182,10 @@ export const UnitSalesEditor = ({
         </div>
       </div>
 
+      {formError && (
+        <p className="mt-2 text-sm text-destructive">{formError}</p>
+      )}
+
       <div className="mt-4 space-y-2">
         {sales.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhuma venda lançada neste mês.</p>
@@ -166,72 +194,75 @@ export const UnitSalesEditor = ({
             const isEditing = editingId === sale.id;
             const isBusy = busyId === sale.id;
             return (
-              <div
-                key={sale.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    Venda #{idx + 1}: {formatCurrency(Number(sale.valor || 0))}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    ID: {sale.id}
-                  </p>
+              <div key={sale.id} className="space-y-1">
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      Venda #{idx + 1}: {formatCurrency(Number(sale.valor || 0))}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {sale.created_at ? `Criada em ${formatDate(sale.created_at)}` : ""}
+                    </p>
+                  </div>
+
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={editingValue}
+                        onChange={(e) => setEditingValue(e.target.value)}
+                        disabled={!canEdit || isBusy}
+                        className="input-field h-9 w-40"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => confirmEdit(sale.id)}
+                        disabled={!canEdit || isBusy}
+                      >
+                        <Check className="w-4 h-4 mr-1" />
+                        Salvar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={cancelEdit}
+                        disabled={isBusy}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Cancelar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(sale)}
+                        disabled={!canEdit || isBusy}
+                      >
+                        <Pencil className="w-4 h-4 mr-1" />
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDelete(sale.id)}
+                        disabled={!canEdit || isBusy}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Excluir
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
-                {isEditing ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={editingValue}
-                      onChange={(e) => setEditingValue(e.target.value)}
-                      disabled={!canEdit || isBusy}
-                      className="input-field h-9 w-40"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => confirmEdit(sale.id)}
-                      disabled={!canEdit || isBusy}
-                    >
-                      <Check className="w-4 h-4 mr-1" />
-                      Salvar
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={cancelEdit}
-                      disabled={isBusy}
-                    >
-                      <X className="w-4 h-4 mr-1" />
-                      Cancelar
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => startEdit(sale)}
-                      disabled={!canEdit || isBusy}
-                    >
-                      <Pencil className="w-4 h-4 mr-1" />
-                      Editar
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDelete(sale.id)}
-                      disabled={!canEdit || isBusy}
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Excluir
-                    </Button>
-                  </div>
+                {isEditing && editError && (
+                  <p className="text-sm text-destructive">{editError}</p>
                 )}
               </div>
             );

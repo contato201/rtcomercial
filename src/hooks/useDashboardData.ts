@@ -104,6 +104,24 @@ export const useDashboardData = () => {
     }
   }, []);
 
+  const applyUnitSalesAggregateToMonth = useCallback((monthName: string, list: UnitSaleRow[]) => {
+    const count = list.length;
+    const sum = list.reduce((s, it) => s + Number(it.valor || 0), 0);
+    const avg = count > 0 ? sum / count : 0;
+
+    setData((prev) =>
+      prev.map((m) => {
+        if (m.month !== monthName) return m;
+        return {
+          ...m,
+          realizadoVendas: count,
+          realizadoFaturamento: sum,
+          ticketRealizado: count > 0 ? avg : m.ticketRealizado,
+        };
+      })
+    );
+  }, []);
+
   // Carrega dados iniciais e configura realtime
   useEffect(() => {
     loadFromDatabase();
@@ -233,28 +251,86 @@ export const useDashboardData = () => {
     const v = valorSchema.safeParse(valor);
     if (!m.success || !v.success) return;
 
-    const { error } = await supabase.from('vendas_unitarias').insert({
-      month: m.data,
-      valor: v.data,
+    const { data: inserted, error } = await supabase
+      .from('vendas_unitarias')
+      .insert({ month: m.data, valor: v.data })
+      .select('*')
+      .single();
+    if (error) {
+      console.error('Erro ao inserir venda unitária:', error);
+      return;
+    }
+
+    // Atualização otimista do estado (não depende de realtime)
+    setUnitSalesByMonth((prev) => {
+      const next = { ...prev };
+      const list = [...(next[m.data] ?? [])];
+      const newRow: UnitSaleRow = {
+        id: inserted.id,
+        month: inserted.month,
+        valor: Number(inserted.valor || 0),
+        created_at: inserted.created_at,
+        updated_at: inserted.updated_at,
+      };
+      list.push(newRow);
+      next[m.data] = list;
+      // Atualiza agregados no dashboard imediatamente
+      applyUnitSalesAggregateToMonth(m.data, list);
+      return next;
     });
-    if (error) console.error('Erro ao inserir venda unitária:', error);
-  }, []);
+  }, [applyUnitSalesAggregateToMonth]);
 
   const updateUnitSale = useCallback(async (id: string, valor: number) => {
     const v = valorSchema.safeParse(valor);
     if (!v.success) return;
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('vendas_unitarias')
       .update({ valor: v.data })
-      .eq('id', id);
-    if (error) console.error('Erro ao atualizar venda unitária:', error);
-  }, []);
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) {
+      console.error('Erro ao atualizar venda unitária:', error);
+      return;
+    }
+
+    setUnitSalesByMonth((prev) => {
+      const next = { ...prev };
+      const monthName = String(updated.month);
+      const list = [...(next[monthName] ?? [])];
+      const idx = list.findIndex((s) => s.id === id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], valor: Number(updated.valor || 0), updated_at: updated.updated_at };
+      }
+      next[monthName] = list;
+      applyUnitSalesAggregateToMonth(monthName, list);
+      return next;
+    });
+  }, [applyUnitSalesAggregateToMonth]);
 
   const deleteUnitSale = useCallback(async (id: string) => {
-    const { error } = await supabase.from('vendas_unitarias').delete().eq('id', id);
-    if (error) console.error('Erro ao excluir venda unitária:', error);
-  }, []);
+    const { data: deleted, error } = await supabase
+      .from('vendas_unitarias')
+      .delete()
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+    if (error) {
+      console.error('Erro ao excluir venda unitária:', error);
+      return;
+    }
+    if (!deleted) return;
+
+    const monthName = String(deleted.month);
+    setUnitSalesByMonth((prev) => {
+      const next = { ...prev };
+      const list = (next[monthName] ?? []).filter((s) => s.id !== id);
+      next[monthName] = list;
+      applyUnitSalesAggregateToMonth(monthName, list);
+      return next;
+    });
+  }, [applyUnitSalesAggregateToMonth]);
 
   // Reverte para um valor anterior do histórico
   const revertToValue = useCallback(async (month: string, field: string, value: number) => {
