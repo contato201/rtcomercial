@@ -46,27 +46,27 @@ export const SyncStatusBanner = ({
   return (
     <div
       className={cn(
-        "rounded-lg border p-4 mb-6 animate-fade-in",
+        "rounded-lg border p-3 sm:p-4 mb-4 sm:mb-6 animate-fade-in",
         neverSynced 
           ? "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800" 
           : "bg-amber-50/80 border-amber-200/80 dark:bg-amber-950/20 dark:border-amber-800/60"
       )}
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-2 sm:gap-3">
           <div className="flex-shrink-0 mt-0.5">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
           </div>
           <div>
-            <h3 className="font-medium text-amber-800 dark:text-amber-200">
+            <h3 className="font-medium text-sm sm:text-base text-amber-800 dark:text-amber-200">
               {neverSynced 
                 ? "Dados não sincronizados" 
                 : "Seus dados estão desatualizados"
               }
             </h3>
-            <p className="text-sm text-amber-700/80 dark:text-amber-300/70 mt-0.5">
+            <p className="text-xs sm:text-sm text-amber-700/80 dark:text-amber-300/70 mt-0.5">
               {neverSynced ? (
-                "Clique em 'Sincronizar Agora' para carregar os dados do Google Sheets."
+                "Clique em 'Sincronizar Agora' para carregar os dados."
               ) : (
                 <>Última sincronização: <span className="font-medium">{formatLastSync()}</span></>
               )}
@@ -78,7 +78,7 @@ export const SyncStatusBanner = ({
           onClick={onSync}
           disabled={isSyncing}
           size="sm"
-          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex-shrink-0"
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex-shrink-0 min-h-[44px] sm:min-h-0 w-full sm:w-auto"
         >
           {isSyncing ? (
             <>

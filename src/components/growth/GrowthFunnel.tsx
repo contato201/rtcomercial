@@ -92,9 +92,9 @@ export const GrowthFunnel = ({
 
   return (
     <TooltipProvider>
-      <div className="bg-card rounded-xl border border-border p-6">
-        {/* Tabs com estados visuais distintos */}
-        <div className="flex justify-center gap-2 mb-8">
+      <div className="bg-card rounded-xl border border-border p-4 sm:p-6">
+        {/* Tabs com estados visuais distintos - scroll horizontal em mobile */}
+        <div className="flex justify-start sm:justify-center gap-2 mb-4 sm:mb-8 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
           <DashboardTab
             label="Detalhamento Geral"
             state="active"
@@ -110,23 +110,24 @@ export const GrowthFunnel = ({
             state="no-data"
           />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px_1fr] gap-6 items-start">
+        {/* Layout responsivo: empilhado em mobile/tablet, 3 colunas em desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px_1fr] xl:grid-cols-[1fr_320px_1fr] gap-4 sm:gap-6 items-start">
           
-          {/* Left KPIs */}
-          <div className="space-y-3">
+          {/* Left KPIs - Horizontal em mobile, vertical em desktop */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2 sm:gap-3 order-2 lg:order-1">
             {leftKPIs.map((kpi, idx) => (
               <div 
                 key={idx}
-                className="flex items-center gap-3 bg-muted/40 rounded-lg px-4 py-3 border border-border/50"
+                className="flex items-center gap-2 sm:gap-3 bg-muted/40 rounded-lg px-3 sm:px-4 py-2 sm:py-3 border border-border/50"
               >
                 <div 
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: `${kpi.color}15` }}
                 >
-                  <kpi.icon className="w-5 h-5" style={{ color: kpi.color }} />
+                  <kpi.icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: kpi.color }} />
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide truncate">
                     {kpi.tooltipKey ? (
                       <MetricTooltip label={kpi.tooltipKey}>
                         {kpi.label}
@@ -143,6 +144,7 @@ export const GrowthFunnel = ({
                     hasData={hasData}
                     lastSyncTime={lastSyncTime}
                     showSyncTooltip={kpi.showSyncTooltip}
+                    className="text-sm sm:text-base"
                   />
                 </div>
               </div>
@@ -150,14 +152,14 @@ export const GrowthFunnel = ({
           </div>
 
           {/* Center Funnel - Clean horizontal bars */}
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center order-1 lg:order-2">
             {stages.map((stage, idx) => (
               <div key={stage.label} className="w-full flex flex-col items-center">
                 {/* Conversion rate arrow between stages */}
                 {idx > 0 && (
-                  <div className="flex items-center gap-1.5 py-2">
-                    <ArrowDown className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  <div className="flex items-center gap-1.5 py-1.5 sm:py-2">
+                    <ArrowDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground" />
+                    <span className="text-[10px] sm:text-xs font-semibold text-primary bg-primary/10 px-1.5 sm:px-2 py-0.5 rounded-full">
                       {getRate(idx).toFixed(1)}%
                     </span>
                   </div>
@@ -165,18 +167,18 @@ export const GrowthFunnel = ({
                 
                 {/* Funnel bar */}
                 <div 
-                  className="flex items-center justify-center py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg cursor-default"
+                  className="flex items-center justify-center py-3 sm:py-4 rounded-lg sm:rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg cursor-default"
                   style={{ 
                     width: widths[idx],
                     backgroundColor: stage.color,
-                    minHeight: '64px'
+                    minHeight: '52px'
                   }}
                 >
-                <div className="text-center">
-                    <p className="text-white font-bold text-xl leading-none drop-shadow-sm">
+                  <div className="text-center">
+                    <p className="text-white font-bold text-lg sm:text-xl leading-none drop-shadow-sm">
                       {formatNumber(stage.value)}
                     </p>
-                    <p className="text-white/90 text-xs font-semibold mt-1 tracking-wide">
+                    <p className="text-white/90 text-[10px] sm:text-xs font-semibold mt-0.5 sm:mt-1 tracking-wide">
                       {stage.hasTooltip && stage.tooltipKey ? (
                         <MetricTooltip label={stage.tooltipKey} showIcon={false} className="text-white/90">
                           {stage.label}
@@ -191,41 +193,41 @@ export const GrowthFunnel = ({
             ))}
 
             {/* Legenda do funil */}
-            <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-border/50">
-              <div className="flex items-center gap-1.5">
+            <div className="flex items-center justify-center gap-3 sm:gap-4 mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-border/50">
+              <div className="flex items-center gap-1 sm:gap-1.5">
                 <div 
-                  className="w-3 h-3 rounded-full" 
+                  className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full" 
                   style={{ backgroundColor: FUNNEL_COLORS.leads }}
                 />
-                <span className="text-xs text-muted-foreground">Maior volume</span>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">Maior volume</span>
               </div>
-              <div className="text-muted-foreground/40">→</div>
-              <div className="flex items-center gap-1.5">
+              <div className="text-muted-foreground/40 text-sm">→</div>
+              <div className="flex items-center gap-1 sm:gap-1.5">
                 <div 
-                  className="w-3 h-3 rounded-full" 
+                  className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full" 
                   style={{ backgroundColor: FUNNEL_COLORS.vendas }}
                 />
-                <span className="text-xs text-muted-foreground">Conversão final</span>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">Conversão final</span>
               </div>
             </div>
           </div>
 
           {/* Right KPIs - Costs per stage */}
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2 sm:gap-3 order-3">
             {rightKPIs.map((kpi, idx) => (
               <div 
                 key={idx}
-                className="flex items-center gap-3 bg-muted/40 rounded-lg px-4 py-3 border-l-4"
+                className="flex items-center gap-2 sm:gap-3 bg-muted/40 rounded-lg px-3 sm:px-4 py-2 sm:py-3 border-l-4"
                 style={{ borderLeftColor: kpi.borderColor }}
               >
                 <div 
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: `${kpi.borderColor}15` }}
                 >
-                  <kpi.icon className="w-5 h-5" style={{ color: kpi.borderColor }} />
+                  <kpi.icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: kpi.borderColor }} />
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide truncate">
                     {kpi.tooltipKey ? (
                       <MetricTooltip label={kpi.tooltipKey}>
                         {kpi.label}
@@ -241,6 +243,7 @@ export const GrowthFunnel = ({
                     isSyncing={isSyncing}
                     hasData={hasData}
                     lastSyncTime={lastSyncTime}
+                    className="text-sm sm:text-base"
                   />
                 </div>
               </div>
