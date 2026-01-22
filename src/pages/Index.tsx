@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useAuth } from '@/hooks/useAuth';
-import { Header } from '@/components/dashboard/Header';
+import { AppNavbar } from '@/components/AppNavbar';
 import { FilterBar } from '@/components/dashboard/FilterBar';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { DataEntryForm } from '@/components/dashboard/DataEntryForm';
@@ -38,8 +38,14 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <AppNavbar />
+      
       <div className="max-w-[1600px] mx-auto p-6 lg:p-8">
-        <Header />
+        {/* Título da página */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Dashboard Comercial</h1>
+          <p className="text-sm text-muted-foreground">Acompanhamento de Metas vs Realizado</p>
+        </div>
         
         <FilterBar
           filterType={filterType}

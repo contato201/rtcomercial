@@ -21,6 +21,15 @@ interface CampaignData {
   status: string;
 }
 
+// Função para normalizar texto removendo acentos e caracteres especiais
+function normalizeText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[çÇ]/g, 'c') // Substitui cedilha
+    .toUpperCase();
+}
+
 function parseNumber(value: string | undefined): number {
   if (!value) return 0;
   const cleaned = value.toString().replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
@@ -115,7 +124,7 @@ serve(async (req) => {
       console.log(`Linha ${i}: Campaign="${campaignName.substring(0, 50)}"`);
     }
     
-    // Processar dados - filtrar apenas CAPTACAO/CAPTAÇÃO
+    // Processar dados - filtrar apenas CAPTACAO (sem acento, sem cedilha)
     const campaigns: CampaignData[] = [];
     const allCampaigns: CampaignData[] = [];
     
@@ -136,9 +145,9 @@ serve(async (req) => {
       
       allCampaigns.push(campaign);
       
-      // Filtrar CAPTACAO (case-insensitive)
-      const campaignUpper = campaign.campaignName.toUpperCase();
-      if (campaignUpper.includes('CAPTACAO') || campaignUpper.includes('CAPTAÇÃO')) {
+      // Normalizar e filtrar CAPTACAO (remove acentos e cedilha)
+      const normalizedCampaign = normalizeText(campaign.campaignName);
+      if (normalizedCampaign.includes('CAPTACAO')) {
         campaigns.push(campaign);
       }
     }
