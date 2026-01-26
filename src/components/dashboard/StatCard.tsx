@@ -57,7 +57,7 @@ export const StatCard = ({
         <div className="h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-primary to-[hsl(var(--success))] rounded-full transition-all duration-500"
-            style={{ width: `${Math.min((realizado / meta) * 100, 100) || 0}%` }}
+            style={{ width: `${meta > 0 ? Math.min((realizado / meta) * 100, 100) : 0}%` }}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-2 text-center">

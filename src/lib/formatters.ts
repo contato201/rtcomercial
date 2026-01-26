@@ -30,3 +30,10 @@ export const formatDateTime = (date: Date | null): string => {
     minute: '2-digit',
   }).format(date);
 };
+
+export const safePercentage = (realizado: number, meta: number): number => {
+  if (!meta || meta === 0) return 0;
+  if (!Number.isFinite(realizado)) return 0;
+  const result = (realizado / meta) * 100;
+  return Number.isFinite(result) ? result : 0;
+};
