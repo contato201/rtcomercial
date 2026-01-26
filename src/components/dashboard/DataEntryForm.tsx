@@ -311,7 +311,7 @@ export const DataEntryForm = ({
                         ? 'bg-warning' 
                         : 'bg-destructive'
                   }`}
-                  style={{ width: `${Math.min((currentData.realizadoVendas / currentData.metaVendas) * 100, 100)}%` }}
+                  style={{ width: `${currentData.metaVendas > 0 ? Math.min((currentData.realizadoVendas / currentData.metaVendas) * 100, 100) : 0}%` }}
                 />
               </div>
               <p className="text-xs text-center text-muted-foreground mt-1">
@@ -398,7 +398,7 @@ export const DataEntryForm = ({
                     ? 'bg-warning' 
                     : 'bg-destructive'
               }`}
-              style={{ width: `${Math.min((currentData.realizadoFaturamento / currentData.metaFaturamento) * 100, 100)}%` }}
+              style={{ width: `${currentData.metaFaturamento > 0 ? Math.min((currentData.realizadoFaturamento / currentData.metaFaturamento) * 100, 100) : 0}%` }}
             />
           </div>
           <p className="text-xs text-center text-muted-foreground mt-1">
