@@ -120,20 +120,26 @@ export const useGrowthData = () => {
     }
   }, []);
 
-  const syncFromSheets = useCallback(async () => {
+  const [investimentoAcumulado, setInvestimentoAcumulado] = useState<number>(0);
+
+  const syncFromSheets = useCallback(async (monthToSync?: number) => {
+    const targetMonth = monthToSync ?? selectedMonth;
     setIsSyncing(true);
     try {
-      const { data: response, error } = await supabase.functions.invoke('fetch-sheets-data');
+      const { data: monthResponse, error: monthError } = await supabase.functions.invoke(
+        `fetch-sheets-data?month=${targetMonth}`,
+      );
 
-      if (error) throw error;
+      if (monthError) throw monthError;
 
-      if (response?.success) {
-        setCampaigns(response.campaigns || []);
-        setAvailableFilters(response.filters || { campaigns: [], adsets: [], statuses: [] });
+      if (monthResponse?.success) {
+        setCampaigns(monthResponse.campaigns || []);
+        setAvailableFilters(monthResponse.filters || { campaigns: [], adsets: [], statuses: [] });
+        setInvestimentoAcumulado(monthResponse.investimentoAcumulado || 0);
         
-        // Salvar totais no banco para o mês atual
-        const monthName = MONTHS[selectedMonth];
-        const totals = response.totals;
+        // Salvar totais no banco para o mês selecionado
+        const monthName = MONTHS[targetMonth];
+        const totals = monthResponse.totals;
         
         const { error: upsertError } = await supabase
           .from('dados_trafego' as any)
@@ -154,7 +160,8 @@ export const useGrowthData = () => {
 
         await loadFromDatabase();
         setLastSyncTime(new Date());
-        toast.success(`${response.count} campanhas de CAPTAÇÃO carregadas!`);
+        syncedMonth.current = targetMonth;
+        toast.success(`${monthResponse.count} campanhas de CAPTAÇÃO carregadas para ${monthName}!`);
       }
     } catch (error) {
       console.error('Erro ao sincronizar:', error);
@@ -300,6 +307,7 @@ export const useGrowthData = () => {
     isSyncing,
     lastSyncTime,
     hasData,
+    investimentoAcumulado,
     syncFromSheets,
     updateManualData,
   };
