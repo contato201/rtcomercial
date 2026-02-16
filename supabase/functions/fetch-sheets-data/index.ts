@@ -63,11 +63,10 @@ function getMonthFromDate(dateStr: string): number {
   // Try common date formats
   const trimmed = dateStr.trim();
   
-  // MM/DD/YYYY or DD/MM/YYYY
+  // DD/MM/YYYY (formato brasileiro)
   const slashParts = trimmed.split('/');
   if (slashParts.length === 3) {
-    // Assume MM/DD/YYYY (common in US/Sheets)
-    const month = parseInt(slashParts[0], 10);
+    const month = parseInt(slashParts[1], 10); // Segundo campo é o mês
     if (month >= 1 && month <= 12) {
       return month - 1;
     }
