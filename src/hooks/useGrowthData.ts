@@ -249,10 +249,13 @@ export const useGrowthData = () => {
     };
   }, [syncFromSheets]);
 
+  // O mês em que o sync foi feito (mês atual do sistema)
+  const syncedMonth = useRef<number>(new Date().getMonth());
+
   const currentMonthData = useMemo(() => {
     const baseData = data[selectedMonth];
-    // Sobrescrever com dados do Sheets se houver sync
-    if (lastSyncTime && campaigns.length > 0) {
+    // Sobrescrever com dados do Sheets APENAS para o mês que foi sincronizado
+    if (lastSyncTime && campaigns.length > 0 && selectedMonth === syncedMonth.current) {
       // Usar totais filtrados se houver filtros ativos, senão usar todos
       const hasActiveFilters = activeFilters.campaign || activeFilters.adset || activeFilters.status;
       const totalsToUse = hasActiveFilters ? filteredTotals : {
