@@ -237,7 +237,7 @@ serve(async (req) => {
       campaigns.push(campaign);
     }
     
-    console.log(`=== RESULTADO: ${campaigns.length} campanhas CAPTACAO ${filterMonth !== null ? `do mês ${filterMonth}` : 'TOTAL'} ===`);
+    console.log(`=== RESULTADO: ${campaigns.length} campanhas TODAS ${filterMonth !== null ? `do mês ${filterMonth}` : 'TOTAL'} ===`);
     console.log(`=== MESES ENCONTRADOS: ${Object.keys(monthlyTotals).join(', ')} ===`);
     
     // Calcular totais do mês filtrado
