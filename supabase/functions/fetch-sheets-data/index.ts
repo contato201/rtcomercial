@@ -6,7 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ID da planilha e GID específico da aba "Meta Ads" com dados de campanhas
 const SHEET_ID = '1eHadRBjkkm7d2yq5-MKDcVtC6naXrz26FVn7OObUejI';
 const SHEET_GID = '2051070694';
 
@@ -22,12 +21,11 @@ interface CampaignData {
   status: string;
 }
 
-// Função para normalizar texto removendo acentos e caracteres especiais
 function normalizeText(text: string): string {
   return text
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[çÇ]/g, 'c') // Substitui cedilha
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[çÇ]/g, 'c')
     .toUpperCase();
 }
 
@@ -58,12 +56,46 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
+// Parse date string and return month (0-11) or -1 if invalid
+function getMonthFromDate(dateStr: string): number {
+  if (!dateStr || !dateStr.trim()) return -1;
+  
+  // Try common date formats
+  const trimmed = dateStr.trim();
+  
+  // MM/DD/YYYY or DD/MM/YYYY
+  const slashParts = trimmed.split('/');
+  if (slashParts.length === 3) {
+    // Assume MM/DD/YYYY (common in US/Sheets)
+    const month = parseInt(slashParts[0], 10);
+    if (month >= 1 && month <= 12) {
+      return month - 1;
+    }
+  }
+  
+  // YYYY-MM-DD
+  const dashParts = trimmed.split('-');
+  if (dashParts.length === 3 && dashParts[0].length === 4) {
+    const month = parseInt(dashParts[1], 10);
+    if (month >= 1 && month <= 12) {
+      return month - 1;
+    }
+  }
+  
+  // Try native Date parse as fallback
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) {
+    return d.getMonth();
+  }
+  
+  return -1;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Authentication check
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response(
@@ -88,7 +120,6 @@ serve(async (req) => {
     );
   }
 
-  // Verify user is the authorized editor
   const userEmail = data.claims.email;
   if (userEmail !== 'contato@allancatao.com.br') {
     return new Response(
@@ -97,15 +128,20 @@ serve(async (req) => {
     );
   }
 
+  // Parse optional month filter from query params (0-11)
+  const url = new URL(req.url);
+  const monthParam = url.searchParams.get('month');
+  const filterMonth = monthParam !== null ? parseInt(monthParam, 10) : null;
+
   try {
-    // URL direta com GID específico - garante que busca a aba correta
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
     
     console.log(`=== BUSCANDO DADOS ===`);
-    console.log(`URL: ${url}`);
+    console.log(`URL: ${sheetUrl}`);
     console.log(`User: ${userEmail}`);
+    console.log(`Filtro mês: ${filterMonth !== null ? filterMonth : 'TODOS'}`);
     
-    const response = await fetch(url);
+    const response = await fetch(sheetUrl);
     
     if (!response.ok) {
       throw new Error(`Erro ao buscar planilha: ${response.status} ${response.statusText}`);
@@ -120,12 +156,10 @@ serve(async (req) => {
       throw new Error('Planilha vazia ou sem dados');
     }
     
-    // Parse headers (primeira linha)
     const headers = parseCSVLine(lines[0]);
     console.log(`=== HEADERS ===`);
     console.log(JSON.stringify(headers.slice(0, 20)));
     
-    // Encontrar índices das colunas (flexível para variações de nome)
     const findColumn = (patterns: string[]): number => {
       for (let i = 0; i < headers.length; i++) {
         const h = headers[i].toLowerCase().trim();
@@ -138,7 +172,9 @@ serve(async (req) => {
       return -1;
     };
     
+    const dateIndex = findColumn(['date', 'data', 'dia']);
     const columnIndices = {
+      date: dateIndex,
       campaignName: findColumn(['campaign name', 'nome da campanha', 'campanha']),
       adsetName: findColumn(['adset name', 'nome do conjunto', 'conjunto']),
       adName: findColumn(['ad name', 'nome do anúncio', 'anuncio']),
@@ -153,22 +189,26 @@ serve(async (req) => {
     console.log(`=== ÍNDICES DAS COLUNAS ===`);
     console.log(JSON.stringify(columnIndices));
     
-    // Log primeiras linhas de dados para debug
-    for (let i = 1; i <= Math.min(5, lines.length - 1); i++) {
-      const cols = parseCSVLine(lines[i]);
-      const campaignName = columnIndices.campaignName >= 0 ? (cols[columnIndices.campaignName] || '') : '';
-      console.log(`Linha ${i}: Campaign="${campaignName.substring(0, 50)}"`);
-    }
-    
-    // Processar dados - filtrar apenas CAPTACAO (sem acento, sem cedilha)
+    // Processar dados
     const campaigns: CampaignData[] = [];
-    const allCampaigns: CampaignData[] = [];
+    // Acumulador por mês para totais mensais
+    const monthlyTotals: Record<number, { investimento: number; impressoes: number; cliques: number; linkClicks: number; leads: number }> = {};
     
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i]);
       
+      const campaignName = columnIndices.campaignName >= 0 ? (cols[columnIndices.campaignName] || '') : '';
+      
+      // Filtrar CAPTACAO
+      const normalizedCampaign = normalizeText(campaignName);
+      if (!normalizedCampaign.includes('CAPTACAO')) continue;
+      
+      // Parse date to get month
+      const dateStr = dateIndex >= 0 ? (cols[dateIndex] || '') : '';
+      const rowMonth = getMonthFromDate(dateStr);
+      
       const campaign: CampaignData = {
-        campaignName: columnIndices.campaignName >= 0 ? (cols[columnIndices.campaignName] || '') : '',
+        campaignName,
         adsetName: columnIndices.adsetName >= 0 ? (cols[columnIndices.adsetName] || '') : '',
         adName: columnIndices.adName >= 0 ? (cols[columnIndices.adName] || '') : '',
         amountSpent: columnIndices.amountSpent >= 0 ? parseNumber(cols[columnIndices.amountSpent]) : 0,
@@ -179,25 +219,31 @@ serve(async (req) => {
         status: columnIndices.status >= 0 ? (cols[columnIndices.status] || 'active') : 'active',
       };
       
-      allCampaigns.push(campaign);
-      
-      // Normalizar e filtrar CAPTACAO (remove acentos e cedilha)
-      const normalizedCampaign = normalizeText(campaign.campaignName);
-      if (normalizedCampaign.includes('CAPTACAO')) {
-        campaigns.push(campaign);
+      // Acumular totais por mês (para o acumulado geral)
+      if (rowMonth >= 0) {
+        if (!monthlyTotals[rowMonth]) {
+          monthlyTotals[rowMonth] = { investimento: 0, impressoes: 0, cliques: 0, linkClicks: 0, leads: 0 };
+        }
+        monthlyTotals[rowMonth].investimento += campaign.amountSpent;
+        monthlyTotals[rowMonth].impressoes += campaign.impressions;
+        monthlyTotals[rowMonth].cliques += campaign.clicks;
+        monthlyTotals[rowMonth].linkClicks += campaign.linkClicks;
+        monthlyTotals[rowMonth].leads += campaign.leads;
       }
+      
+      // Se há filtro de mês, só incluir campanhas desse mês
+      if (filterMonth !== null) {
+        if (rowMonth !== filterMonth) continue;
+      }
+      
+      campaigns.push(campaign);
     }
     
-    console.log(`=== RESULTADO: ${campaigns.length} campanhas CAPTACAO de ${lines.length - 1} linhas ===`);
+    console.log(`=== RESULTADO: ${campaigns.length} campanhas CAPTACAO ${filterMonth !== null ? `do mês ${filterMonth}` : 'TOTAL'} ===`);
+    console.log(`=== MESES ENCONTRADOS: ${Object.keys(monthlyTotals).join(', ')} ===`);
     
-    // Se não encontrou campanhas CAPTACAO, retornar todas (para debug)
-    const finalCampaigns = campaigns.length > 0 ? campaigns : allCampaigns;
-    if (campaigns.length === 0) {
-      console.log('Nenhuma campanha CAPTACAO encontrada, retornando todas...');
-    }
-    
-    // Calcular totais
-    const totals = finalCampaigns.reduce((acc, c) => ({
+    // Calcular totais do mês filtrado
+    const totals = campaigns.reduce((acc, c) => ({
       investimento: acc.investimento + c.amountSpent,
       impressoes: acc.impressoes + c.impressions,
       cliques: acc.cliques + c.clicks,
@@ -205,36 +251,47 @@ serve(async (req) => {
       leads: acc.leads + c.leads,
     }), { investimento: 0, impressoes: 0, cliques: 0, linkClicks: 0, leads: 0 });
     
-    // Calcular métricas
     const cpc = totals.cliques > 0 ? totals.investimento / totals.cliques : 0;
     const cpl = totals.leads > 0 ? totals.investimento / totals.leads : 0;
     
-    console.log(`=== TOTAIS ===`);
+    // Calcular investimento acumulado (todos os meses até o mês filtrado ou todos)
+    let investimentoAcumulado = 0;
+    const maxMonth = filterMonth !== null ? filterMonth : 11;
+    for (let m = 0; m <= maxMonth; m++) {
+      if (monthlyTotals[m]) {
+        investimentoAcumulado += monthlyTotals[m].investimento;
+      }
+    }
+    
+    console.log(`=== TOTAIS MÊS ===`);
     console.log(JSON.stringify({ ...totals, cpc, cpl }));
+    console.log(`=== INVESTIMENTO ACUMULADO: ${investimentoAcumulado} ===`);
     
     // Filtros disponíveis
-    const uniqueCampaigns = [...new Set(finalCampaigns.map(c => c.campaignName).filter(Boolean))];
-    const uniqueAdsets = [...new Set(finalCampaigns.map(c => c.adsetName).filter(Boolean))];
-    const uniqueStatuses = [...new Set(finalCampaigns.map(c => c.status).filter(Boolean))];
+    const uniqueCampaigns = [...new Set(campaigns.map(c => c.campaignName).filter(Boolean))];
+    const uniqueAdsets = [...new Set(campaigns.map(c => c.adsetName).filter(Boolean))];
+    const uniqueStatuses = [...new Set(campaigns.map(c => c.status).filter(Boolean))];
     
     return new Response(
       JSON.stringify({
         success: true,
-        campaigns: finalCampaigns,
+        campaigns,
         totals: { ...totals, cpc, cpl },
+        investimentoAcumulado,
+        monthlyTotals,
         filters: {
           campaigns: uniqueCampaigns,
           adsets: uniqueAdsets,
           statuses: uniqueStatuses,
         },
-        count: finalCampaigns.length,
+        count: campaigns.length,
         debug: {
           totalLines: lines.length,
           captacaoCount: campaigns.length,
-          allCampaignsCount: allCampaigns.length,
           headers: headers.slice(0, 15),
           indices: columnIndices,
           gid: SHEET_GID,
+          filterMonth,
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -248,7 +305,8 @@ serve(async (req) => {
         success: false, 
         error: errorMessage,
         campaigns: [],
-        totals: { investimento: 0, impressoes: 0, cliques: 0, linkClicks: 0, leads: 0, cpc: 0, cpl: 0 }
+        totals: { investimento: 0, impressoes: 0, cliques: 0, linkClicks: 0, leads: 0, cpc: 0, cpl: 0 },
+        investimentoAcumulado: 0,
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

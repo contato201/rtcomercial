@@ -12,6 +12,7 @@ interface GrowthMetricsCardsProps {
   isLoading?: boolean;
   isSyncing?: boolean;
   hasData?: boolean;
+  investimentoAcumulado?: number;
 }
 
 // Estilo monocromático padronizado para todos os ícones
@@ -35,6 +36,7 @@ export const GrowthMetricsCards = ({
   isLoading = false,
   isSyncing = false,
   hasData = true,
+  investimentoAcumulado = 0,
 }: GrowthMetricsCardsProps) => {
   const roi = data.investimento > 0 
     ? ((data.valorVendas - data.investimento) / data.investimento) * 100
@@ -145,9 +147,15 @@ export const GrowthMetricsCards = ({
   return (
     <TooltipProvider>
       <div className="space-y-3 sm:space-y-4">
-        {/* Card Destaque: INVESTIMENTO */}
+        {/* Card Destaque: INVESTIMENTO + ACUMULADO */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {renderMetricCard(investmentMetric, true)}
+          {renderMetricCard({
+            title: 'INVESTIDO ACUMULADO',
+            value: investimentoAcumulado,
+            formatter: formatCurrency,
+            icon: TrendingUp,
+          }, false)}
         </div>
 
         {/* Performance: ROI & ROAS */}

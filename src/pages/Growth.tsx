@@ -29,6 +29,7 @@ const Growth = () => {
     isSyncing,
     lastSyncTime,
     hasData,
+    investimentoAcumulado,
     syncFromSheets,
     updateManualData,
   } = useGrowthData();
@@ -81,7 +82,7 @@ const Growth = () => {
               </Select>
 
               <Button 
-                onClick={syncFromSheets} 
+                onClick={() => syncFromSheets()} 
                 disabled={isSyncing}
                 variant="outline"
                 size="sm"
@@ -97,7 +98,7 @@ const Growth = () => {
         {/* Banner de Status de Sincronização */}
         <SyncStatusBanner
           lastSyncTime={lastSyncTime}
-          onSync={syncFromSheets}
+          onSync={() => syncFromSheets()}
           isSyncing={isSyncing}
           hasData={hasData}
         />
@@ -122,6 +123,7 @@ const Growth = () => {
             isLoading={isLoading}
             isSyncing={isSyncing}
             hasData={hasData}
+            investimentoAcumulado={investimentoAcumulado}
           />
         </div>
 
