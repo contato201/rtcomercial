@@ -199,9 +199,7 @@ serve(async (req) => {
       
       const campaignName = columnIndices.campaignName >= 0 ? (cols[columnIndices.campaignName] || '') : '';
       
-      // Filtrar CAPTACAO
-      const normalizedCampaign = normalizeText(campaignName);
-      if (!normalizedCampaign.includes('CAPTACAO')) continue;
+      // Incluir todas as campanhas (sem filtro de CAPTACAO)
       
       // Parse date to get month
       const dateStr = dateIndex >= 0 ? (cols[dateIndex] || '') : '';
