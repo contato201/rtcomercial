@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { UnitSalesEditor, type UnitSale } from '@/components/dashboard/UnitSalesEditor';
 import { AgendamentosEditor, type AgendamentoRow } from '@/components/dashboard/AgendamentosEditor';
+import { ReunioesEditor, type ReuniaoEntry } from '@/components/dashboard/ReunioesEditor';
 
 interface DataEntryFormProps {
   selectedMonth: number;
