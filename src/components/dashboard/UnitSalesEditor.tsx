@@ -8,6 +8,7 @@ export type UnitSale = {
   id: string;
   month: string;
   valor: number;
+  cliente: string;
   created_at: string;
   updated_at: string;
 };
