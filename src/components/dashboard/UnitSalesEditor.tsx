@@ -39,8 +39,8 @@ interface UnitSalesEditorProps {
   monthLabel: string;
   sales: UnitSale[];
   canEdit: boolean;
-  onAdd: (valor: number) => Promise<void> | void;
-  onUpdate: (id: string, valor: number) => Promise<void> | void;
+  onAdd: (valor: number, cliente: string) => Promise<void> | void;
+  onUpdate: (id: string, valor: number, cliente: string) => Promise<void> | void;
   onDelete: (id: string) => Promise<void> | void;
 }
 
