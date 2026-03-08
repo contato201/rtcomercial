@@ -53,6 +53,7 @@ export const UnitSalesEditor = ({
   onDelete,
 }: UnitSalesEditorProps) => {
   const [newValue, setNewValue] = useState("");
+  const [newCliente, setNewCliente] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
