@@ -166,8 +166,39 @@ export type Database = {
           },
         ]
       }
+      reunioes_entries: {
+        Row: {
+          created_at: string
+          data_lancamento: string
+          id: string
+          month: string
+          quantidade: number
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_lancamento?: string
+          id?: string
+          month: string
+          quantidade?: number
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_lancamento?: string
+          id?: string
+          month?: string
+          quantidade?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vendas_unitarias: {
         Row: {
+          cliente: string
           created_at: string
           id: string
           month: string
@@ -175,6 +206,7 @@ export type Database = {
           valor: number
         }
         Insert: {
+          cliente?: string
           created_at?: string
           id?: string
           month: string
@@ -182,6 +214,7 @@ export type Database = {
           valor?: number
         }
         Update: {
+          cliente?: string
           created_at?: string
           id?: string
           month?: string
