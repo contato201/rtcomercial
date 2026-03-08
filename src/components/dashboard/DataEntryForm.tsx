@@ -230,7 +230,7 @@ export const DataEntryForm = ({
             monthLabel={MONTHS[selectedMonth]}
             sales={unitSales}
             canEdit={canEdit}
-            onAdd={(valor) => onAddUnitSale(selectedMonth, valor)}
+            onAdd={(valor, cliente) => onAddUnitSale(selectedMonth, valor, cliente)}
             onUpdate={onUpdateUnitSale}
             onDelete={onDeleteUnitSale}
           />
