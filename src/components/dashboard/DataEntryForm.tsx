@@ -13,13 +13,16 @@ interface DataEntryFormProps {
   currentData: MonthData;
   unitSales: UnitSale[];
   agendamentos: AgendamentoRow[];
+  reunioesEntries: ReuniaoEntry[];
   metaAgendamentos: number;
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
-  onAddUnitSale: (monthIndex: number, valor: number) => Promise<void> | void;
-  onUpdateUnitSale: (id: string, valor: number) => Promise<void> | void;
+  onAddUnitSale: (monthIndex: number, valor: number, cliente: string) => Promise<void> | void;
+  onUpdateUnitSale: (id: string, valor: number, cliente: string) => Promise<void> | void;
   onDeleteUnitSale: (id: string) => Promise<void> | void;
   onAddAgendamento: (monthIndex: number, pessoa: 'Tadeu' | 'Nicole', quantidade: number) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
+  onAddReuniaoEntry: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number) => Promise<void>;
+  onDeleteReuniaoEntry: (id: string) => Promise<void>;
   onReset: () => void;
   onOpenHistory: () => void;
   canEdit: boolean;
