@@ -66,6 +66,7 @@ const Index = () => {
             currentData={data[selectedMonth]}
             unitSales={unitSalesByMonth[data[selectedMonth].month] ?? []}
             agendamentos={agendamentos}
+            reunioesEntries={reunioesEntries}
             metaAgendamentos={getMetaAgendamentos(selectedMonth)}
             onUpdate={updateMonthData}
             onAddUnitSale={addUnitSale}
@@ -73,6 +74,8 @@ const Index = () => {
             onDeleteUnitSale={deleteUnitSale}
             onAddAgendamento={addAgendamento}
             onDeleteAgendamento={deleteAgendamento}
+            onAddReuniaoEntry={addReuniaoEntry}
+            onDeleteReuniaoEntry={deleteReuniaoEntry}
             onReset={resetData}
             onOpenHistory={() => setIsHistoryOpen(true)}
             canEdit={canEdit}
