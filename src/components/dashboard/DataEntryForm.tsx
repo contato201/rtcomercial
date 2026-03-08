@@ -6,19 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { UnitSalesEditor, type UnitSale } from '@/components/dashboard/UnitSalesEditor';
 import { AgendamentosEditor, type AgendamentoRow } from '@/components/dashboard/AgendamentosEditor';
+import { ReunioesEditor, type ReuniaoEntry } from '@/components/dashboard/ReunioesEditor';
 
 interface DataEntryFormProps {
   selectedMonth: number;
   currentData: MonthData;
   unitSales: UnitSale[];
   agendamentos: AgendamentoRow[];
+  reunioesEntries: ReuniaoEntry[];
   metaAgendamentos: number;
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
-  onAddUnitSale: (monthIndex: number, valor: number) => Promise<void> | void;
-  onUpdateUnitSale: (id: string, valor: number) => Promise<void> | void;
+  onAddUnitSale: (monthIndex: number, valor: number, cliente: string) => Promise<void> | void;
+  onUpdateUnitSale: (id: string, valor: number, cliente: string) => Promise<void> | void;
   onDeleteUnitSale: (id: string) => Promise<void> | void;
   onAddAgendamento: (monthIndex: number, pessoa: 'Tadeu' | 'Nicole', quantidade: number) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
+  onAddReuniaoEntry: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number) => Promise<void>;
+  onDeleteReuniaoEntry: (id: string) => Promise<void>;
   onReset: () => void;
   onOpenHistory: () => void;
   canEdit: boolean;
@@ -29,6 +33,7 @@ export const DataEntryForm = ({
   currentData,
   unitSales,
   agendamentos,
+  reunioesEntries,
   metaAgendamentos,
   onUpdate,
   onAddUnitSale,
@@ -36,6 +41,8 @@ export const DataEntryForm = ({
   onDeleteUnitSale,
   onAddAgendamento,
   onDeleteAgendamento,
+  onAddReuniaoEntry,
+  onDeleteReuniaoEntry,
   onReset,
   onOpenHistory,
   canEdit,
@@ -182,82 +189,28 @@ export const DataEntryForm = ({
         />
       </div>
 
-      {/* 2. REUNIÕES - 1ª e 2ª */}
+      {/* 2. REUNIÕES - 1ª e 2ª (lançamento incremental) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {inputGroups.map((group) => {
-          const realizadoValue = group.realizadoValue || 0;
-          const metaValue = group.meta || 1;
-          const progress = getProgressStatus(metaValue, realizadoValue);
-          const isComplete = progress.percent >= 100;
-          
-          return (
-            <div key={group.title} className={`relative bg-card rounded-xl p-4 border-2 transition-all duration-300 ${
-              isComplete 
-                ? 'border-[hsl(var(--success))]/50 shadow-[0_0_20px_hsl(var(--success)/0.1)]' 
-                : 'border-border hover:border-primary/30'
-            }`}>
-              {/* Indicador de conclusão */}
-              {isComplete && (
-                <div className="absolute -top-2 -right-2 bg-[hsl(var(--success))] rounded-full p-1 shadow-lg">
-                  <CheckCircle2 className="w-4 h-4 text-white" />
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <group.icon className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold text-foreground">{group.title}</h3>
-                </div>
-              </div>
-              
-              {/* Meta fixa - visual destacado */}
-              <div className="mb-3 p-2 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Lock className="w-3 h-3 text-primary/60" />
-                  <span className="text-xs text-primary/80 font-medium">Meta</span>
-                </div>
-                <span className="text-lg font-bold text-primary">{group.meta}</span>
-              </div>
-              
-              {/* Campo editável para realizado */}
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1.5 font-medium">
-                  Realizado
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={group.realizadoValue || ''}
-                  onChange={(e) => handleInputChange(group.realizadoField, e.target.value)}
-                  placeholder="Digite aqui..."
-                  disabled={!canEdit}
-                  className={`input-field text-center text-xl font-bold transition-all ${
-                    !canEdit ? 'cursor-not-allowed opacity-60' :
-                    isComplete 
-                      ? 'border-[hsl(var(--success))] bg-[hsl(var(--success))]/5 text-[hsl(var(--success))]' 
-                      : group.realizadoValue > 0 ? 'border-primary/50' : ''
-                  }`}
-                />
-              </div>
-
-              {/* Mini barra de progresso */}
-              <div className="mt-3">
-                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      progress.status === 'success' ? 'bg-[hsl(var(--success))]' :
-                      progress.status === 'warning' ? 'bg-warning' : 'bg-destructive'
-                    }`}
-                    style={{ width: `${Math.min(progress.percent, 100)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-center text-muted-foreground mt-1">
-                  {metaValue > 0 ? `${((realizadoValue / metaValue) * 100).toFixed(0)}% da meta` : '0% da meta'}
-                </p>
-              </div>
-            </div>
-          );
-        })}
+        <ReunioesEditor
+          selectedMonth={selectedMonth}
+          tipo="primeira"
+          label="1ª Reuniões"
+          entries={reunioesEntries}
+          meta={currentData.metaPrimeiraReuniao}
+          onAdd={onAddReuniaoEntry}
+          onDelete={onDeleteReuniaoEntry}
+          canEdit={canEdit}
+        />
+        <ReunioesEditor
+          selectedMonth={selectedMonth}
+          tipo="segunda"
+          label="2ª Reuniões"
+          entries={reunioesEntries}
+          meta={currentData.metaSegundaReuniao}
+          onAdd={onAddReuniaoEntry}
+          onDelete={onDeleteReuniaoEntry}
+          canEdit={canEdit}
+        />
       </div>
 
       {/* 3. FATURAMENTO - Final do funil */}
@@ -277,7 +230,7 @@ export const DataEntryForm = ({
             monthLabel={MONTHS[selectedMonth]}
             sales={unitSales}
             canEdit={canEdit}
-            onAdd={(valor) => onAddUnitSale(selectedMonth, valor)}
+            onAdd={(valor, cliente) => onAddUnitSale(selectedMonth, valor, cliente)}
             onUpdate={onUpdateUnitSale}
             onDelete={onDeleteUnitSale}
           />

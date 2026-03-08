@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { z } from "zod";
-import { Trash2, Pencil, Check, X, Plus } from "lucide-react";
+import { Trash2, Pencil, Check, X, Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -8,6 +8,7 @@ export type UnitSale = {
   id: string;
   month: string;
   valor: number;
+  cliente: string;
   created_at: string;
   updated_at: string;
 };
@@ -19,27 +20,24 @@ const moneySchema = z
   .max(1_000_000, "Valor muito alto");
 
 const parseCurrencyToNumber = (raw: string) => {
-  // aceita "1.234,56" ou "1234"; internamente salva em reais com 2 casas
   const cleaned = raw
     .trim()
     .replace(/[^0-9,.-]/g, "")
-    .replace(/\.(?=\d{3}(?:\D|$))/g, "") // remove separador de milhar
+    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
     .replace(",", ".");
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
 };
 
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-    value
-  );
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 interface UnitSalesEditorProps {
   monthLabel: string;
   sales: UnitSale[];
   canEdit: boolean;
-  onAdd: (valor: number) => Promise<void> | void;
-  onUpdate: (id: string, valor: number) => Promise<void> | void;
+  onAdd: (valor: number, cliente: string) => Promise<void> | void;
+  onUpdate: (id: string, valor: number, cliente: string) => Promise<void> | void;
   onDelete: (id: string) => Promise<void> | void;
 }
 
@@ -52,9 +50,11 @@ export const UnitSalesEditor = ({
   onDelete,
 }: UnitSalesEditorProps) => {
   const [newValue, setNewValue] = useState("");
+  const [newCliente, setNewCliente] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [editingCliente, setEditingCliente] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -89,8 +89,9 @@ export const UnitSalesEditor = ({
     try {
       setIsAdding(true);
       setFormError(null);
-      await onAdd(parsed.data);
+      await onAdd(parsed.data, newCliente.trim());
       setNewValue("");
+      setNewCliente("");
     } finally {
       setIsAdding(false);
     }
@@ -100,12 +101,14 @@ export const UnitSalesEditor = ({
     if (!canEdit) return;
     setEditingId(sale.id);
     setEditingValue(String(sale.valor ?? ""));
+    setEditingCliente(sale.cliente ?? "");
     setEditError(null);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditingValue("");
+    setEditingCliente("");
     setEditError(null);
   };
 
@@ -117,11 +120,10 @@ export const UnitSalesEditor = ({
       setEditError(parsed.error.issues[0]?.message ?? "Valor inválido");
       return;
     }
-
     try {
       setBusyId(id);
       setEditError(null);
-      await onUpdate(id, parsed.data);
+      await onUpdate(id, parsed.data, editingCliente.trim());
       cancelEdit();
     } finally {
       setBusyId(null);
@@ -155,6 +157,19 @@ export const UnitSalesEditor = ({
       </div>
 
       <div className="mt-3 flex flex-col sm:flex-row gap-2">
+        <div className="flex-1">
+          <label className="text-xs text-muted-foreground block mb-1 font-medium">
+            Nome do cliente
+          </label>
+          <input
+            type="text"
+            value={newCliente}
+            onChange={(e) => setNewCliente(e.target.value)}
+            placeholder="Ex: João Silva"
+            disabled={!canEdit || isAdding}
+            className={`input-field ${!canEdit ? "cursor-not-allowed opacity-60" : ""}`}
+          />
+        </div>
         <div className="flex-1">
           <label className="text-xs text-muted-foreground block mb-1 font-medium">
             Valor da venda
@@ -199,6 +214,12 @@ export const UnitSalesEditor = ({
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">
                       Venda #{idx + 1}: {formatCurrency(Number(sale.valor || 0))}
+                      {sale.cliente && (
+                        <span className="ml-2 text-muted-foreground font-normal">
+                          <User className="w-3 h-3 inline mr-1" />
+                          {sale.cliente}
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {sale.created_at ? `Criada em ${formatDate(sale.created_at)}` : ""}
@@ -206,14 +227,22 @@ export const UnitSalesEditor = ({
                   </div>
 
                   {isEditing ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="text"
+                        value={editingCliente}
+                        onChange={(e) => setEditingCliente(e.target.value)}
+                        placeholder="Cliente"
+                        disabled={!canEdit || isBusy}
+                        className="input-field h-9 w-32"
+                      />
                       <input
                         type="text"
                         inputMode="decimal"
                         value={editingValue}
                         onChange={(e) => setEditingValue(e.target.value)}
                         disabled={!canEdit || isBusy}
-                        className="input-field h-9 w-40"
+                        className="input-field h-9 w-32"
                       />
                       <Button
                         type="button"
