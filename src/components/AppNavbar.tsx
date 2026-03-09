@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, LogIn, LogOut, Pencil } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, UserSearch, LogIn, LogOut, Pencil } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Comercial', href: '/', icon: LayoutDashboard },
   { label: 'Growth', href: '/growth', icon: TrendingUp },
+  { label: 'Análise de Perfil', href: '/analise', icon: UserSearch },
 ];
 
 export const AppNavbar = () => {
