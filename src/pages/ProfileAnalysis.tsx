@@ -101,6 +101,8 @@ const ProfileAnalysis = () => {
         body: {
           pdfText: finalPdfText || undefined,
           pageUrl: pageUrl || undefined,
+          pageType: pageType || undefined,
+          businessType: businessType || undefined,
           scripts: scripts || undefined,
         },
       });
