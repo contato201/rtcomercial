@@ -147,7 +147,28 @@ const ProfileAnalysis = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Input Form */}
-          <div className="space-y-4">
+        <div className="space-y-4">
+            {/* Tipo de Negócio */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">📋 Tipo de Negócio</CardTitle>
+                <CardDescription>Selecione o tipo de negócio do prospect</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={businessType} onValueChange={setBusinessType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo de negócio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BUSINESS_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+
+            {/* PDF */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
