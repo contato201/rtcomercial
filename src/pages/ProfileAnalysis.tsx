@@ -5,9 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, Globe, FileText, Loader2, Copy, CheckCircle2 } from "lucide-react";
+
+const BUSINESS_TYPES = [
+  { value: "negocio-local", label: "Negócio Local" },
+  { value: "infoproduto", label: "Infoproduto" },
+  { value: "ecommerce", label: "E-commerce" },
+  { value: "saas", label: "SaaS / Software" },
+  { value: "servicos", label: "Prestação de Serviços" },
+  { value: "outro", label: "Outro" },
+] as const;
+
+const PAGE_TYPES = [
+  { value: "vendas", label: "Página de Vendas" },
+  { value: "captura", label: "Página de Captura / Lançamento" },
+  { value: "negocio-local", label: "Página de Negócio Local" },
+  { value: "institucional", label: "Site Institucional" },
+  { value: "outro", label: "Outro" },
+] as const;
 
 const ProfileAnalysis = () => {
   const { toast } = useToast();
