@@ -16,7 +16,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { pdfText, pageUrl, scripts } = await req.json();
+    const { pdfText, pageUrl, pageType, businessType, scripts } = await req.json();
 
     if (!pdfText && !pageUrl && !scripts) {
       return new Response(
@@ -25,13 +25,33 @@ serve(async (req) => {
       );
     }
 
-    let userPrompt = `Analise o seguinte perfil/prospect e gere um ROTEIRO DE VÍDEO DE PROSPECÇÃO detalhado. O roteiro deve demonstrar valor, apontar melhorias e posicionar nossos serviços como solução.\n\n`;
+    const businessTypeLabels: Record<string, string> = {
+      "negocio-local": "Negócio Local",
+      "infoproduto": "Infoproduto",
+      "ecommerce": "E-commerce",
+      "saas": "SaaS / Software",
+      "servicos": "Prestação de Serviços",
+    };
+
+    const pageTypeLabels: Record<string, string> = {
+      "vendas": "Página de Vendas",
+      "captura": "Página de Captura / Lançamento",
+      "negocio-local": "Página de Negócio Local",
+      "institucional": "Site Institucional",
+    };
+
+    let userPrompt = `Analise o seguinte perfil/prospect e gere um ROTEIRO DE VÍDEO DE PROSPECÇÃO detalhado.\n\n`;
+
+    if (businessType) {
+      userPrompt += `## Tipo de Negócio: ${businessTypeLabels[businessType] || businessType}\n\n`;
+    }
 
     if (pdfText) {
       userPrompt += `## Dados do perfil Instagram (extraídos do PDF):\n${pdfText}\n\n`;
     }
     if (pageUrl) {
-      userPrompt += `## URL da página do prospect:\n${pageUrl}\n\n`;
+      const pageLabel = pageType ? (pageTypeLabels[pageType] || pageType) : "não especificado";
+      userPrompt += `## URL da página do prospect (Tipo: ${pageLabel}):\n${pageUrl}\n\n`;
     }
     if (scripts) {
       userPrompt += `## Scripts de prospecção atuais:\n${scripts}\n\n`;
