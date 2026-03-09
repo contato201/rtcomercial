@@ -15,6 +15,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Comercial', href: '/', icon: LayoutDashboard },
   { label: 'Growth', href: '/growth', icon: TrendingUp },
+  { label: 'Análise de Perfil', href: '/analise', icon: UserSearch },
 ];
 
 export const AppNavbar = () => {
