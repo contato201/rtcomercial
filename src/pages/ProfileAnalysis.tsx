@@ -1,34 +1,53 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AppNavbar } from "@/components/AppNavbar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Globe, FileText, Loader2, Copy, CheckCircle2 } from "lucide-react";
+import {
+  Upload,
+  Globe,
+  FileText,
+  Loader2,
+  Copy,
+  CheckCircle2,
+  X,
+  Sparkles,
+  Store,
+  ShoppingBag,
+  Monitor,
+  Briefcase,
+  Package,
+  HelpCircle,
+  ExternalLink,
+  Target,
+  Megaphone,
+  Building2,
+  LayoutTemplate,
+} from "lucide-react";
 
 const BUSINESS_TYPES = [
-  { value: "negocio-local", label: "Negócio Local" },
-  { value: "infoproduto", label: "Infoproduto" },
-  { value: "ecommerce", label: "E-commerce" },
-  { value: "saas", label: "SaaS / Software" },
-  { value: "servicos", label: "Prestação de Serviços" },
-  { value: "outro", label: "Outro" },
+  { value: "negocio-local", label: "Negócio Local", icon: Store, description: "Restaurante, clínica, salão, loja física..." },
+  { value: "infoproduto", label: "Infoproduto", icon: Megaphone, description: "Curso online, mentoria, e-book, comunidade..." },
+  { value: "ecommerce", label: "E-commerce", icon: ShoppingBag, description: "Loja virtual, dropshipping, marketplace..." },
+  { value: "saas", label: "SaaS / Software", icon: Monitor, description: "Aplicativo, plataforma, ferramenta digital..." },
+  { value: "servicos", label: "Serviços", icon: Briefcase, description: "Agência, consultoria, freelancer..." },
+  { value: "outro", label: "Outro", icon: HelpCircle, description: "Outro tipo de negócio" },
 ] as const;
 
 const PAGE_TYPES = [
-  { value: "vendas", label: "Página de Vendas" },
-  { value: "captura", label: "Página de Captura / Lançamento" },
-  { value: "negocio-local", label: "Página de Negócio Local" },
-  { value: "institucional", label: "Site Institucional" },
-  { value: "outro", label: "Outro" },
+  { value: "vendas", label: "Página de Vendas", icon: Target, description: "Oferta de produto/serviço com CTA de compra" },
+  { value: "captura", label: "Captura / Lançamento", icon: Megaphone, description: "Captação de leads, webinário, lançamento" },
+  { value: "negocio-local", label: "Negócio Local", icon: Building2, description: "Site do estabelecimento com endereço e contato" },
+  { value: "institucional", label: "Site Institucional", icon: LayoutTemplate, description: "Site corporativo, portfólio, apresentação" },
+  { value: "outro", label: "Outro", icon: HelpCircle, description: "Outro tipo de página" },
 ] as const;
 
 const ProfileAnalysis = () => {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfText, setPdfText] = useState("");
   const [pageUrl, setPageUrl] = useState("");
@@ -49,22 +68,17 @@ const ProfileAnalysis = () => {
     }
 
     setPdfFile(file);
-
-    // Read PDF as text (basic extraction)
     const reader = new FileReader();
     reader.onload = async () => {
-      const text = reader.result as string;
-      // For PDF we'll send the base64 content and let the AI interpret it
-      // Since browser can't parse PDF natively, we'll extract text via the AI
-      const base64 = btoa(
-        new Uint8Array(reader.result as ArrayBuffer).reduce(
-          (data, byte) => data + String.fromCharCode(byte),
-          ""
-        )
-      );
-      setPdfText(`[PDF uploaded: ${file.name}] - O conteúdo será analisado pela IA`);
+      setPdfText(`[PDF uploaded: ${file.name}]`);
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const removePdf = () => {
+    setPdfFile(null);
+    setPdfText("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleAnalyze = async () => {
@@ -81,10 +95,8 @@ const ProfileAnalysis = () => {
     setAnalysis("");
 
     try {
-      // If we have a PDF file, upload it and get text
       let finalPdfText = pdfText;
       if (pdfFile) {
-        // Upload to storage
         const filePath = `${Date.now()}-${pdfFile.name}`;
         const { error: uploadError } = await supabase.storage
           .from("profile-pdfs")
@@ -92,7 +104,6 @@ const ProfileAnalysis = () => {
 
         if (uploadError) {
           console.error("Upload error:", uploadError);
-          // Continue without the file, use the text description
         }
         finalPdfText = `Arquivo PDF enviado: ${pdfFile.name}. Analise com base no nome e contexto fornecido.`;
       }
@@ -134,172 +145,264 @@ const ProfileAnalysis = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const filledCount = [pdfText, pageUrl, scripts].filter(Boolean).length;
+
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
-      <main className="max-w-[1200px] mx-auto px-6 py-8 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Análise de Perfil</h1>
-          <p className="text-muted-foreground mt-1">
-            Analise prospects e gere roteiros de vídeo personalizados para prospecção
-          </p>
+      <main className="max-w-[1200px] mx-auto px-6 py-8 space-y-8">
+        {/* Header */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/10">
+              <Sparkles className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">Análise de Perfil</h1>
+              <p className="text-sm text-muted-foreground">
+                Analise prospects e gere roteiros de vídeo personalizados
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Input Form */}
-        <div className="space-y-4">
-            {/* Tipo de Negócio */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">📋 Tipo de Negócio</CardTitle>
-                <CardDescription>Selecione o tipo de negócio do prospect</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Select value={businessType} onValueChange={setBusinessType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo de negócio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BUSINESS_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* ───── LEFT: FORM ───── */}
+          <div className="space-y-6">
 
-            {/* PDF */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Upload className="w-5 h-5 text-primary" />
-                  PDF do Instagram
-                </CardTitle>
-                <CardDescription>
-                  Envie o relatório ou print do perfil em PDF
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handlePdfUpload}
-                    className="cursor-pointer"
-                  />
-                  {pdfFile && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <FileText className="w-4 h-4" />
-                      {pdfFile.name}
-                    </p>
-                  )}
+            {/* Tipo de Negócio — Card Grid */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+                <Package className="w-4 h-4 text-primary" />
+                Tipo de Negócio
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {BUSINESS_TYPES.map((t) => {
+                  const Icon = t.icon;
+                  const selected = businessType === t.value;
+                  return (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setBusinessType(selected ? "" : t.value)}
+                      className={`group relative flex flex-col items-center gap-1.5 rounded-xl border-2 p-3.5 text-center transition-all duration-200 cursor-pointer
+                        ${selected
+                          ? "border-primary bg-primary/10 shadow-sm shadow-primary/10"
+                          : "border-border bg-card hover:border-primary/40 hover:bg-accent/40"
+                        }`}
+                    >
+                      <Icon className={`w-5 h-5 transition-colors ${selected ? "text-primary" : "text-muted-foreground group-hover:text-primary/70"}`} />
+                      <span className={`text-xs font-semibold leading-tight ${selected ? "text-foreground" : "text-muted-foreground"}`}>
+                        {t.label}
+                      </span>
+                      {selected && (
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {businessType && (
+                <p className="text-xs text-muted-foreground pl-1">
+                  {BUSINESS_TYPES.find((t) => t.value === businessType)?.description}
+                </p>
+              )}
+            </section>
+
+            {/* PDF Upload — Drop Zone */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+                <Upload className="w-4 h-4 text-primary" />
+                PDF do Instagram
+              </h2>
+
+              {!pdfFile ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-card hover:bg-accent/30 transition-all duration-200 p-8 flex flex-col items-center gap-3 cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <Upload className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-foreground">Clique para enviar o PDF</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Relatório ou print do perfil Instagram</p>
+                  </div>
+                </button>
+              ) : (
+                <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <FileText className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{pdfFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024).toFixed(0)} KB • PDF</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removePdf}
+                    className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={handlePdfUpload}
+                className="hidden"
+              />
+            </section>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Globe className="w-5 h-5 text-primary" />
-                  Link da Página
-                </CardTitle>
-                <CardDescription>
-                  Cole o link e selecione o tipo da página
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input
-                  type="url"
-                  placeholder="https://exemplo.com.br"
-                  value={pageUrl}
-                  onChange={(e) => setPageUrl(e.target.value)}
-                />
-                <Select value={pageType} onValueChange={setPageType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Tipo da página" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAGE_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
+            {/* Link da Página + Tipo */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+                <Globe className="w-4 h-4 text-primary" />
+                Link da Página
+              </h2>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <FileText className="w-5 h-5 text-primary" />
-                  Scripts de Prospecção
-                </CardTitle>
-                <CardDescription>
-                  Cole seus scripts atuais de prospecção para esse perfil
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+              <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+                <div className="relative">
+                  <ExternalLink className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="url"
+                    placeholder="https://exemplo.com.br"
+                    value={pageUrl}
+                    onChange={(e) => setPageUrl(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Page type chips */}
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Tipo da página:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {PAGE_TYPES.map((t) => {
+                      const Icon = t.icon;
+                      const selected = pageType === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => setPageType(selected ? "" : t.value)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 cursor-pointer
+                            ${selected
+                              ? "border-primary bg-primary/10 text-foreground shadow-sm"
+                              : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                            }`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {pageType && (
+                  <p className="text-xs text-muted-foreground">
+                    {PAGE_TYPES.find((t) => t.value === pageType)?.description}
+                  </p>
+                )}
+              </div>
+            </section>
+
+            {/* Scripts */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                Scripts de Prospecção
+              </h2>
+              <div className="rounded-xl border border-border bg-card p-4">
                 <Textarea
-                  placeholder="Cole aqui seus scripts de prospecção..."
+                  placeholder="Cole aqui seus scripts de prospecção para esse perfil..."
                   value={scripts}
                   onChange={(e) => setScripts(e.target.value)}
-                  rows={6}
+                  rows={5}
+                  className="border-0 bg-transparent p-0 focus-visible:ring-0 resize-none text-sm"
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
+            {/* Submit */}
             <Button
               onClick={handleAnalyze}
               disabled={isLoading || (!pdfText && !pageUrl && !scripts)}
-              className="w-full"
+              className="w-full h-12 text-base font-semibold gap-2 rounded-xl shadow-md hover:shadow-lg transition-shadow"
               size="lg"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin" />
                   Analisando...
                 </>
               ) : (
-                "🎬 Gerar Roteiro de Vídeo"
+                <>
+                  <Sparkles className="w-5 h-5" />
+                  Gerar Roteiro de Vídeo
+                </>
               )}
             </Button>
+
+            {filledCount > 0 && !isLoading && (
+              <p className="text-xs text-center text-muted-foreground">
+                {filledCount} {filledCount === 1 ? "entrada preenchida" : "entradas preenchidas"}
+                {businessType && ` • ${BUSINESS_TYPES.find(t => t.value === businessType)?.label}`}
+                {pageType && ` • ${PAGE_TYPES.find(t => t.value === pageType)?.label}`}
+              </p>
+            )}
           </div>
 
-          {/* Output */}
-          <div>
-            <Card className="h-full">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Roteiro de Vídeo</CardTitle>
-                  {analysis && (
-                    <Button variant="outline" size="sm" onClick={handleCopy}>
-                      {copied ? (
-                        <CheckCircle2 className="w-4 h-4 mr-1 text-green-500" />
-                      ) : (
-                        <Copy className="w-4 h-4 mr-1" />
-                      )}
-                      {copied ? "Copiado" : "Copiar"}
-                    </Button>
-                  )}
+          {/* ───── RIGHT: OUTPUT ───── */}
+          <div className="lg:sticky lg:top-6 lg:self-start">
+            <Card className="overflow-hidden border-2">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <h3 className="text-sm font-semibold text-foreground">Roteiro de Vídeo</h3>
                 </div>
-                <CardDescription>
-                  O roteiro será gerado aqui após a análise
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                {analysis && (
+                  <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 text-xs gap-1.5 rounded-lg">
+                    {copied ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--success))]" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    {copied ? "Copiado!" : "Copiar"}
+                  </Button>
+                )}
+              </div>
+              <CardContent className="p-5">
                 {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <Loader2 className="w-8 h-8 animate-spin mb-3" />
-                    <p>Analisando perfil e gerando roteiro...</p>
-                    <p className="text-sm mt-1">Isso pode levar alguns segundos</p>
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground space-y-4">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-full border-4 border-muted animate-pulse" />
+                      <Loader2 className="w-8 h-8 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-foreground">Gerando roteiro...</p>
+                      <p className="text-xs mt-1">Analisando perfil e criando recomendações</p>
+                    </div>
                   </div>
                 ) : analysis ? (
                   <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap text-sm leading-relaxed">
                     {analysis}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <FileText className="w-12 h-12 mb-3 opacity-30" />
-                    <p>Preencha os campos e clique em "Gerar Roteiro"</p>
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground space-y-3">
+                    <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center">
+                      <Sparkles className="w-7 h-7 opacity-30" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-foreground/60">Nenhum roteiro gerado</p>
+                      <p className="text-xs mt-0.5">Preencha os campos ao lado e clique em gerar</p>
+                    </div>
                   </div>
                 )}
               </CardContent>
