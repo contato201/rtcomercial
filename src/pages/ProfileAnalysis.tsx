@@ -5,15 +5,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, Globe, FileText, Loader2, Copy, CheckCircle2 } from "lucide-react";
+
+const BUSINESS_TYPES = [
+  { value: "negocio-local", label: "Negócio Local" },
+  { value: "infoproduto", label: "Infoproduto" },
+  { value: "ecommerce", label: "E-commerce" },
+  { value: "saas", label: "SaaS / Software" },
+  { value: "servicos", label: "Prestação de Serviços" },
+  { value: "outro", label: "Outro" },
+] as const;
+
+const PAGE_TYPES = [
+  { value: "vendas", label: "Página de Vendas" },
+  { value: "captura", label: "Página de Captura / Lançamento" },
+  { value: "negocio-local", label: "Página de Negócio Local" },
+  { value: "institucional", label: "Site Institucional" },
+  { value: "outro", label: "Outro" },
+] as const;
 
 const ProfileAnalysis = () => {
   const { toast } = useToast();
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfText, setPdfText] = useState("");
   const [pageUrl, setPageUrl] = useState("");
+  const [pageType, setPageType] = useState("");
+  const [businessType, setBusinessType] = useState("");
   const [scripts, setScripts] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -81,6 +101,8 @@ const ProfileAnalysis = () => {
         body: {
           pdfText: finalPdfText || undefined,
           pageUrl: pageUrl || undefined,
+          pageType: pageType || undefined,
+          businessType: businessType || undefined,
           scripts: scripts || undefined,
         },
       });
@@ -125,7 +147,28 @@ const ProfileAnalysis = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Input Form */}
-          <div className="space-y-4">
+        <div className="space-y-4">
+            {/* Tipo de Negócio */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">📋 Tipo de Negócio</CardTitle>
+                <CardDescription>Selecione o tipo de negócio do prospect</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={businessType} onValueChange={setBusinessType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo de negócio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BUSINESS_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+
+            {/* PDF */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -161,16 +204,26 @@ const ProfileAnalysis = () => {
                   Link da Página
                 </CardTitle>
                 <CardDescription>
-                  Cole o link da página de vendas, captura ou negócio local
+                  Cole o link e selecione o tipo da página
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <Input
                   type="url"
                   placeholder="https://exemplo.com.br"
                   value={pageUrl}
                   onChange={(e) => setPageUrl(e.target.value)}
                 />
+                <Select value={pageType} onValueChange={setPageType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tipo da página" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardContent>
             </Card>
 
