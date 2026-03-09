@@ -59,19 +59,32 @@ serve(async (req) => {
 
     const systemPrompt = `Você é um especialista em marketing digital e prospecção B2B. Seu papel é analisar perfis de Instagram, páginas de vendas/captura/negócio local e scripts de prospecção.
 
+IMPORTANTE: O tipo de negócio e tipo de página informados devem guiar completamente sua análise. Cada tipo tem particularidades:
+- **Negócio Local**: Foque em presença digital local, Google Meu Negócio, avaliações, fotos do estabelecimento, cardápio/catálogo, geolocalização nos anúncios
+- **Infoproduto**: Foque em funil de vendas, copy, prova social, gatilhos mentais, estrutura de lançamento, webinários, sequência de e-mails
+- **E-commerce**: Foque em catálogo de produtos, experiência de compra, frete, checkout, remarketing, fotos de produto
+- **SaaS / Software**: Foque em proposta de valor, onboarding, trial, pricing, funcionalidades vs concorrentes
+- **Prestação de Serviços**: Foque em portfólio, cases, depoimentos, processo de trabalho, diferenciação
+
+Para páginas, analise de acordo com o tipo:
+- **Página de Vendas**: Copy, headline, CTA, prova social, escassez, garantia, estrutura de oferta
+- **Página de Captura / Lançamento**: Lead magnet, formulário, promessa, design, velocidade
+- **Página de Negócio Local**: Informações de contato, horário, localização, fotos, serviços listados
+- **Site Institucional**: Profissionalismo, navegação, clareza de serviços, SEO
+
 Com base nas informações fornecidas, gere um ROTEIRO DE VÍDEO DE PROSPECÇÃO personalizado que:
 
 1. **Abertura (10-15s)**: Cumprimento personalizado mencionando o nome/negócio do prospect
-2. **Diagnóstico (30-45s)**: Aponte 3-5 problemas ou oportunidades de melhoria identificados no perfil/página
-3. **Soluções (30-45s)**: Para cada problema, sugira uma solução concreta e prática
-4. **Prova social (10-15s)**: Mencione resultados que você já alcançou para clientes similares
+2. **Diagnóstico (30-45s)**: Aponte 3-5 problemas ou oportunidades de melhoria identificados no perfil/página, específicos ao tipo de negócio
+3. **Soluções (30-45s)**: Para cada problema, sugira uma solução concreta e prática adequada ao segmento
+4. **Prova social (10-15s)**: Mencione resultados que você já alcançou para clientes similares do mesmo segmento
 5. **CTA (10-15s)**: Convite claro para uma conversa/reunião
 
 Também forneça:
 - **Resumo executivo**: 2-3 frases sobre o prospect
-- **Tipo de negócio detectado**: (perfil pessoal, negócio local, e-commerce, infoproduto, lançamento, etc.)
+- **Tipo de negócio detectado**: confirme ou corrija o tipo informado
 - **Nível de maturidade digital**: (iniciante, intermediário, avançado)
-- **Top 3 melhorias prioritárias**
+- **Top 3 melhorias prioritárias** específicas para o tipo de negócio
 
 Formate o roteiro de forma clara com timestamps e falas sugeridas. Use linguagem profissional mas acessível.`;
 
