@@ -204,16 +204,26 @@ const ProfileAnalysis = () => {
                   Link da Página
                 </CardTitle>
                 <CardDescription>
-                  Cole o link da página de vendas, captura ou negócio local
+                  Cole o link e selecione o tipo da página
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <Input
                   type="url"
                   placeholder="https://exemplo.com.br"
                   value={pageUrl}
                   onChange={(e) => setPageUrl(e.target.value)}
                 />
+                <Select value={pageType} onValueChange={setPageType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tipo da página" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardContent>
             </Card>
 
