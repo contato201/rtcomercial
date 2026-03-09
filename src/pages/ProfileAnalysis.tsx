@@ -32,6 +32,8 @@ const ProfileAnalysis = () => {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfText, setPdfText] = useState("");
   const [pageUrl, setPageUrl] = useState("");
+  const [pageType, setPageType] = useState("");
+  const [businessType, setBusinessType] = useState("");
   const [scripts, setScripts] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [isLoading, setIsLoading] = useState(false);
