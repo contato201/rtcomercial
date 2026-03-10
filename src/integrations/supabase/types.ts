@@ -44,6 +44,45 @@ export type Database = {
         }
         Relationships: []
       }
+      analises_perfil: {
+        Row: {
+          analysis: string
+          business_type: string | null
+          created_at: string
+          id: string
+          page_type: string | null
+          page_url: string | null
+          pdf_name: string | null
+          prospect_name: string | null
+          scripts: string | null
+          user_id: string | null
+        }
+        Insert: {
+          analysis: string
+          business_type?: string | null
+          created_at?: string
+          id?: string
+          page_type?: string | null
+          page_url?: string | null
+          pdf_name?: string | null
+          prospect_name?: string | null
+          scripts?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          analysis?: string
+          business_type?: string | null
+          created_at?: string
+          id?: string
+          page_type?: string | null
+          page_url?: string | null
+          pdf_name?: string | null
+          prospect_name?: string | null
+          scripts?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       dados_realizados: {
         Row: {
           created_at: string
