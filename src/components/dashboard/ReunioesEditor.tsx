@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Plus, Trash2, Users } from 'lucide-react';
 import { MONTHS } from '@/types/dashboard';
+import { clampPercentage, safePercentage } from '@/lib/formatters';
 
 export interface ReuniaoEntry {
   id: string;
@@ -43,8 +43,8 @@ export const ReunioesEditor = ({
 
   const monthName = MONTHS[selectedMonth];
   const monthEntries = entries.filter(e => e.month === monthName && e.tipo === tipo);
-  const total = monthEntries.reduce((sum, e) => sum + e.quantidade, 0);
-  const progresso = meta > 0 ? (total / meta) * 100 : 0;
+  const total = monthEntries.reduce((sum, e) => sum + Number(e.quantidade || 0), 0);
+  const progresso = safePercentage(total, meta);
 
   const getProgressColor = (progress: number) => {
     if (progress >= 100) return 'bg-green-500';
@@ -89,7 +89,7 @@ export const ReunioesEditor = ({
       </div>
 
       <Progress
-        value={Math.min(progresso, 100)}
+        value={clampPercentage(progresso)}
         className={`h-2 ${getProgressColor(progresso)}`}
       />
       <div className="text-xs text-muted-foreground text-right">

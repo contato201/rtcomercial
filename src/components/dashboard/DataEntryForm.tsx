@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { UnitSalesEditor, type UnitSale } from '@/components/dashboard/UnitSalesEditor';
 import { AgendamentosEditor, type AgendamentoRow } from '@/components/dashboard/AgendamentosEditor';
 import { ReunioesEditor, type ReuniaoEntry } from '@/components/dashboard/ReunioesEditor';
+import { clampPercentage, safePercentage } from '@/lib/formatters';
 
 interface DataEntryFormProps {
   selectedMonth: number;
@@ -71,8 +72,8 @@ export const DataEntryForm = ({
   };
 
   const getProgressStatus = (meta: number, realizado: number) => {
-    if (meta === 0) return { percent: 0, status: 'neutral' };
-    const percent = (realizado / meta) * 100;
+    const percent = safePercentage(realizado, meta);
+    if (percent === 0) return { percent, status: 'neutral' };
     if (percent >= 100) return { percent, status: 'success' };
     if (percent >= 70) return { percent, status: 'warning' };
     return { percent, status: 'danger' };
@@ -264,14 +265,11 @@ export const DataEntryForm = ({
                         ? 'bg-warning' 
                         : 'bg-destructive'
                   }`}
-                  style={{ width: `${currentData.metaVendas > 0 ? Math.min((currentData.realizadoVendas / currentData.metaVendas) * 100, 100) : 0}%` }}
+                  style={{ width: `${clampPercentage(safePercentage(currentData.realizadoVendas, currentData.metaVendas))}%` }}
                 />
               </div>
               <p className="text-xs text-center text-muted-foreground mt-1">
-                {currentData.metaVendas > 0 
-                  ? `${((currentData.realizadoVendas / currentData.metaVendas) * 100).toFixed(0)}% da meta`
-                  : '0% da meta'
-                }
+                {`${safePercentage(currentData.realizadoVendas, currentData.metaVendas).toFixed(0)}% da meta`}
               </p>
             </div>
           </div>
@@ -351,14 +349,11 @@ export const DataEntryForm = ({
                     ? 'bg-warning' 
                     : 'bg-destructive'
               }`}
-              style={{ width: `${currentData.metaFaturamento > 0 ? Math.min((currentData.realizadoFaturamento / currentData.metaFaturamento) * 100, 100) : 0}%` }}
+              style={{ width: `${clampPercentage(safePercentage(currentData.realizadoFaturamento, currentData.metaFaturamento))}%` }}
             />
           </div>
           <p className="text-xs text-center text-muted-foreground mt-1">
-            {currentData.metaFaturamento > 0 
-              ? `${((currentData.realizadoFaturamento / currentData.metaFaturamento) * 100).toFixed(0)}% da meta`
-              : '0% da meta'
-            }
+            {`${safePercentage(currentData.realizadoFaturamento, currentData.metaFaturamento).toFixed(0)}% da meta`}
           </p>
         </div>
       </div>

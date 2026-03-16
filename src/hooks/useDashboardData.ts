@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { z } from 'zod';
 import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { supabase } from '@/integrations/supabase/client';
+import { safeVariation, toFiniteNumber } from '@/lib/formatters';
 
 type UnitSaleRow = {
   id: string;
@@ -77,15 +78,23 @@ export const useDashboardData = () => {
 
       // Process agendamentos
       const processedAgendamentos: AgendamentoRow[] = ((agendamentosData as any[]) ?? []).map((row: any) => ({
-        id: row.id, month: row.month, pessoa: row.pessoa as 'Tadeu' | 'Nicole',
-        quantidade: row.quantidade, data_lancamento: row.data_lancamento, created_at: row.created_at,
+        id: row.id,
+        month: row.month,
+        pessoa: row.pessoa as 'Tadeu' | 'Nicole',
+        quantidade: toFiniteNumber(row.quantidade),
+        data_lancamento: row.data_lancamento,
+        created_at: row.created_at,
       }));
       setAgendamentos(processedAgendamentos);
 
       // Process reunioes entries
       const processedReunioes: ReuniaoEntryRow[] = ((reunioesData as any[]) ?? []).map((row: any) => ({
-        id: row.id, month: row.month, tipo: row.tipo as 'primeira' | 'segunda',
-        quantidade: row.quantidade, data_lancamento: row.data_lancamento, created_at: row.created_at,
+        id: row.id,
+        month: row.month,
+        tipo: row.tipo as 'primeira' | 'segunda',
+        quantidade: toFiniteNumber(row.quantidade),
+        data_lancamento: row.data_lancamento,
+        created_at: row.created_at,
       }));
       setReunioesEntries(processedReunioes);
 
@@ -134,20 +143,20 @@ export const useDashboardData = () => {
           if (dbMonth) {
             return {
               ...month,
-              realizadoVendas: agg.count,
-              realizadoFaturamento: agg.sum,
-              ticketRealizado: agg.count > 0 ? agg.avg : (Number(dbMonth.ticket_realizado) || VALOR_POR_VENDA),
-              realizadoPrimeiraReuniao: hasReuniaoEntries ? rAgg.primeira : (dbMonth.realizado_primeira_reuniao || 0),
-              realizadoSegundaReuniao: hasReuniaoEntries ? rAgg.segunda : (dbMonth.realizado_segunda_reuniao || 0),
+              realizadoVendas: toFiniteNumber(agg.count),
+              realizadoFaturamento: toFiniteNumber(agg.sum),
+              ticketRealizado: agg.count > 0 ? toFiniteNumber(agg.avg) : (toFiniteNumber(dbMonth.ticket_realizado) || VALOR_POR_VENDA),
+              realizadoPrimeiraReuniao: hasReuniaoEntries ? toFiniteNumber(rAgg.primeira) : toFiniteNumber(dbMonth.realizado_primeira_reuniao),
+              realizadoSegundaReuniao: hasReuniaoEntries ? toFiniteNumber(rAgg.segunda) : toFiniteNumber(dbMonth.realizado_segunda_reuniao),
             };
           }
           return {
             ...month,
-            realizadoVendas: agg.count,
-            realizadoFaturamento: agg.sum,
-            ticketRealizado: agg.count > 0 ? agg.avg : VALOR_POR_VENDA,
-            realizadoPrimeiraReuniao: rAgg.primeira,
-            realizadoSegundaReuniao: rAgg.segunda,
+            realizadoVendas: toFiniteNumber(agg.count),
+            realizadoFaturamento: toFiniteNumber(agg.sum),
+            ticketRealizado: agg.count > 0 ? toFiniteNumber(agg.avg) : VALOR_POR_VENDA,
+            realizadoPrimeiraReuniao: toFiniteNumber(rAgg.primeira),
+            realizadoSegundaReuniao: toFiniteNumber(rAgg.segunda),
           };
         });
         setData(updatedData);
@@ -341,8 +350,7 @@ export const useDashboardData = () => {
   }, [filteredData, filterType, selectedQuarter]);
 
   const calculateVariation = useCallback((meta: number, realizado: number): number => {
-    if (meta === 0) return realizado > 0 ? 100 : 0;
-    return ((realizado - meta) / meta) * 100;
+    return safeVariation(meta, realizado);
   }, []);
 
   const resetData = useCallback(async () => {
