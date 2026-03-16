@@ -78,15 +78,23 @@ export const useDashboardData = () => {
 
       // Process agendamentos
       const processedAgendamentos: AgendamentoRow[] = ((agendamentosData as any[]) ?? []).map((row: any) => ({
-        id: row.id, month: row.month, pessoa: row.pessoa as 'Tadeu' | 'Nicole',
-        quantidade: row.quantidade, data_lancamento: row.data_lancamento, created_at: row.created_at,
+        id: row.id,
+        month: row.month,
+        pessoa: row.pessoa as 'Tadeu' | 'Nicole',
+        quantidade: toFiniteNumber(row.quantidade),
+        data_lancamento: row.data_lancamento,
+        created_at: row.created_at,
       }));
       setAgendamentos(processedAgendamentos);
 
       // Process reunioes entries
       const processedReunioes: ReuniaoEntryRow[] = ((reunioesData as any[]) ?? []).map((row: any) => ({
-        id: row.id, month: row.month, tipo: row.tipo as 'primeira' | 'segunda',
-        quantidade: row.quantidade, data_lancamento: row.data_lancamento, created_at: row.created_at,
+        id: row.id,
+        month: row.month,
+        tipo: row.tipo as 'primeira' | 'segunda',
+        quantidade: toFiniteNumber(row.quantidade),
+        data_lancamento: row.data_lancamento,
+        created_at: row.created_at,
       }));
       setReunioesEntries(processedReunioes);
 
