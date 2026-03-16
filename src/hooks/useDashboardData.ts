@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { z } from 'zod';
 import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { supabase } from '@/integrations/supabase/client';
+import { safeVariation, toFiniteNumber } from '@/lib/formatters';
 
 type UnitSaleRow = {
   id: string;
