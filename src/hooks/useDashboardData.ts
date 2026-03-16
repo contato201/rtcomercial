@@ -143,20 +143,20 @@ export const useDashboardData = () => {
           if (dbMonth) {
             return {
               ...month,
-              realizadoVendas: agg.count,
-              realizadoFaturamento: agg.sum,
-              ticketRealizado: agg.count > 0 ? agg.avg : (Number(dbMonth.ticket_realizado) || VALOR_POR_VENDA),
-              realizadoPrimeiraReuniao: hasReuniaoEntries ? rAgg.primeira : (dbMonth.realizado_primeira_reuniao || 0),
-              realizadoSegundaReuniao: hasReuniaoEntries ? rAgg.segunda : (dbMonth.realizado_segunda_reuniao || 0),
+              realizadoVendas: toFiniteNumber(agg.count),
+              realizadoFaturamento: toFiniteNumber(agg.sum),
+              ticketRealizado: agg.count > 0 ? toFiniteNumber(agg.avg) : (toFiniteNumber(dbMonth.ticket_realizado) || VALOR_POR_VENDA),
+              realizadoPrimeiraReuniao: hasReuniaoEntries ? toFiniteNumber(rAgg.primeira) : toFiniteNumber(dbMonth.realizado_primeira_reuniao),
+              realizadoSegundaReuniao: hasReuniaoEntries ? toFiniteNumber(rAgg.segunda) : toFiniteNumber(dbMonth.realizado_segunda_reuniao),
             };
           }
           return {
             ...month,
-            realizadoVendas: agg.count,
-            realizadoFaturamento: agg.sum,
-            ticketRealizado: agg.count > 0 ? agg.avg : VALOR_POR_VENDA,
-            realizadoPrimeiraReuniao: rAgg.primeira,
-            realizadoSegundaReuniao: rAgg.segunda,
+            realizadoVendas: toFiniteNumber(agg.count),
+            realizadoFaturamento: toFiniteNumber(agg.sum),
+            ticketRealizado: agg.count > 0 ? toFiniteNumber(agg.avg) : VALOR_POR_VENDA,
+            realizadoPrimeiraReuniao: toFiniteNumber(rAgg.primeira),
+            realizadoSegundaReuniao: toFiniteNumber(rAgg.segunda),
           };
         });
         setData(updatedData);
