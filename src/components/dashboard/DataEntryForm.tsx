@@ -349,14 +349,11 @@ export const DataEntryForm = ({
                     ? 'bg-warning' 
                     : 'bg-destructive'
               }`}
-              style={{ width: `${currentData.metaFaturamento > 0 ? Math.min((currentData.realizadoFaturamento / currentData.metaFaturamento) * 100, 100) : 0}%` }}
+              style={{ width: `${clampPercentage(safePercentage(currentData.realizadoFaturamento, currentData.metaFaturamento))}%` }}
             />
           </div>
           <p className="text-xs text-center text-muted-foreground mt-1">
-            {currentData.metaFaturamento > 0 
-              ? `${((currentData.realizadoFaturamento / currentData.metaFaturamento) * 100).toFixed(0)}% da meta`
-              : '0% da meta'
-            }
+            {`${safePercentage(currentData.realizadoFaturamento, currentData.metaFaturamento).toFixed(0)}% da meta`}
           </p>
         </div>
       </div>
