@@ -72,8 +72,8 @@ export const DataEntryForm = ({
   };
 
   const getProgressStatus = (meta: number, realizado: number) => {
-    if (meta === 0) return { percent: 0, status: 'neutral' };
-    const percent = (realizado / meta) * 100;
+    const percent = safePercentage(realizado, meta);
+    if (percent === 0) return { percent, status: 'neutral' };
     if (percent >= 100) return { percent, status: 'success' };
     if (percent >= 70) return { percent, status: 'warning' };
     return { percent, status: 'danger' };
