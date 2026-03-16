@@ -89,7 +89,7 @@ export const ReunioesEditor = ({
       </div>
 
       <Progress
-        value={Math.min(progresso, 100)}
+        value={clampPercentage(progresso)}
         className={`h-2 ${getProgressColor(progresso)}`}
       />
       <div className="text-xs text-muted-foreground text-right">

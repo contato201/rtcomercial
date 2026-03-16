@@ -209,7 +209,7 @@ export const AgendamentosEditor = ({
             </div>
             
             <Progress 
-              value={Math.min(progressoNicole, 100)} 
+              value={clampPercentage(progressoNicole)} 
               className={`h-2 ${getProgressColor(progressoNicole)}`}
             />
             
