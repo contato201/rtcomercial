@@ -1,5 +1,6 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
+import { clampPercentage, safePercentage, toFiniteNumber } from '@/lib/formatters';
 
 interface StatCardProps {
   title: string;
@@ -18,8 +19,11 @@ export const StatCard = ({
   icon: Icon,
   formatValue = (v) => v.toLocaleString('pt-BR')
 }: StatCardProps) => {
-  const isPositive = variation > 0;
-  const isNeutral = variation === 0;
+  const safeVariationValue = toFiniteNumber(variation);
+  const progressPercentage = safePercentage(realizado, meta);
+  const progressWidth = clampPercentage(progressPercentage);
+  const isPositive = safeVariationValue > 0;
+  const isNeutral = safeVariationValue === 0;
 
   return (
     <div className="stat-card">
@@ -30,7 +34,7 @@ export const StatCard = ({
         {!isNeutral ? (
           <div className={isPositive ? 'variation-positive' : 'variation-negative'}>
             {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-            {Math.abs(variation).toFixed(1)}%
+            {Math.abs(safeVariationValue).toFixed(1)}%
           </div>
         ) : (
           <div className="bg-secondary text-secondary-foreground px-2 py-1 rounded-md text-sm font-semibold inline-flex items-center gap-1">
@@ -57,11 +61,11 @@ export const StatCard = ({
         <div className="h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-primary to-[hsl(var(--success))] rounded-full transition-all duration-500"
-            style={{ width: `${meta > 0 ? Math.min((realizado / meta) * 100, 100) : 0}%` }}
+            style={{ width: `${progressWidth}%` }}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          {meta > 0 ? `${((realizado / meta) * 100).toFixed(1)}% da meta` : 'Defina uma meta'}
+          {meta > 0 ? `${progressPercentage.toFixed(1)}% da meta` : 'Defina uma meta'}
         </p>
       </div>
     </div>

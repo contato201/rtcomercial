@@ -350,8 +350,7 @@ export const useDashboardData = () => {
   }, [filteredData, filterType, selectedQuarter]);
 
   const calculateVariation = useCallback((meta: number, realizado: number): number => {
-    if (meta === 0) return realizado > 0 ? 100 : 0;
-    return ((realizado - meta) / meta) * 100;
+    return safeVariation(meta, realizado);
   }, []);
 
   const resetData = useCallback(async () => {

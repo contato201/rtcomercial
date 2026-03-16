@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Plus, Trash2, Calendar, User } from 'lucide-react';
 import { MONTHS } from '@/types/dashboard';
+import { clampPercentage, safePercentage } from '@/lib/formatters';
 
 export interface AgendamentoRow {
   id: string;
@@ -46,14 +46,14 @@ export const AgendamentosEditor = ({
   const agendamentosTadeu = monthAgendamentos.filter(a => a.pessoa === 'Tadeu');
   const agendamentosNicole = monthAgendamentos.filter(a => a.pessoa === 'Nicole');
   
-  const totalTadeu = agendamentosTadeu.reduce((sum, a) => sum + a.quantidade, 0);
-  const totalNicole = agendamentosNicole.reduce((sum, a) => sum + a.quantidade, 0);
+  const totalTadeu = agendamentosTadeu.reduce((sum, a) => sum + Number(a.quantidade || 0), 0);
+  const totalNicole = agendamentosNicole.reduce((sum, a) => sum + Number(a.quantidade || 0), 0);
   const totalGeral = totalTadeu + totalNicole;
 
   const metaPorPessoa = Math.ceil(metaAgendamentos / 2);
-  const progressoTadeu = metaPorPessoa > 0 ? (totalTadeu / metaPorPessoa) * 100 : 0;
-  const progressoNicole = metaPorPessoa > 0 ? (totalNicole / metaPorPessoa) * 100 : 0;
-  const progressoGeral = metaAgendamentos > 0 ? (totalGeral / metaAgendamentos) * 100 : 0;
+  const progressoTadeu = safePercentage(totalTadeu, metaPorPessoa);
+  const progressoNicole = safePercentage(totalNicole, metaPorPessoa);
+  const progressoGeral = safePercentage(totalGeral, metaAgendamentos);
 
   const getProgressColor = (progress: number) => {
     if (progress >= 100) return 'bg-green-500';
