@@ -123,7 +123,7 @@ export const AgendamentosEditor = ({
             <span className="text-sm font-medium">Realizado Total</span>
             <span className="font-bold text-lg text-primary">{totalGeral}</span>
           </div>
-          <Progress value={Math.min(progressoGeral, 100)} className="h-2" />
+          <Progress value={clampPercentage(progressoGeral)} className="h-2" />
           <div className="text-xs text-muted-foreground text-right">
             {progressoGeral.toFixed(1)}% da meta
           </div>
@@ -144,7 +144,7 @@ export const AgendamentosEditor = ({
             </div>
             
             <Progress 
-              value={Math.min(progressoTadeu, 100)} 
+              value={clampPercentage(progressoTadeu)} 
               className={`h-2 ${getProgressColor(progressoTadeu)}`}
             />
             

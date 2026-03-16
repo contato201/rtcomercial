@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { UnitSalesEditor, type UnitSale } from '@/components/dashboard/UnitSalesEditor';
 import { AgendamentosEditor, type AgendamentoRow } from '@/components/dashboard/AgendamentosEditor';
 import { ReunioesEditor, type ReuniaoEntry } from '@/components/dashboard/ReunioesEditor';
+import { clampPercentage, safePercentage } from '@/lib/formatters';
 
 interface DataEntryFormProps {
   selectedMonth: number;
