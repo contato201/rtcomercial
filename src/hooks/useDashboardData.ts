@@ -460,27 +460,34 @@ export const useDashboardData = () => {
   }, []);
 
   const deleteReuniaoEntry = useCallback(async (id: string) => {
-    const entry = reunioesEntries.find(e => e.id === id);
+    // Read entry from current state to avoid stale closure
+    let entry: ReuniaoEntryRow | undefined;
+    setReunioesEntries((prev) => {
+      entry = prev.find(e => e.id === id);
+      return prev; // don't modify yet
+    });
+
     const { error } = await supabase.from('reunioes_entries' as any).delete().eq('id', id);
     if (error) { console.error('Erro ao excluir reunião:', error); return; }
     setReunioesEntries((prev) => prev.filter((e) => e.id !== id));
 
     if (entry) {
+      const capturedEntry = entry;
       setData((prev) => {
         const updated = prev.map((md) => {
-          if (md.month !== entry.month) return md;
-          if (entry.tipo === 'primeira') return { ...md, realizadoPrimeiraReuniao: Math.max(0, md.realizadoPrimeiraReuniao - entry.quantidade) };
-          return { ...md, realizadoSegundaReuniao: Math.max(0, md.realizadoSegundaReuniao - entry.quantidade) };
+          if (md.month !== capturedEntry.month) return md;
+          if (capturedEntry.tipo === 'primeira') return { ...md, realizadoPrimeiraReuniao: Math.max(0, md.realizadoPrimeiraReuniao - capturedEntry.quantidade) };
+          return { ...md, realizadoSegundaReuniao: Math.max(0, md.realizadoSegundaReuniao - capturedEntry.quantidade) };
         });
 
         // Sync to dados_realizados using fresh state
-        const currentMonth = updated.find(d => d.month === entry.month);
+        const currentMonth = updated.find(d => d.month === capturedEntry.month);
         if (currentMonth) {
-          const newTotal = entry.tipo === 'primeira'
+          const newTotal = capturedEntry.tipo === 'primeira'
             ? currentMonth.realizadoPrimeiraReuniao
             : currentMonth.realizadoSegundaReuniao;
-          const field = entry.tipo === 'primeira' ? 'realizado_primeira_reuniao' : 'realizado_segunda_reuniao';
-          supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', entry.month).then(({ error }) => {
+          const field = capturedEntry.tipo === 'primeira' ? 'realizado_primeira_reuniao' : 'realizado_segunda_reuniao';
+          supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', capturedEntry.month).then(({ error }) => {
             if (error) console.error('Erro ao sincronizar dados_realizados:', error);
           });
         }
@@ -488,7 +495,7 @@ export const useDashboardData = () => {
         return updated;
       });
     }
-  }, [reunioesEntries]);
+  }, []);
 
   const getMetaAgendamentos = useCallback((monthIndex: number) => {
     const monthData = data[monthIndex];
