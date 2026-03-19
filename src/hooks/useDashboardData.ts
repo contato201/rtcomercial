@@ -435,25 +435,29 @@ export const useDashboardData = () => {
     };
     setReunioesEntries((prev) => [newRow, ...prev]);
 
-    // Update data aggregates optimistically
-    setData((prev) => prev.map((md) => {
-      if (md.month !== m.data) return md;
-      if (tipo === 'primeira') return { ...md, realizadoPrimeiraReuniao: md.realizadoPrimeiraReuniao + quantidade };
-      return { ...md, realizadoSegundaReuniao: md.realizadoSegundaReuniao + quantidade };
-    }));
+    // Update data aggregates optimistically and sync to dados_realizados
+    setData((prev) => {
+      const updated = prev.map((md) => {
+        if (md.month !== m.data) return md;
+        if (tipo === 'primeira') return { ...md, realizadoPrimeiraReuniao: md.realizadoPrimeiraReuniao + quantidade };
+        return { ...md, realizadoSegundaReuniao: md.realizadoSegundaReuniao + quantidade };
+      });
 
-    // Also sync to dados_realizados
-    try {
-      const currentMonth = data.find(d => d.month === m.data);
+      // Sync to dados_realizados using fresh state
+      const currentMonth = updated.find(d => d.month === m.data);
       if (currentMonth) {
         const newTotal = tipo === 'primeira'
-          ? currentMonth.realizadoPrimeiraReuniao + quantidade
-          : currentMonth.realizadoSegundaReuniao + quantidade;
+          ? currentMonth.realizadoPrimeiraReuniao
+          : currentMonth.realizadoSegundaReuniao;
         const field = tipo === 'primeira' ? 'realizado_primeira_reuniao' : 'realizado_segunda_reuniao';
-        await supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', m.data);
+        supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', m.data).then(({ error }) => {
+          if (error) console.error('Erro ao sincronizar dados_realizados:', error);
+        });
       }
-    } catch (e) { console.error(e); }
-  }, [data]);
+
+      return updated;
+    });
+  }, []);
 
   const deleteReuniaoEntry = useCallback(async (id: string) => {
     const entry = reunioesEntries.find(e => e.id === id);
