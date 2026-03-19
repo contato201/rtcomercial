@@ -119,6 +119,21 @@ export const DataEntryForm = ({
           </Link>
         </div>
       )}
+
+      {/* Banner informativo quando visualização não é mensal */}
+      {filterType !== 'month' && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-2">
+          <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              🔍 Editando: <span className="font-bold">{MONTHS[selectedMonth]}</span> | Visualização: {filterType === 'annual' ? 'Anual' : 'Trimestral'}
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-300 mt-0.5">
+              Na visualização {filterType === 'annual' ? 'anual' : 'trimestral'}, o formulário edita apenas o mês selecionado. Para editar outro mês, selecione-o no filtro acima.
+            </p>
+          </div>
+        </div>
+      )}
       
       {/* Header destacado */}
       <div className="flex items-center justify-between mb-6">

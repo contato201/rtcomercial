@@ -64,6 +64,7 @@ const Index = () => {
           <DataEntryForm
             selectedMonth={selectedMonth}
             currentData={data[selectedMonth]}
+            filterType={filterType}
             unitSales={unitSalesByMonth[data[selectedMonth].month] ?? []}
             agendamentos={agendamentos}
             reunioesEntries={reunioesEntries}
