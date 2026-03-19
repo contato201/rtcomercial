@@ -466,25 +466,29 @@ export const useDashboardData = () => {
     setReunioesEntries((prev) => prev.filter((e) => e.id !== id));
 
     if (entry) {
-      setData((prev) => prev.map((md) => {
-        if (md.month !== entry.month) return md;
-        if (entry.tipo === 'primeira') return { ...md, realizadoPrimeiraReuniao: Math.max(0, md.realizadoPrimeiraReuniao - entry.quantidade) };
-        return { ...md, realizadoSegundaReuniao: Math.max(0, md.realizadoSegundaReuniao - entry.quantidade) };
-      }));
+      setData((prev) => {
+        const updated = prev.map((md) => {
+          if (md.month !== entry.month) return md;
+          if (entry.tipo === 'primeira') return { ...md, realizadoPrimeiraReuniao: Math.max(0, md.realizadoPrimeiraReuniao - entry.quantidade) };
+          return { ...md, realizadoSegundaReuniao: Math.max(0, md.realizadoSegundaReuniao - entry.quantidade) };
+        });
 
-      // Sync to dados_realizados
-      try {
-        const currentMonth = data.find(d => d.month === entry.month);
+        // Sync to dados_realizados using fresh state
+        const currentMonth = updated.find(d => d.month === entry.month);
         if (currentMonth) {
           const newTotal = entry.tipo === 'primeira'
-            ? Math.max(0, currentMonth.realizadoPrimeiraReuniao - entry.quantidade)
-            : Math.max(0, currentMonth.realizadoSegundaReuniao - entry.quantidade);
+            ? currentMonth.realizadoPrimeiraReuniao
+            : currentMonth.realizadoSegundaReuniao;
           const field = entry.tipo === 'primeira' ? 'realizado_primeira_reuniao' : 'realizado_segunda_reuniao';
-          await supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', entry.month);
+          supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', entry.month).then(({ error }) => {
+            if (error) console.error('Erro ao sincronizar dados_realizados:', error);
+          });
         }
-      } catch (e) { console.error(e); }
+
+        return updated;
+      });
     }
-  }, [reunioesEntries, data]);
+  }, [reunioesEntries]);
 
   const getMetaAgendamentos = useCallback((monthIndex: number) => {
     const monthData = data[monthIndex];
