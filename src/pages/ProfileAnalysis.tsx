@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ const ProfileAnalysis = () => {
   const [analysis, setAnalysis] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
 
   // History
   const [history, setHistory] = useState<AnalysisHistory[]>([]);
@@ -597,7 +599,7 @@ const ProfileAnalysis = () => {
                       prose-table:border-collapse prose-th:border prose-th:border-border prose-th:px-3 prose-th:py-1.5 prose-th:bg-muted/50
                       prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-1.5
                       prose-hr:border-border">
-                      <ReactMarkdown>{displayedAnalysis}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayedAnalysis}</ReactMarkdown>
                       {isLoading && (
                         <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1 align-middle rounded-sm" />
                       )}
