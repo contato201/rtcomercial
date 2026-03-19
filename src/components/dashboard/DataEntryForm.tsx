@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MonthData, MONTHS, VALOR_POR_VENDA } from '@/types/dashboard';
-import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2, History, ShieldOff } from 'lucide-react';
+import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2, History, ShieldOff, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
