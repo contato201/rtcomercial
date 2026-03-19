@@ -319,14 +319,38 @@ export const useDashboardData = () => {
     await updateMonthData(monthIndex, { [field]: value } as Partial<MonthData>);
   }, [updateMonthData]);
 
+  // Derive realized values reactively from unitSalesByMonth and reunioesEntries
+  const computedData = useMemo(() => {
+    return data.map((month) => {
+      const salesList = unitSalesByMonth[month.month] ?? [];
+      const count = salesList.length;
+      const sum = salesList.reduce((s, it) => s + Number(it.valor || 0), 0);
+      const avg = count > 0 ? sum / count : month.ticketRealizado;
+
+      const monthReunioes = reunioesEntries.filter(e => e.month === month.month);
+      const hasReuniaoEntries = monthReunioes.length > 0;
+      const primeira = monthReunioes.filter(e => e.tipo === 'primeira').reduce((s, e) => s + e.quantidade, 0);
+      const segunda = monthReunioes.filter(e => e.tipo === 'segunda').reduce((s, e) => s + e.quantidade, 0);
+
+      return {
+        ...month,
+        realizadoVendas: count,
+        realizadoFaturamento: sum,
+        ticketRealizado: avg,
+        realizadoPrimeiraReuniao: hasReuniaoEntries ? primeira : month.realizadoPrimeiraReuniao,
+        realizadoSegundaReuniao: hasReuniaoEntries ? segunda : month.realizadoSegundaReuniao,
+      };
+    });
+  }, [data, unitSalesByMonth, reunioesEntries]);
+
   const filteredData = useMemo(() => {
     switch (filterType) {
-      case 'month': return [data[selectedMonth]];
-      case 'quarter': return QUARTERS[selectedQuarter].map(i => data[i]);
-      case 'year': return data;
-      default: return data;
+      case 'month': return [computedData[selectedMonth]];
+      case 'quarter': return QUARTERS[selectedQuarter].map(i => computedData[i]);
+      case 'year': return computedData;
+      default: return computedData;
     }
-  }, [data, filterType, selectedMonth, selectedQuarter]);
+  }, [computedData, filterType, selectedMonth, selectedQuarter]);
 
   const aggregatedData = useMemo(() => {
     if (filteredData.length === 1) return filteredData[0];
