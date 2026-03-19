@@ -7,6 +7,9 @@ import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { DataEntryForm } from '@/components/dashboard/DataEntryForm';
 import { ChartsGrid } from '@/components/dashboard/ChartsGrid';
 import { HistoryPanel } from '@/components/dashboard/HistoryPanel';
+import { exportDashboardCsv } from '@/lib/exportCsv';
+import { Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -45,9 +48,29 @@ const Index = () => {
       
       <div className="max-w-[1600px] mx-auto p-6 lg:p-8">
         {/* Título da página */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Dashboard Comercial</h1>
-          <p className="text-sm text-muted-foreground">Acompanhamento de Metas vs Realizado</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Dashboard Comercial</h1>
+            <p className="text-sm text-muted-foreground">Acompanhamento de Metas vs Realizado</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const label = filterType === 'month'
+                ? data[selectedMonth].month
+                : filterType === 'quarter'
+                  ? selectedQuarter
+                  : 'Anual';
+              exportDashboardCsv(
+                filterType === 'month' ? [data[selectedMonth]] : filteredData,
+                `dashboard-${label}-2025`
+              );
+            }}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exportar CSV
+          </Button>
         </div>
         
         <FilterBar
