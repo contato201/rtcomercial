@@ -47,6 +47,7 @@ export const useGrowthData = () => {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const hasAutoSynced = useRef(false);
+  const syncedMonth = useRef<number>(new Date().getMonth());
 
   // Campanhas filtradas
   const filteredCampaigns = useMemo(() => {
@@ -257,8 +258,7 @@ export const useGrowthData = () => {
     };
   }, [syncFromSheets]);
 
-  // O mês em que o sync foi feito (mês atual do sistema)
-  const syncedMonth = useRef<number>(new Date().getMonth());
+  // currentMonthData usa syncedMonth (declarado no início do hook)
 
   const currentMonthData = useMemo(() => {
     const baseData = data[selectedMonth];
