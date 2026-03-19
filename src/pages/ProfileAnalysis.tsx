@@ -60,6 +60,66 @@ const ProfileAnalysis = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // DEV: Test markdown rendering
+  const SAMPLE_MARKDOWN = `# 📊 Diagnóstico Consultivo — Clínica Viva
+
+## 1. Resumo Executivo
+
+A **Clínica Viva** apresenta um perfil com *potencial significativo* de crescimento, mas com lacunas importantes na estratégia digital. O Instagram tem boa frequência de postagens, porém ***baixo engajamento***.
+
+---
+
+## 2. Análise de Maturidade Digital
+
+| Dimensão | Nota | Observação |
+|----------|------|------------|
+| Conteúdo | 6/10 | Frequência boa, mas falta estratégia |
+| Engajamento | 4/10 | Taxa abaixo da média do segmento |
+| Conversão | 3/10 | Sem funil estruturado |
+| Branding | 7/10 | Identidade visual consistente |
+
+### 2.1 Pontos Fortes
+- ✅ Identidade visual **bem definida**
+- ✅ Frequência de postagens *acima da média*
+- ✅ Boas avaliações no Google
+
+### 2.2 Pontos de Melhoria
+1. Implementar **CTA claro** em todos os posts
+2. Criar sequência de *stories* com enquetes
+3. Adicionar depoimentos de pacientes
+4. Otimizar a bio com link de agendamento
+
+---
+
+## 3. Plano de Ação
+
+> **Prioridade máxima:** Estruturar o funil de captação antes de investir em tráfego pago.
+
+### Fase 1: Fundação (Semanas 1-2)
+- Revisar bio do Instagram
+- Criar link de agendamento
+- Configurar WhatsApp Business
+
+### Fase 2: Conteúdo (Semanas 3-4)
+- Gravar 3 vídeos de bastidores
+- Criar carrossel de antes/depois
+- Publicar 2 depoimentos
+
+---
+
+## 4. Roteiro de Vídeo para Prospecção
+
+**Duração:** 45-60 segundos
+
+---
+
+*Análise gerada em 19/03/2026 às 14:30 — **RT Comercial***
+`;
+
+  const injectTestMarkdown = () => {
+    setAnalysis(SAMPLE_MARKDOWN);
+  };
+
   // History
   const [history, setHistory] = useState<AnalysisHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
