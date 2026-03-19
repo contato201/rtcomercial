@@ -39,7 +39,8 @@ const Index = () => {
     getMetaAgendamentos,
     calculateVariation,
     resetData,
-    revertToValue
+    revertToValue,
+    isLoading,
   } = useDashboardData();
 
   return (
