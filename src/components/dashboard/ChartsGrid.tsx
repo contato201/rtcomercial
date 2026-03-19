@@ -1,4 +1,4 @@
-import { MonthData, FilterType, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
+import { MonthData, FilterType, QuarterType, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { ComparisonChart } from './ComparisonChart';
 import type { AgendamentoRow } from '@/hooks/useDashboardData';
 
@@ -6,10 +6,11 @@ interface ChartsGridProps {
   filteredData: MonthData[];
   aggregatedData: MonthData;
   filterType: FilterType;
+  selectedQuarter: QuarterType;
   agendamentos?: AgendamentoRow[];
 }
 
-export const ChartsGrid = ({ filteredData, aggregatedData, filterType, agendamentos = [] }: ChartsGridProps) => {
+export const ChartsGrid = ({ filteredData, aggregatedData, filterType, selectedQuarter, agendamentos = [] }: ChartsGridProps) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
