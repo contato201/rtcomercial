@@ -247,6 +247,7 @@ export const useGrowthData = () => {
       
       if (session && mounted) {
         hasAutoSynced.current = true;
+        hasAutoSyncedThisSession = true;
         console.log('Auto-syncing from Google Sheets...');
         syncFromSheets();
       }
