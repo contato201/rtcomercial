@@ -93,6 +93,7 @@ const Index = () => {
           filteredData={filteredData}
           aggregatedData={aggregatedData}
           filterType={filterType}
+          selectedQuarter={selectedQuarter}
           agendamentos={agendamentos}
         />
       </div>
