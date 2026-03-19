@@ -120,6 +120,7 @@ const Index = () => {
           filterType={filterType}
           selectedQuarter={selectedQuarter}
           agendamentos={agendamentos}
+          isLoading={isLoading}
         />
       </div>
 
