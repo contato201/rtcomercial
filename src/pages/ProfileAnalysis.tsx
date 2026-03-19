@@ -672,6 +672,15 @@ A **Clínica Viva** apresenta um perfil com *potencial significativo* de crescim
                       <p className="font-medium text-foreground/60">Nenhuma análise gerada</p>
                       <p className="text-xs mt-0.5">Preencha os campos e clique em gerar</p>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 gap-1.5 text-xs"
+                      onClick={injectTestMarkdown}
+                    >
+                      <Eye className="w-3 h-3" />
+                      Testar Markdown
+                    </Button>
                     {history.length > 0 && (
                       <Button
                         variant="outline"
