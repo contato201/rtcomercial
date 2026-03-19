@@ -38,13 +38,10 @@ export const GrowthMetricsCards = ({
   hasData = true,
   investimentoAcumulado = 0,
 }: GrowthMetricsCardsProps) => {
-  const roi = data.investimento > 0 
-    ? ((data.valorVendas - data.investimento) / data.investimento) * 100
-    : 0;
+  const safeDiv = (a: number, b: number) => { if (!b || b === 0) return 0; const r = a / b; return isFinite(r) ? r : 0; };
 
-  const roas = data.investimento > 0 
-    ? data.valorVendas / data.investimento
-    : 0;
+  const roi = safeDiv((data.valorVendas - data.investimento) * 100, data.investimento);
+  const roas = safeDiv(data.valorVendas, data.investimento);
 
   // Métricas agrupadas por categoria
   const investmentMetric = {
