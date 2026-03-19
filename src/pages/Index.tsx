@@ -7,6 +7,9 @@ import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { DataEntryForm } from '@/components/dashboard/DataEntryForm';
 import { ChartsGrid } from '@/components/dashboard/ChartsGrid';
 import { HistoryPanel } from '@/components/dashboard/HistoryPanel';
+import { exportDashboardCsv } from '@/lib/exportCsv';
+import { Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
