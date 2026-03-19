@@ -577,15 +577,15 @@ const ProfileAnalysis = () => {
                 </div>
               </div>
               <CardContent className="p-0">
-                {isLoading ? (
+                {isLoading && !analysis ? (
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground space-y-4">
                     <div className="relative">
                       <div className="w-16 h-16 rounded-full border-4 border-primary/20 animate-pulse" />
                       <Loader2 className="w-8 h-8 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
                     </div>
                     <div className="text-center space-y-1">
-                      <p className="font-medium text-foreground">Gerando análise consultiva...</p>
-                      <p className="text-xs">Isso pode levar até 30 segundos</p>
+                      <p className="font-medium text-foreground">Conectando com a IA...</p>
+                      <p className="text-xs">A análise aparecerá em tempo real</p>
                     </div>
                   </div>
                 ) : displayedAnalysis ? (
@@ -598,6 +598,9 @@ const ProfileAnalysis = () => {
                       prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-1.5
                       prose-hr:border-border">
                       <ReactMarkdown>{displayedAnalysis}</ReactMarkdown>
+                      {isLoading && (
+                        <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1 align-middle rounded-sm" />
+                      )}
                     </div>
                   </div>
                 ) : (
