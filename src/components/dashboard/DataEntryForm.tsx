@@ -16,6 +16,7 @@ interface DataEntryFormProps {
   agendamentos: AgendamentoRow[];
   reunioesEntries: ReuniaoEntry[];
   metaAgendamentos: number;
+  filterType?: 'month' | 'quarter' | 'annual';
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
   onAddUnitSale: (monthIndex: number, valor: number, cliente: string) => Promise<void> | void;
   onUpdateUnitSale: (id: string, valor: number, cliente: string) => Promise<void> | void;
