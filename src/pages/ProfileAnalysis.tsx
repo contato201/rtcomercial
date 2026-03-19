@@ -547,11 +547,14 @@ const ProfileAnalysis = () => {
                   </div>
                 ) : displayedAnalysis ? (
                   <div className="p-5 max-h-[75vh] overflow-y-auto">
-                    <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap text-sm leading-relaxed
+                    <div className="prose prose-sm max-w-none dark:prose-invert text-sm leading-relaxed
                       prose-headings:text-foreground prose-h2:text-lg prose-h2:mt-6 prose-h2:mb-2
                       prose-h3:text-base prose-h3:mt-4 prose-h3:mb-1
-                      prose-strong:text-foreground prose-li:text-foreground/90">
-                      {displayedAnalysis}
+                      prose-strong:text-foreground prose-li:text-foreground/90
+                      prose-table:border-collapse prose-th:border prose-th:border-border prose-th:px-3 prose-th:py-1.5 prose-th:bg-muted/50
+                      prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-1.5
+                      prose-hr:border-border">
+                      <ReactMarkdown>{displayedAnalysis}</ReactMarkdown>
                     </div>
                   </div>
                 ) : (
