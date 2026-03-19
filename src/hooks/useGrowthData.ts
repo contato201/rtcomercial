@@ -11,6 +11,9 @@ import {
 } from '@/types/growth';
 import { toast } from 'sonner';
 
+// Module-level flag: persiste entre mount/unmount, reseta apenas ao recarregar a aba
+let hasAutoSyncedThisSession = false;
+
 interface DadosTrafego {
   id: string;
   month: string;
@@ -46,7 +49,7 @@ export const useGrowthData = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-  const hasAutoSynced = useRef(false);
+  const hasAutoSynced = useRef(hasAutoSyncedThisSession);
   const syncedMonth = useRef<number>(new Date().getMonth());
 
   // Campanhas filtradas
@@ -244,6 +247,7 @@ export const useGrowthData = () => {
       
       if (session && mounted) {
         hasAutoSynced.current = true;
+        hasAutoSyncedThisSession = true;
         console.log('Auto-syncing from Google Sheets...');
         syncFromSheets();
       }
