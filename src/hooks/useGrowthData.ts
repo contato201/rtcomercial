@@ -49,7 +49,7 @@ export const useGrowthData = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-  const hasAutoSynced = useRef(false);
+  const hasAutoSynced = useRef(hasAutoSyncedThisSession);
   const syncedMonth = useRef<number>(new Date().getMonth());
 
   // Campanhas filtradas
