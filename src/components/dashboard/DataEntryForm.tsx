@@ -37,6 +37,7 @@ export const DataEntryForm = ({
   agendamentos,
   reunioesEntries,
   metaAgendamentos,
+  filterType = 'month',
   onUpdate,
   onAddUnitSale,
   onUpdateUnitSale,
