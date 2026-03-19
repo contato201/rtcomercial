@@ -274,8 +274,9 @@ export const useGrowthData = () => {
         cpc: 0,
         cpl: 0,
       };
-      totalsToUse.cpc = totalsToUse.cliques > 0 ? totalsToUse.investimento / totalsToUse.cliques : 0;
-      totalsToUse.cpl = totalsToUse.leads > 0 ? totalsToUse.investimento / totalsToUse.leads : 0;
+      const sd = (a: number, b: number) => { if (!b || b === 0) return 0; const r = a / b; return isFinite(r) ? r : 0; };
+      totalsToUse.cpc = sd(totalsToUse.investimento, totalsToUse.cliques);
+      totalsToUse.cpl = sd(totalsToUse.investimento, totalsToUse.leads);
       
       return calculateMetrics({
         ...baseData,

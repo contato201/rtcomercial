@@ -87,13 +87,19 @@ export const createEmptyGrowthData = (monthIndex: number): GrowthData => ({
   taxaFechamento: 0,
 });
 
+const safeDiv = (a: number, b: number): number => {
+  if (!b || b === 0) return 0;
+  const r = a / b;
+  return isFinite(r) ? r : 0;
+};
+
 export const calculateMetrics = (data: GrowthData): GrowthData => {
   return {
     ...data,
-    cpl: data.leadsTotal > 0 ? data.investimento / data.leadsTotal : 0,
-    cac: data.vendasFechadas > 0 ? data.investimento / data.vendasFechadas : 0,
-    taxaMQL: data.leadsTotal > 0 ? (data.leadsQualificados / data.leadsTotal) * 100 : 0,
-    taxaReuniao: data.leadsQualificados > 0 ? (data.reunioesAgendadas / data.leadsQualificados) * 100 : 0,
-    taxaFechamento: data.reunioesAgendadas > 0 ? (data.vendasFechadas / data.reunioesAgendadas) * 100 : 0,
+    cpl: safeDiv(data.investimento, data.leadsTotal),
+    cac: safeDiv(data.investimento, data.vendasFechadas),
+    taxaMQL: safeDiv(data.leadsQualificados * 100, data.leadsTotal),
+    taxaReuniao: safeDiv(data.reunioesAgendadas * 100, data.leadsQualificados),
+    taxaFechamento: safeDiv(data.vendasFechadas * 100, data.reunioesAgendadas),
   };
 };
