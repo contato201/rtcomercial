@@ -11,6 +11,9 @@ import {
 } from '@/types/growth';
 import { toast } from 'sonner';
 
+// Module-level flag: persiste entre mount/unmount, reseta apenas ao recarregar a aba
+let hasAutoSyncedThisSession = false;
+
 interface DadosTrafego {
   id: string;
   month: string;
