@@ -258,8 +258,7 @@ export const useGrowthData = () => {
     };
   }, [syncFromSheets]);
 
-  // O mês em que o sync foi feito (mês atual do sistema)
-  const syncedMonth = useRef<number>(new Date().getMonth());
+  // currentMonthData usa syncedMonth (declarado no início do hook)
 
   const currentMonthData = useMemo(() => {
     const baseData = data[selectedMonth];
