@@ -39,7 +39,8 @@ const Index = () => {
     getMetaAgendamentos,
     calculateVariation,
     resetData,
-    revertToValue
+    revertToValue,
+    isLoading,
   } = useDashboardData();
 
   return (
@@ -119,6 +120,7 @@ const Index = () => {
           filterType={filterType}
           selectedQuarter={selectedQuarter}
           agendamentos={agendamentos}
+          isLoading={isLoading}
         />
       </div>
 
