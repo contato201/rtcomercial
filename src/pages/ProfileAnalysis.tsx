@@ -153,24 +153,67 @@ const ProfileAnalysis = () => {
         finalPdfText = `Arquivo PDF enviado: ${pdfFile.name}. Analise com base no nome e contexto fornecido.`;
       }
 
-      const { data, error } = await supabase.functions.invoke("analyze-profile", {
-        body: {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = (await supabase.auth.getSession()).data.session;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/analyze-profile`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || supabaseKey}`,
+          "apikey": supabaseKey,
+        },
+        body: JSON.stringify({
           pdfText: finalPdfText || undefined,
           pageUrl: pageUrl || undefined,
           pageType: pageType || undefined,
           businessType: businessType || undefined,
           prospectName: prospectName || undefined,
           scripts: scripts || undefined,
-        },
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `Erro ao processar análise (${response.status})`);
+      }
 
-      if (data?.error) {
-        toast({ title: "Erro", description: data.error, variant: "destructive" });
-      } else if (data?.analysis) {
-        setAnalysis(data.analysis);
-        await saveAnalysis(data.analysis);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Streaming não suportado");
+
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullText += content;
+              setAnalysis(fullText);
+            }
+          } catch {
+            // skip malformed chunks
+          }
+        }
+      }
+
+      if (fullText) {
+        await saveAnalysis(fullText);
         toast({ title: "Análise concluída!", description: "Relatório consultivo gerado com sucesso" });
       } else {
         toast({ title: "Erro", description: "Resposta vazia do servidor. Tente novamente.", variant: "destructive" });

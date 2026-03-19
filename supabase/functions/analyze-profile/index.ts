@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -225,7 +224,7 @@ REGRAS CRÍTICAS:
 - O tom deve ser de consultor premium, não de vendedor.
 - Formate com markdown rico: negrito, listas, emojis, separadores.`;
 
-    console.log("Sending request to AI gateway...");
+    console.log("Sending streaming request to AI gateway...");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -235,6 +234,7 @@ REGRAS CRÍTICAS:
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
+        stream: true,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -247,7 +247,7 @@ REGRAS CRÍTICAS:
     if (!response.ok) {
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
-      
+
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns minutos." }),
@@ -266,15 +266,39 @@ REGRAS CRÍTICAS:
       );
     }
 
-    const data = await response.json();
-    console.log("AI response received, choices:", data.choices?.length);
-    
-    const content = data.choices?.[0]?.message?.content || "Não foi possível gerar a análise.";
+    // Stream the SSE response back to the client
+    const reader = response.body!.getReader();
+    const encoder = new TextEncoder();
 
-    return new Response(
-      JSON.stringify({ analysis: content }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    const stream = new ReadableStream({
+      async start(controller) {
+        const decoder = new TextDecoder();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              break;
+            }
+            // Forward the SSE chunks as-is
+            controller.enqueue(value);
+          }
+        } catch (err) {
+          console.error("Stream error:", err);
+          controller.error(err);
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (e) {
     console.error("analyze-profile error:", e);
     return new Response(
