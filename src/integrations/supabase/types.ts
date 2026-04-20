@@ -267,7 +267,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      rename_sdr: {
+        Args: { new_name: string; old_name: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
