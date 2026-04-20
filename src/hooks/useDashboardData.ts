@@ -16,7 +16,7 @@ type UnitSaleRow = {
 export type AgendamentoRow = {
   id: string;
   month: string;
-  pessoa: 'Tadeu' | 'Nicole';
+  pessoa: string;
   quantidade: number;
   data_lancamento: string;
   created_at: string;
@@ -38,7 +38,7 @@ const valorSchema = z
   .positive('Valor precisa ser maior que zero')
   .max(1_000_000, 'Valor muito alto');
 
-const pessoaSchema = z.enum(['Tadeu', 'Nicole']);
+const pessoaSchema = z.string().trim().min(1, 'Nome do SDR obrigatório').max(50);
 const quantidadeSchema = z
   .number({ invalid_type_error: 'Quantidade inválida' })
   .int()
@@ -80,7 +80,7 @@ export const useDashboardData = () => {
       const processedAgendamentos: AgendamentoRow[] = ((agendamentosData as any[]) ?? []).map((row: any) => ({
         id: row.id,
         month: row.month,
-        pessoa: row.pessoa as 'Tadeu' | 'Nicole',
+        pessoa: String(row.pessoa ?? ''),
         quantidade: toFiniteNumber(row.quantidade),
         data_lancamento: row.data_lancamento,
         created_at: row.created_at,
@@ -392,7 +392,7 @@ export const useDashboardData = () => {
   }, []);
 
   // Agendamentos
-  const addAgendamento = useCallback(async (monthIndex: number, pessoa: 'Tadeu' | 'Nicole', quantidade: number) => {
+  const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number) => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const p = pessoaSchema.safeParse(pessoa);
