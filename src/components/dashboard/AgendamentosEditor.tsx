@@ -227,7 +227,7 @@ export const AgendamentosEditor = ({
   onDeleteAgendamento,
   canEdit,
 }: AgendamentosEditorProps) => {
-  const [sdrNames, setSdrNames] = useState<[string, string]>(loadSdrNames);
+  const [sdrNames, setSdrNames] = useState<[string, string, string]>(loadSdrNames);
 
   const monthName = MONTHS[selectedMonth];
   const monthAgendamentos = useMemo(
@@ -235,25 +235,24 @@ export const AgendamentosEditor = ({
     [agendamentos, monthName]
   );
 
-  const [sdr1, sdr2] = sdrNames;
-  const entriesSdr1 = monthAgendamentos.filter((a) => a.pessoa === sdr1);
-  const entriesSdr2 = monthAgendamentos.filter((a) => a.pessoa === sdr2);
+  const slots = sdrNames.map((name) => {
+    const entries = monthAgendamentos.filter((a) => a.pessoa === name);
+    const total = entries.reduce((sum, a) => sum + Number(a.quantidade || 0), 0);
+    return { name, entries, total };
+  });
 
-  const totalSdr1 = entriesSdr1.reduce((sum, a) => sum + Number(a.quantidade || 0), 0);
-  const totalSdr2 = entriesSdr2.reduce((sum, a) => sum + Number(a.quantidade || 0), 0);
-  const totalGeral = totalSdr1 + totalSdr2;
-
-  const metaPorPessoa = Math.ceil(metaAgendamentos / 2);
+  const totalGeral = slots.reduce((s, x) => s + x.total, 0);
+  const metaPorPessoa = Math.ceil(metaAgendamentos / SDR_COUNT);
   const progressoGeral = safePercentage(totalGeral, metaAgendamentos);
 
-  const handleRename = async (slotIndex: 0 | 1, newName: string) => {
+  const iconColors = ['text-primary', 'text-secondary-foreground', 'text-accent-foreground'];
+
+  const handleRename = async (slotIndex: number, newName: string) => {
     const oldName = sdrNames[slotIndex];
     if (oldName === newName) return;
 
-    // Check duplicate
-    const otherName = sdrNames[slotIndex === 0 ? 1 : 0];
-    if (newName === otherName) {
-      toast({ title: 'Nome duplicado', description: 'Os dois SDRs precisam ter nomes diferentes.', variant: 'destructive' });
+    if (sdrNames.some((n, i) => i !== slotIndex && n === newName)) {
+      toast({ title: 'Nome duplicado', description: 'Os SDRs precisam ter nomes diferentes.', variant: 'destructive' });
       throw new Error('duplicate');
     }
 
@@ -264,7 +263,8 @@ export const AgendamentosEditor = ({
       });
       if (error) throw error;
 
-      const newNames: [string, string] = slotIndex === 0 ? [newName, sdrNames[1]] : [sdrNames[0], newName];
+      const newNames = [...sdrNames] as [string, string, string];
+      newNames[slotIndex] = newName;
       setSdrNames(newNames);
       saveSdrNames(newNames);
 
@@ -307,35 +307,26 @@ export const AgendamentosEditor = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SdrSlot
-            name={sdr1}
-            metaPorPessoa={metaPorPessoa}
-            total={totalSdr1}
-            entries={entriesSdr1}
-            selectedMonth={selectedMonth}
-            canEdit={canEdit}
-            onAdd={(pessoa, qtd) => onAddAgendamento(selectedMonth, pessoa, qtd)}
-            onDelete={onDeleteAgendamento}
-            onRename={(newName) => handleRename(0, newName)}
-            iconColor="text-primary"
-          />
-          <SdrSlot
-            name={sdr2}
-            metaPorPessoa={metaPorPessoa}
-            total={totalSdr2}
-            entries={entriesSdr2}
-            selectedMonth={selectedMonth}
-            canEdit={canEdit}
-            onAdd={(pessoa, qtd) => onAddAgendamento(selectedMonth, pessoa, qtd)}
-            onDelete={onDeleteAgendamento}
-            onRename={(newName) => handleRename(1, newName)}
-            iconColor="text-secondary-foreground"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {slots.map((slot, i) => (
+            <SdrSlot
+              key={i}
+              name={slot.name}
+              metaPorPessoa={metaPorPessoa}
+              total={slot.total}
+              entries={slot.entries}
+              selectedMonth={selectedMonth}
+              canEdit={canEdit}
+              onAdd={(pessoa, qtd) => onAddAgendamento(selectedMonth, pessoa, qtd)}
+              onDelete={onDeleteAgendamento}
+              onRename={(newName) => handleRename(i, newName)}
+              iconColor={iconColors[i]}
+            />
+          ))}
         </div>
 
         <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2">
-          <strong>Cálculo:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)}
+          <strong>Cálculo:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)} (dividida entre {SDR_COUNT} SDRs)
         </div>
       </CardContent>
     </Card>
