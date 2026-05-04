@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-// Email autorizado para edição
-const AUTHORIZED_EMAIL = 'contato@allancatao.com.br';
+// E-mails autorizados para edição
+const AUTHORIZED_EMAILS = [
+  'contato@allancatao.com.br',
+  'parceiros@reproduzindotalentos.com.br',
+  'comercial@reproduzindotalentos.com.br',
+];
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -35,7 +39,7 @@ export const useAuth = () => {
   };
 
   // Verifica se o usuário logado tem permissão para editar
-  const canEdit = user?.email === AUTHORIZED_EMAIL;
+  const canEdit = !!user?.email && AUTHORIZED_EMAILS.includes(user.email);
 
   return {
     user,
