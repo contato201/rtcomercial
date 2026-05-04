@@ -50,7 +50,7 @@ interface AgendamentosEditorProps {
   selectedMonth: number;
   agendamentos: AgendamentoRow[];
   metaAgendamentos: number;
-  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number) => Promise<void>;
+  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
   canEdit: boolean;
 }
