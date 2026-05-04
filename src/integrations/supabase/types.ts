@@ -267,6 +267,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      is_authorized_editor: { Args: never; Returns: boolean }
       rename_sdr: {
         Args: { new_name: string; old_name: string }
         Returns: number
