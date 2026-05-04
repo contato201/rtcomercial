@@ -58,6 +58,8 @@ interface AgendamentosEditorProps {
 interface SdrSlotProps {
   name: string;
   metaPorPessoa: number;
+  metaPorDia: number;
+  realizadoHoje: number;
   total: number;
   entries: AgendamentoRow[];
   selectedMonth: number;
@@ -68,9 +70,17 @@ interface SdrSlotProps {
   iconColor?: string;
 }
 
+const todayISO = () => {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+};
+
 const SdrSlot = ({
   name,
   metaPorPessoa,
+  metaPorDia,
+  realizadoHoje,
   total,
   entries,
   canEdit,
@@ -80,6 +90,7 @@ const SdrSlot = ({
   iconColor = 'text-primary',
 }: SdrSlotProps) => {
   const [quantidade, setQuantidade] = useState('');
+  const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -87,6 +98,7 @@ const SdrSlot = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const progresso = safePercentage(total, metaPorPessoa);
+  const progressoDia = safePercentage(realizadoHoje, metaPorDia);
   const getProgressColor = (p: number) =>
     p >= 100 ? 'bg-green-500' : p >= 70 ? 'bg-yellow-500' : 'bg-red-500';
 
@@ -96,11 +108,16 @@ const SdrSlot = ({
       setError('Digite um número válido maior que zero');
       return;
     }
+    if (!dataLancamento) {
+      setError('Selecione a data');
+      return;
+    }
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(name, qtd);
+      await onAdd(name, qtd, dataLancamento);
       setQuantidade('');
+      setDataLancamento(todayISO());
     } catch {
       setError('Erro ao adicionar');
     } finally {
