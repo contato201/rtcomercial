@@ -416,16 +416,19 @@ export const useDashboardData = () => {
   }, []);
 
   // Reuniões entries
-  const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number) => {
+  const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string) => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const t = tipoReuniaoSchema.safeParse(tipo);
     const q = quantidadeSchema.safeParse(quantidade);
     if (!m.success || !t.success || !q.success) return;
 
+    const payload: any = { month: m.data, tipo: t.data, quantidade: q.data };
+    if (dataLancamento) payload.data_lancamento = dataLancamento;
+
     const { data: inserted, error } = await supabase
       .from('reunioes_entries' as any)
-      .insert({ month: m.data, tipo: t.data, quantidade: q.data })
+      .insert(payload)
       .select('*')
       .single();
     if (error) { console.error('Erro ao inserir reunião:', error); return; }
