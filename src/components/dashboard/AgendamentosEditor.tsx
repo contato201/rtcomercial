@@ -278,6 +278,10 @@ export const AgendamentosEditor = ({
   const metaPorPessoa = Math.ceil(metaAgendamentos / SDR_COUNT);
   const progressoGeral = safePercentage(totalGeral, metaAgendamentos);
 
+  const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
+  const metaPorDia = Math.ceil(metaPorPessoa / Math.max(diasUteis, 1));
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const iconColors = ['text-primary', 'text-secondary-foreground', 'text-accent-foreground'];
 
   const handleRename = async (slotIndex: number, newName: string) => {
