@@ -392,13 +392,15 @@ export const useDashboardData = () => {
   }, []);
 
   // Agendamentos
-  const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number) => {
+  const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const p = pessoaSchema.safeParse(pessoa);
     const q = quantidadeSchema.safeParse(quantidade);
     if (!m.success || !p.success || !q.success) return;
-    const { data: inserted, error } = await supabase.from('agendamentos' as any).insert({ month: m.data, pessoa: p.data, quantidade: q.data }).select('*').single();
+    const payload: any = { month: m.data, pessoa: p.data, quantidade: q.data };
+    if (dataLancamento) payload.data_lancamento = dataLancamento;
+    const { data: inserted, error } = await supabase.from('agendamentos' as any).insert(payload).select('*').single();
     if (error) { console.error('Erro ao inserir agendamento:', error); return; }
     const newRow: AgendamentoRow = {
       id: (inserted as any).id, month: (inserted as any).month, pessoa: (inserted as any).pessoa,
