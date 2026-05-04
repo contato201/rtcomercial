@@ -8,6 +8,7 @@ import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
 
 export interface AgendamentoRow {
   id: string;
@@ -49,7 +50,7 @@ interface AgendamentosEditorProps {
   selectedMonth: number;
   agendamentos: AgendamentoRow[];
   metaAgendamentos: number;
-  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number) => Promise<void>;
+  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
   canEdit: boolean;
 }
@@ -57,19 +58,29 @@ interface AgendamentosEditorProps {
 interface SdrSlotProps {
   name: string;
   metaPorPessoa: number;
+  metaPorDia: number;
+  realizadoHoje: number;
   total: number;
   entries: AgendamentoRow[];
   selectedMonth: number;
   canEdit: boolean;
-  onAdd: (pessoa: string, qtd: number) => Promise<void>;
+  onAdd: (pessoa: string, qtd: number, dataLancamento: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onRename: (newName: string) => Promise<void>;
   iconColor?: string;
 }
 
+const todayISO = () => {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+};
+
 const SdrSlot = ({
   name,
   metaPorPessoa,
+  metaPorDia,
+  realizadoHoje,
   total,
   entries,
   canEdit,
@@ -79,6 +90,7 @@ const SdrSlot = ({
   iconColor = 'text-primary',
 }: SdrSlotProps) => {
   const [quantidade, setQuantidade] = useState('');
+  const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -86,6 +98,7 @@ const SdrSlot = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const progresso = safePercentage(total, metaPorPessoa);
+  const progressoDia = safePercentage(realizadoHoje, metaPorDia);
   const getProgressColor = (p: number) =>
     p >= 100 ? 'bg-green-500' : p >= 70 ? 'bg-yellow-500' : 'bg-red-500';
 
@@ -95,11 +108,16 @@ const SdrSlot = ({
       setError('Digite um número válido maior que zero');
       return;
     }
+    if (!dataLancamento) {
+      setError('Selecione a data');
+      return;
+    }
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(name, qtd);
+      await onAdd(name, qtd, dataLancamento);
       setQuantidade('');
+      setDataLancamento(todayISO());
     } catch {
       setError('Erro ao adicionar');
     } finally {
@@ -177,20 +195,35 @@ const SdrSlot = ({
 
       <Progress value={clampPercentage(progresso)} className={`h-2 ${getProgressColor(progresso)}`} />
 
+      <div className="flex justify-between text-xs bg-muted/30 rounded px-2 py-1">
+        <span>Meta/dia: <strong>{metaPorDia}</strong></span>
+        <span>Hoje: <strong className={realizadoHoje >= metaPorDia ? 'text-green-600' : 'text-destructive'}>{realizadoHoje}</strong></span>
+      </div>
+
       {canEdit && (
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            placeholder="Qtd"
-            value={quantidade}
-            onChange={(e) => setQuantidade(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-            className="flex-1"
-            min={1}
-          />
-          <Button size="sm" onClick={handleAdd} disabled={isAdding}>
-            <Plus className="h-4 w-4" />
-          </Button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Input
+              type="date"
+              value={dataLancamento}
+              onChange={(e) => setDataLancamento(e.target.value)}
+              className="flex-1 text-xs"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              placeholder="Qtd"
+              value={quantidade}
+              onChange={(e) => setQuantidade(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              className="flex-1"
+              min={1}
+            />
+            <Button size="sm" onClick={handleAdd} disabled={isAdding}>
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -244,6 +277,10 @@ export const AgendamentosEditor = ({
   const totalGeral = slots.reduce((s, x) => s + x.total, 0);
   const metaPorPessoa = Math.ceil(metaAgendamentos / SDR_COUNT);
   const progressoGeral = safePercentage(totalGeral, metaAgendamentos);
+
+  const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
+  const metaPorDia = Math.ceil(metaPorPessoa / Math.max(diasUteis, 1));
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const iconColors = ['text-primary', 'text-secondary-foreground', 'text-accent-foreground'];
 
@@ -308,25 +345,33 @@ export const AgendamentosEditor = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {slots.map((slot, i) => (
-            <SdrSlot
-              key={i}
-              name={slot.name}
-              metaPorPessoa={metaPorPessoa}
-              total={slot.total}
-              entries={slot.entries}
-              selectedMonth={selectedMonth}
-              canEdit={canEdit}
-              onAdd={(pessoa, qtd) => onAddAgendamento(selectedMonth, pessoa, qtd)}
-              onDelete={onDeleteAgendamento}
-              onRename={(newName) => handleRename(i, newName)}
-              iconColor={iconColors[i]}
-            />
-          ))}
+          {slots.map((slot, i) => {
+            const realizadoHoje = slot.entries
+              .filter((e) => e.data_lancamento === todayStr)
+              .reduce((s, e) => s + Number(e.quantidade || 0), 0);
+            return (
+              <SdrSlot
+                key={i}
+                name={slot.name}
+                metaPorPessoa={metaPorPessoa}
+                metaPorDia={metaPorDia}
+                realizadoHoje={realizadoHoje}
+                total={slot.total}
+                entries={slot.entries}
+                selectedMonth={selectedMonth}
+                canEdit={canEdit}
+                onAdd={(pessoa, qtd, dataLancamento) => onAddAgendamento(selectedMonth, pessoa, qtd, dataLancamento)}
+                onDelete={onDeleteAgendamento}
+                onRename={(newName) => handleRename(i, newName)}
+                iconColor={iconColors[i]}
+              />
+            );
+          })}
         </div>
 
-        <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2">
-          <strong>Cálculo:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)} (dividida entre {SDR_COUNT} SDRs)
+        <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 space-y-1">
+          <div><strong>Cálculo Mensal:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)} (dividida entre {SDR_COUNT} SDRs)</div>
+          <div><strong>Cálculo Diário:</strong> Meta por SDR ({metaPorPessoa}) ÷ {diasUteis} dias úteis em {monthName} = <strong>{metaPorDia}/dia</strong></div>
         </div>
       </CardContent>
     </Card>
