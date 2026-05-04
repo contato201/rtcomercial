@@ -195,20 +195,35 @@ const SdrSlot = ({
 
       <Progress value={clampPercentage(progresso)} className={`h-2 ${getProgressColor(progresso)}`} />
 
+      <div className="flex justify-between text-xs bg-muted/30 rounded px-2 py-1">
+        <span>Meta/dia: <strong>{metaPorDia}</strong></span>
+        <span>Hoje: <strong className={realizadoHoje >= metaPorDia ? 'text-green-600' : 'text-destructive'}>{realizadoHoje}</strong></span>
+      </div>
+
       {canEdit && (
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            placeholder="Qtd"
-            value={quantidade}
-            onChange={(e) => setQuantidade(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-            className="flex-1"
-            min={1}
-          />
-          <Button size="sm" onClick={handleAdd} disabled={isAdding}>
-            <Plus className="h-4 w-4" />
-          </Button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Input
+              type="date"
+              value={dataLancamento}
+              onChange={(e) => setDataLancamento(e.target.value)}
+              className="flex-1 text-xs"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              placeholder="Qtd"
+              value={quantidade}
+              onChange={(e) => setQuantidade(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              className="flex-1"
+              min={1}
+            />
+            <Button size="sm" onClick={handleAdd} disabled={isAdding}>
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
