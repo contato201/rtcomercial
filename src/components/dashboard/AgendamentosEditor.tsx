@@ -7,7 +7,7 @@ import { Plus, Trash2, Calendar, User, Pencil, Check, X } from 'lucide-react';
 import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
 
 export interface AgendamentoRow {
   id: string;
