@@ -21,7 +21,7 @@ interface DataEntryFormProps {
   onAddUnitSale: (monthIndex: number, valor: number, cliente: string) => Promise<void> | void;
   onUpdateUnitSale: (id: string, valor: number, cliente: string) => Promise<void> | void;
   onDeleteUnitSale: (id: string) => Promise<void> | void;
-  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number) => Promise<void>;
+  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
   onAddReuniaoEntry: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number) => Promise<void>;
   onDeleteReuniaoEntry: (id: string) => Promise<void>;
