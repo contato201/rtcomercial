@@ -39,7 +39,7 @@ export const useAuth = () => {
   };
 
   // Verifica se o usuário logado tem permissão para editar
-  const canEdit = user?.email === AUTHORIZED_EMAIL;
+  const canEdit = !!user?.email && AUTHORIZED_EMAILS.includes(user.email);
 
   return {
     user,
