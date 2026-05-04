@@ -62,7 +62,7 @@ interface SdrSlotProps {
   entries: AgendamentoRow[];
   selectedMonth: number;
   canEdit: boolean;
-  onAdd: (pessoa: string, qtd: number) => Promise<void>;
+  onAdd: (pessoa: string, qtd: number, dataLancamento: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onRename: (newName: string) => Promise<void>;
   iconColor?: string;
