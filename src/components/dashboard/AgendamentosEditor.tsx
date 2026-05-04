@@ -345,25 +345,33 @@ export const AgendamentosEditor = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {slots.map((slot, i) => (
-            <SdrSlot
-              key={i}
-              name={slot.name}
-              metaPorPessoa={metaPorPessoa}
-              total={slot.total}
-              entries={slot.entries}
-              selectedMonth={selectedMonth}
-              canEdit={canEdit}
-              onAdd={(pessoa, qtd) => onAddAgendamento(selectedMonth, pessoa, qtd)}
-              onDelete={onDeleteAgendamento}
-              onRename={(newName) => handleRename(i, newName)}
-              iconColor={iconColors[i]}
-            />
-          ))}
+          {slots.map((slot, i) => {
+            const realizadoHoje = slot.entries
+              .filter((e) => e.data_lancamento === todayStr)
+              .reduce((s, e) => s + Number(e.quantidade || 0), 0);
+            return (
+              <SdrSlot
+                key={i}
+                name={slot.name}
+                metaPorPessoa={metaPorPessoa}
+                metaPorDia={metaPorDia}
+                realizadoHoje={realizadoHoje}
+                total={slot.total}
+                entries={slot.entries}
+                selectedMonth={selectedMonth}
+                canEdit={canEdit}
+                onAdd={(pessoa, qtd, dataLancamento) => onAddAgendamento(selectedMonth, pessoa, qtd, dataLancamento)}
+                onDelete={onDeleteAgendamento}
+                onRename={(newName) => handleRename(i, newName)}
+                iconColor={iconColors[i]}
+              />
+            );
+          })}
         </div>
 
-        <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2">
-          <strong>Cálculo:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)} (dividida entre {SDR_COUNT} SDRs)
+        <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 space-y-1">
+          <div><strong>Cálculo Mensal:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)} (dividida entre {SDR_COUNT} SDRs)</div>
+          <div><strong>Cálculo Diário:</strong> Meta por SDR ({metaPorPessoa}) ÷ {diasUteis} dias úteis em {monthName} = <strong>{metaPorDia}/dia</strong></div>
         </div>
       </CardContent>
     </Card>
