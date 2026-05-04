@@ -5,10 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, LogIn, Mail, Lock } from 'lucide-react';
+import { Loader2, LogIn, Mail, Lock, KeyRound } from 'lucide-react';
 
-const AUTHORIZED_EMAIL = 'contato@allancatao.com.br';
-type LoginMethod = 'password' | 'magic';
+const AUTHORIZED_EMAILS = [
+  'contato@allancatao.com.br',
+  'parceiros@reproduzindotalentos.com.br',
+  'comercial@reproduzindotalentos.com.br',
+];
+type LoginMethod = 'password' | 'magic' | 'recover';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -18,12 +22,11 @@ const Auth = () => {
   const navigate = useNavigate();
 
   const normalizedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
-  const isAuthorizedEmail = normalizedEmail === AUTHORIZED_EMAIL;
+  const isAuthorizedEmail = AUTHORIZED_EMAILS.includes(normalizedEmail);
 
   useEffect(() => {
-    // Verificar se usuário já está logado
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
+      if (session?.user && event !== 'PASSWORD_RECOVERY') {
         navigate('/');
       }
     });
@@ -39,14 +42,14 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!normalizedEmail) {
       toast.error('Informe seu email');
       return;
     }
 
     if (!isAuthorizedEmail) {
-      toast.error('Acesso restrito: use o email autorizado');
+      toast.error('Acesso restrito: use um email autorizado');
       return;
     }
 
@@ -58,6 +61,18 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
+      if (loginMethod === 'recover') {
+        const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+        toast.success('Enviamos um link de recuperação para seu email.');
+        return;
+      }
+
       if (loginMethod === 'magic') {
         const { error } = await supabase.auth.signInWithOtp({
           email: normalizedEmail,
@@ -67,7 +82,6 @@ const Auth = () => {
         });
 
         if (error) {
-          // Caso a opção não esteja habilitada no backend, não quebrar o app.
           toast.error('Link mágico indisponível no momento. Use senha.');
           setLoginMethod('password');
           return;
@@ -112,18 +126,19 @@ const Auth = () => {
               Acessar Dashboard
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
-              Acesso restrito ao email autorizado
+              Acesso restrito aos emails autorizados
             </p>
           </div>
 
-          <div className="mb-6 grid grid-cols-2 gap-2">
+          <div className="mb-6 grid grid-cols-3 gap-2">
             <Button
               type="button"
               variant={loginMethod === 'password' ? 'default' : 'outline'}
               onClick={() => setLoginMethod('password')}
               disabled={isLoading}
+              size="sm"
             >
-              <Lock className="w-4 h-4 mr-2" />
+              <Lock className="w-4 h-4 mr-1" />
               Senha
             </Button>
             <Button
@@ -131,9 +146,20 @@ const Auth = () => {
               variant={loginMethod === 'magic' ? 'default' : 'outline'}
               onClick={() => setLoginMethod('magic')}
               disabled={isLoading}
+              size="sm"
             >
-              <Mail className="w-4 h-4 mr-2" />
-              Link mágico
+              <Mail className="w-4 h-4 mr-1" />
+              Link
+            </Button>
+            <Button
+              type="button"
+              variant={loginMethod === 'recover' ? 'default' : 'outline'}
+              onClick={() => setLoginMethod('recover')}
+              disabled={isLoading}
+              size="sm"
+            >
+              <KeyRound className="w-4 h-4 mr-1" />
+              Recuperar
             </Button>
           </div>
 
@@ -148,7 +174,7 @@ const Auth = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={AUTHORIZED_EMAIL}
+                placeholder="seu@email.com"
                 disabled={isLoading}
               />
             </div>
@@ -168,21 +194,34 @@ const Auth = () => {
                   disabled={isLoading}
                   minLength={6}
                 />
+                <button
+                  type="button"
+                  onClick={() => setLoginMethod('recover')}
+                  className="text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                >
+                  Esqueci minha senha
+                </button>
               </div>
             )}
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
+            {loginMethod === 'recover' && (
+              <p className="text-xs text-muted-foreground">
+                Enviaremos um link para você redefinir sua senha no email informado.
+              </p>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Aguarde...
                 </>
+              ) : loginMethod === 'magic' ? (
+                'Enviar link'
+              ) : loginMethod === 'recover' ? (
+                'Enviar link de recuperação'
               ) : (
-                loginMethod === 'magic' ? 'Enviar link' : 'Entrar'
+                'Entrar'
               )}
             </Button>
           </form>
