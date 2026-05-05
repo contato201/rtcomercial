@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
+import { SDR_COUNT, loadSdrNames, saveSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface AgendamentoRow {
   id: string;
@@ -18,33 +19,6 @@ export interface AgendamentoRow {
   data_lancamento: string;
   created_at: string;
 }
-
-const SDR_COUNT = 3;
-const DEFAULT_SDRS: [string, string, string] = ['SDR 1', 'SDR 2', 'SDR 3'];
-const SDR_NAMES_KEY = 'sdr_names_v2';
-
-const loadSdrNames = (): [string, string, string] => {
-  try {
-    const stored = localStorage.getItem(SDR_NAMES_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length === SDR_COUNT) {
-        return [
-          String(parsed[0] || DEFAULT_SDRS[0]),
-          String(parsed[1] || DEFAULT_SDRS[1]),
-          String(parsed[2] || DEFAULT_SDRS[2]),
-        ];
-      }
-    }
-  } catch {}
-  return [...DEFAULT_SDRS];
-};
-
-const saveSdrNames = (names: [string, string, string]) => {
-  try {
-    localStorage.setItem(SDR_NAMES_KEY, JSON.stringify(names));
-  } catch {}
-};
 
 interface AgendamentosEditorProps {
   selectedMonth: number;
@@ -260,7 +234,21 @@ export const AgendamentosEditor = ({
   onDeleteAgendamento,
   canEdit,
 }: AgendamentosEditorProps) => {
-  const [sdrNames, setSdrNames] = useState<[string, string, string]>(loadSdrNames);
+  const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'sdr_names_v2') setSdrNames(loadSdrNames());
+    };
+    const onCustom = () => setSdrNames(loadSdrNames());
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('sdr-names-updated', onCustom);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('sdr-names-updated', onCustom);
+    };
+  }, []);
+
 
   const monthName = MONTHS[selectedMonth];
   const monthAgendamentos = useMemo(
@@ -300,10 +288,11 @@ export const AgendamentosEditor = ({
       });
       if (error) throw error;
 
-      const newNames = [...sdrNames] as [string, string, string];
+      const newNames = [...sdrNames] as SdrNames;
       newNames[slotIndex] = newName;
       setSdrNames(newNames);
       saveSdrNames(newNames);
+      window.dispatchEvent(new Event('sdr-names-updated'));
 
       toast({
         title: 'SDR renomeado',
