@@ -1,17 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Plus, Trash2, Users } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
+import { loadSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface ReuniaoEntry {
   id: string;
   month: string;
   tipo: 'primeira' | 'segunda';
   quantidade: number;
+  pessoa: string;
   data_lancamento: string;
   created_at: string;
 }
@@ -23,7 +26,7 @@ interface ReunioesEditorProps {
   icon?: React.ReactNode;
   entries: ReuniaoEntry[];
   meta: number;
-  onAdd: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string) => Promise<void>;
+  onAdd: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   canEdit: boolean;
 }
@@ -44,10 +47,27 @@ export const ReunioesEditor = ({
   onDelete,
   canEdit,
 }: ReunioesEditorProps) => {
+  const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
+  const [pessoa, setPessoa] = useState<string>(() => loadSdrNames()[0]);
   const [quantidade, setQuantidade] = useState('');
   const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const refresh = () => {
+      const names = loadSdrNames();
+      setSdrNames(names);
+      setPessoa((p) => (names.includes(p) ? p : names[0]));
+    };
+    const onStorage = (e: StorageEvent) => { if (e.key === 'sdr_names_v2') refresh(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('sdr-names-updated', refresh);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('sdr-names-updated', refresh);
+    };
+  }, []);
 
   const monthName = MONTHS[selectedMonth];
   const monthEntries = entries.filter(e => e.month === monthName && e.tipo === tipo);
@@ -60,6 +80,11 @@ export const ReunioesEditor = ({
   const realizadoHoje = monthEntries
     .filter((e) => e.data_lancamento === todayStr)
     .reduce((s, e) => s + Number(e.quantidade || 0), 0);
+
+  const totalsPorSdr = sdrNames.map((name) => ({
+    name,
+    total: monthEntries.filter((e) => e.pessoa === name).reduce((s, e) => s + Number(e.quantidade || 0), 0),
+  }));
 
   const getProgressColor = (progress: number) => {
     if (progress >= 100) return 'bg-green-500';
@@ -77,10 +102,14 @@ export const ReunioesEditor = ({
       setError('Selecione a data');
       return;
     }
+    if (!pessoa) {
+      setError('Selecione o SDR');
+      return;
+    }
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(selectedMonth, tipo, qtd, dataLancamento);
+      await onAdd(selectedMonth, tipo, qtd, dataLancamento, pessoa);
       setQuantidade('');
       setDataLancamento(todayISO());
     } catch (e) {
@@ -121,8 +150,27 @@ export const ReunioesEditor = ({
         <span>Hoje: <strong className={realizadoHoje >= metaPorDia ? 'text-green-600' : 'text-destructive'}>{realizadoHoje}</strong></span>
       </div>
 
+      <div className="grid grid-cols-3 gap-1 text-[11px]">
+        {totalsPorSdr.map((s) => (
+          <div key={s.name} className="bg-muted/40 rounded px-2 py-1 text-center">
+            <div className="text-muted-foreground truncate" title={s.name}>{s.name}</div>
+            <div className="font-bold">{s.total}</div>
+          </div>
+        ))}
+      </div>
+
       {canEdit && (
         <div className="space-y-2">
+          <Select value={pessoa} onValueChange={setPessoa}>
+            <SelectTrigger className="text-xs h-9">
+              <SelectValue placeholder="Selecione o SDR" />
+            </SelectTrigger>
+            <SelectContent>
+              {sdrNames.map((n) => (
+                <SelectItem key={n} value={n}>{n}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Input
             type="date"
             value={dataLancamento}
@@ -152,14 +200,17 @@ export const ReunioesEditor = ({
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {monthEntries.length > 0 && (
-        <div className="max-h-32 overflow-y-auto space-y-1">
+        <div className="max-h-40 overflow-y-auto space-y-1">
           {monthEntries.map((entry) => (
             <div
               key={entry.id}
-              className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1"
+              className="flex items-center justify-between gap-2 text-xs bg-muted/50 rounded px-2 py-1"
             >
-              <span>{formatDate(entry.data_lancamento)}</span>
-              <span className="font-medium">+{entry.quantidade}</span>
+              <span className="text-muted-foreground">{formatDate(entry.data_lancamento)}</span>
+              <span className="font-medium truncate flex-1" title={entry.pessoa || '—'}>
+                {entry.pessoa || '—'}
+              </span>
+              <span className="font-bold">+{entry.quantidade}</span>
               {canEdit && (
                 <Button
                   variant="ghost"
