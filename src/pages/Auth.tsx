@@ -25,19 +25,35 @@ const Auth = () => {
   const isAuthorizedEmail = AUTHORIZED_EMAILS.includes(normalizedEmail);
 
   useEffect(() => {
+    let mounted = true;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user && event !== 'PASSWORD_RECOVERY') {
-        navigate('/');
+      if (!mounted) return;
+      // Não redireciona em PASSWORD_RECOVERY (usuário deve ir para /reset-password)
+      if (event === 'PASSWORD_RECOVERY') return;
+      if (event === 'SIGNED_IN' && session?.user) {
+        navigate('/', { replace: true });
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        navigate('/');
-      }
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (!mounted) return;
+        if (error) {
+          // Sessão inválida — limpa silenciosamente
+          supabase.auth.signOut().catch(() => {});
+          return;
+        }
+        if (session?.user) {
+          navigate('/', { replace: true });
+        }
+      })
+      .catch(() => {});
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
