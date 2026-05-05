@@ -122,7 +122,7 @@ const Auth = () => {
       }
 
       toast.success('Login realizado com sucesso!');
-      navigate('/');
+      // Navegação acontece via onAuthStateChange — evita race condition
     } catch (error) {
       toast.error('Erro ao processar sua solicitação');
     } finally {
