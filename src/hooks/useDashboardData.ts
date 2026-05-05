@@ -27,6 +27,7 @@ export type ReuniaoEntryRow = {
   month: string;
   tipo: 'primeira' | 'segunda';
   quantidade: number;
+  pessoa: string;
   data_lancamento: string;
   created_at: string;
 };
@@ -93,6 +94,7 @@ export const useDashboardData = () => {
         month: row.month,
         tipo: row.tipo as 'primeira' | 'segunda',
         quantidade: toFiniteNumber(row.quantidade),
+        pessoa: String(row.pessoa ?? ''),
         data_lancamento: row.data_lancamento,
         created_at: row.created_at,
       }));
@@ -416,14 +418,14 @@ export const useDashboardData = () => {
   }, []);
 
   // Reuniões entries
-  const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string) => {
+  const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string) => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const t = tipoReuniaoSchema.safeParse(tipo);
     const q = quantidadeSchema.safeParse(quantidade);
     if (!m.success || !t.success || !q.success) return;
 
-    const payload: any = { month: m.data, tipo: t.data, quantidade: q.data };
+    const payload: any = { month: m.data, tipo: t.data, quantidade: q.data, pessoa: (pessoa ?? '').trim() };
     if (dataLancamento) payload.data_lancamento = dataLancamento;
 
     const { data: inserted, error } = await supabase
@@ -435,7 +437,8 @@ export const useDashboardData = () => {
 
     const newRow: ReuniaoEntryRow = {
       id: (inserted as any).id, month: (inserted as any).month, tipo: (inserted as any).tipo,
-      quantidade: (inserted as any).quantidade, data_lancamento: (inserted as any).data_lancamento,
+      quantidade: (inserted as any).quantidade, pessoa: String((inserted as any).pessoa ?? ''),
+      data_lancamento: (inserted as any).data_lancamento,
       created_at: (inserted as any).created_at,
     };
     setReunioesEntries((prev) => [newRow, ...prev]);
