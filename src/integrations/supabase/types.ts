@@ -211,6 +211,7 @@ export type Database = {
           data_lancamento: string
           id: string
           month: string
+          pessoa: string
           quantidade: number
           tipo: string
           updated_at: string
@@ -220,6 +221,7 @@ export type Database = {
           data_lancamento?: string
           id?: string
           month: string
+          pessoa?: string
           quantidade?: number
           tipo: string
           updated_at?: string
@@ -229,6 +231,7 @@ export type Database = {
           data_lancamento?: string
           id?: string
           month?: string
+          pessoa?: string
           quantidade?: number
           tipo?: string
           updated_at?: string
