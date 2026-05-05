@@ -288,10 +288,11 @@ export const AgendamentosEditor = ({
       });
       if (error) throw error;
 
-      const newNames = [...sdrNames] as [string, string, string];
+      const newNames = [...sdrNames] as SdrNames;
       newNames[slotIndex] = newName;
       setSdrNames(newNames);
       saveSdrNames(newNames);
+      window.dispatchEvent(new Event('sdr-names-updated'));
 
       toast({
         title: 'SDR renomeado',
