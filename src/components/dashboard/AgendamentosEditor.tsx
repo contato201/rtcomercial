@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -236,10 +236,18 @@ export const AgendamentosEditor = ({
 }: AgendamentosEditorProps) => {
   const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
 
-  // Listen for changes from other components (e.g. ReunioesEditor) and other tabs
-  if (typeof window !== 'undefined') {
-    // hook-like effect via useEffect
-  }
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'sdr_names_v2') setSdrNames(loadSdrNames());
+    };
+    const onCustom = () => setSdrNames(loadSdrNames());
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('sdr-names-updated', onCustom);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('sdr-names-updated', onCustom);
+    };
+  }, []);
 
 
   const monthName = MONTHS[selectedMonth];
