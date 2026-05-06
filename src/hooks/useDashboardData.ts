@@ -101,31 +101,26 @@ export const useDashboardData = () => {
         supabase.from('reunioes_entries' as any).select('*').order('data_lancamento', { ascending: false }),
       ]);
 
-      let [
+      let results = await runQueries();
+
+      // Retry once after refresh if any query returned auth error
+      if (results.some(r => isAuthError(r.error))) {
+        const refreshed = await ensureFreshSession();
+        if (refreshed) results = await runQueries();
+      }
+
+      const [
         { data: dbData, error },
         { data: unitData, error: unitError },
         { data: agendamentosData, error: agendamentosError },
         { data: reunioesData, error: reunioesError },
-      ] = await runQueries();
-
-      // Retry once if any query failed with auth error after refresh
-      const anyAuthError = [error, unitError, agendamentosError, reunioesError].some(isAuthError);
-      if (anyAuthError) {
-        const refreshed = await ensureFreshSession();
-        if (refreshed) {
-          [
-            { data: dbData, error },
-            { data: unitData, error: unitError },
-            { data: agendamentosData, error: agendamentosError },
-            { data: reunioesData, error: reunioesError },
-          ] = await runQueries();
-        }
-      }
+      ] = results;
 
       if (error) { handlePersistenceError('Erro ao carregar dados:', error); return; }
       if (unitError) { handlePersistenceError('Erro ao carregar vendas unitárias:', unitError); return; }
       if (agendamentosError) { handlePersistenceError('Erro ao carregar agendamentos:', agendamentosError); return; }
       if (reunioesError) { handlePersistenceError('Erro ao carregar reuniões:', reunioesError); return; }
+
 
 
       // Process agendamentos
