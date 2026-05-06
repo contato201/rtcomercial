@@ -14,6 +14,20 @@ import { toast } from 'sonner';
 // Module-level flag: persiste entre mount/unmount, reseta apenas ao recarregar a aba
 let hasAutoSyncedThisSession = false;
 
+const getPersistenceErrorMessage = (error: unknown) => {
+  const message = String((error as { message?: string } | null)?.message ?? 'Erro desconhecido');
+  const lower = message.toLowerCase();
+
+  if (lower.includes('row-level security') || lower.includes('permission denied') || lower.includes('not authorized')) {
+    return 'Seu login não tem permissão para salvar. Entre novamente com um email autorizado.';
+  }
+  if (lower.includes('jwt') || lower.includes('session') || lower.includes('refresh token')) {
+    return 'Sua sessão expirou. Faça login novamente antes de lançar dados.';
+  }
+  if (!navigator.onLine) return 'Você está sem internet. Reconecte e tente novamente.';
+  return 'Não foi possível salvar no banco. Recarregue a página e tente novamente.';
+};
+
 interface DadosTrafego {
   id: string;
   month: string;
@@ -51,6 +65,15 @@ export const useGrowthData = () => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const hasAutoSynced = useRef(hasAutoSyncedThisSession);
   const syncedMonth = useRef<number>(new Date().getMonth());
+  const lastLoadAtRef = useRef(0);
+
+  const handlePersistenceError = useCallback((context: string, error: unknown) => {
+    console.error(context, error);
+    toast.error('Alteração não salva', {
+      description: getPersistenceErrorMessage(error),
+      duration: 7000,
+    });
+  }, []);
 
   // Campanhas filtradas
   const filteredCampaigns = useMemo(() => {
@@ -81,6 +104,7 @@ export const useGrowthData = () => {
 
   const loadFromDatabase = useCallback(async () => {
     try {
+      lastLoadAtRef.current = Date.now();
       const { data: dbData, error } = await supabase
         .from('dados_trafego' as any)
         .select('*') as { data: DadosTrafego[] | null; error: any };
@@ -119,11 +143,11 @@ export const useGrowthData = () => {
         return newData;
       });
     } catch (error) {
-      console.error('Erro ao carregar dados de tráfego:', error);
+      handlePersistenceError('Erro ao carregar dados de tráfego:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [handlePersistenceError]);
 
   const [investimentoAcumulado, setInvestimentoAcumulado] = useState<number>(0);
 
