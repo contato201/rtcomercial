@@ -77,9 +77,19 @@ export const useDashboardData = () => {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedQuarter, setSelectedQuarter] = useState<QuarterType>('Q1');
   const [isLoading, setIsLoading] = useState(true);
+  const lastLoadAtRef = useRef(0);
+
+  const handlePersistenceError = useCallback((context: string, error: unknown) => {
+    console.error(context, error);
+    toast.error('Alteração não salva', {
+      description: getPersistenceErrorMessage(error),
+      duration: 7000,
+    });
+  }, []);
 
   const loadFromDatabase = useCallback(async () => {
     try {
+      lastLoadAtRef.current = Date.now();
       const [
         { data: dbData, error },
         { data: unitData, error: unitError },
@@ -92,10 +102,10 @@ export const useDashboardData = () => {
         supabase.from('reunioes_entries' as any).select('*').order('data_lancamento', { ascending: false }),
       ]);
 
-      if (error) { console.error('Erro ao carregar dados:', error); return; }
-      if (unitError) console.error('Erro ao carregar vendas unitárias:', unitError);
-      if (agendamentosError) console.error('Erro ao carregar agendamentos:', agendamentosError);
-      if (reunioesError) console.error('Erro ao carregar reuniões:', reunioesError);
+      if (error) { handlePersistenceError('Erro ao carregar dados:', error); return; }
+      if (unitError) handlePersistenceError('Erro ao carregar vendas unitárias:', unitError);
+      if (agendamentosError) handlePersistenceError('Erro ao carregar agendamentos:', agendamentosError);
+      if (reunioesError) handlePersistenceError('Erro ao carregar reuniões:', reunioesError);
 
       // Process agendamentos
       const processedAgendamentos: AgendamentoRow[] = ((agendamentosData as any[]) ?? []).map((row: any) => ({
@@ -184,11 +194,11 @@ export const useDashboardData = () => {
         setData(updatedData);
       }
     } catch (e) {
-      console.error('Erro ao carregar dados:', e);
+      handlePersistenceError('Erro ao carregar dados:', e);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [handlePersistenceError]);
 
   const applyUnitSalesAggregateToMonth = useCallback((monthName: string, list: UnitSaleRow[]) => {
     const count = list.length;
