@@ -1,8 +1,9 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { supabase } from '@/integrations/supabase/client';
 import { safeVariation, toFiniteNumber } from '@/lib/formatters';
+import { toast } from 'sonner';
 
 type UnitSaleRow = {
   id: string;
@@ -47,6 +48,25 @@ const quantidadeSchema = z
   .max(10_000, 'Quantidade muito alta');
 
 const tipoReuniaoSchema = z.enum(['primeira', 'segunda']);
+
+const getPersistenceErrorMessage = (error: unknown) => {
+  const message = String((error as { message?: string } | null)?.message ?? 'Erro desconhecido');
+  const lower = message.toLowerCase();
+
+  if (lower.includes('row-level security') || lower.includes('permission denied') || lower.includes('not authorized')) {
+    return 'Seu login não tem permissão para salvar. Entre novamente com um email autorizado.';
+  }
+
+  if (lower.includes('jwt') || lower.includes('session') || lower.includes('refresh token')) {
+    return 'Sua sessão expirou. Faça login novamente antes de lançar dados.';
+  }
+
+  if (!navigator.onLine) {
+    return 'Você está sem internet. Reconecte e tente salvar novamente.';
+  }
+
+  return 'Não foi possível salvar no banco. Recarregue a página e tente novamente.';
+};
 
 export const useDashboardData = () => {
   const [data, setData] = useState<MonthData[]>(createInitialData());
