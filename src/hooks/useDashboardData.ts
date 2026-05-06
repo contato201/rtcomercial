@@ -4,6 +4,7 @@ import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createIn
 import { supabase } from '@/integrations/supabase/client';
 import { safeVariation, toFiniteNumber } from '@/lib/formatters';
 import { toast } from 'sonner';
+import { ensureFreshSession, isAuthError } from '@/lib/sessionGuard';
 
 type UnitSaleRow = {
   id: string;
