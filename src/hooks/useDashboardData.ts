@@ -103,9 +103,9 @@ export const useDashboardData = () => {
       ]);
 
       if (error) { handlePersistenceError('Erro ao carregar dados:', error); return; }
-      if (unitError) handlePersistenceError('Erro ao carregar vendas unitárias:', unitError);
-      if (agendamentosError) handlePersistenceError('Erro ao carregar agendamentos:', agendamentosError);
-      if (reunioesError) handlePersistenceError('Erro ao carregar reuniões:', reunioesError);
+      if (unitError) { handlePersistenceError('Erro ao carregar vendas unitárias:', unitError); return; }
+      if (agendamentosError) { handlePersistenceError('Erro ao carregar agendamentos:', agendamentosError); return; }
+      if (reunioesError) { handlePersistenceError('Erro ao carregar reuniões:', reunioesError); return; }
 
       // Process agendamentos
       const processedAgendamentos: AgendamentoRow[] = ((agendamentosData as any[]) ?? []).map((row: any) => ({
