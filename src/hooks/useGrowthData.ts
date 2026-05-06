@@ -251,12 +251,31 @@ export const useGrowthData = () => {
         { event: '*', schema: 'public', table: 'dados_trafego' },
         () => loadFromDatabase()
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') loadFromDatabase();
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          handlePersistenceError('Realtime Growth desconectado:', new Error('A atualização em tempo real caiu. A página vai recarregar os dados.'));
+          loadFromDatabase();
+        }
+      });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadFromDatabase();
+    };
+    const handleOnline = () => {
+      if (Date.now() - lastLoadAtRef.current > 1500) loadFromDatabase();
+    };
+    window.addEventListener('focus', handleOnline);
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      window.removeEventListener('focus', handleOnline);
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
-  }, [loadFromDatabase]);
+  }, [loadFromDatabase, handlePersistenceError]);
 
   // Auto-sync from Google Sheets on mount (only if authenticated)
   useEffect(() => {
