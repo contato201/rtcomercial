@@ -582,7 +582,7 @@ export const useDashboardData = () => {
   }, [data]);
 
   return {
-    data,
+    data: computedData,
     unitSalesByMonth,
     agendamentos,
     reunioesEntries,
