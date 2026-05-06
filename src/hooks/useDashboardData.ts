@@ -234,7 +234,9 @@ export const useDashboardData = () => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') loadFromDatabase();
     };
-    const handleOnline = () => loadFromDatabase();
+    const handleOnline = () => {
+      if (Date.now() - lastLoadAtRef.current > 1500) loadFromDatabase();
+    };
     window.addEventListener('focus', handleOnline);
     window.addEventListener('online', handleOnline);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -245,7 +247,7 @@ export const useDashboardData = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
-  }, [loadFromDatabase]);
+  }, [loadFromDatabase, handlePersistenceError]);
 
   const saveToHistory = useCallback(async (
     dadosRealizadosId: string, monthName: string, field: string, oldValue: number, newValue: number
