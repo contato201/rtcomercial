@@ -10,6 +10,7 @@ import {
   calculateMetrics 
 } from '@/types/growth';
 import { toast } from 'sonner';
+import { ensureFreshSession, isAuthError } from '@/lib/sessionGuard';
 
 // Module-level flag: persiste entre mount/unmount, reseta apenas ao recarregar a aba
 let hasAutoSyncedThisSession = false;
