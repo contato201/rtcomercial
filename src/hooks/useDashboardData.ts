@@ -317,7 +317,7 @@ export const useDashboardData = () => {
       .insert({ month: m.data, valor: v.data, cliente } as any)
       .select('*')
       .single();
-    if (error) { console.error('Erro ao inserir venda unitária:', error); return; }
+    if (error) { handlePersistenceError('Erro ao inserir venda unitária:', error); throw error; }
 
     setUnitSalesByMonth((prev) => {
       const next = { ...prev };
@@ -331,7 +331,7 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(m.data, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
 
   const updateUnitSale = useCallback(async (id: string, valor: number, cliente: string = '') => {
     const v = valorSchema.safeParse(valor);
@@ -343,7 +343,7 @@ export const useDashboardData = () => {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) { console.error('Erro ao atualizar venda unitária:', error); return; }
+    if (error) { handlePersistenceError('Erro ao atualizar venda unitária:', error); throw error; }
 
     setUnitSalesByMonth((prev) => {
       const next = { ...prev };
@@ -357,11 +357,11 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(monthName, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
 
   const deleteUnitSale = useCallback(async (id: string) => {
     const { data: deleted, error } = await supabase.from('vendas_unitarias').delete().eq('id', id).select('*').maybeSingle();
-    if (error) { console.error('Erro ao excluir venda unitária:', error); return; }
+    if (error) { handlePersistenceError('Erro ao excluir venda unitária:', error); throw error; }
     if (!deleted) return;
     const monthName = String(deleted.month);
     setUnitSalesByMonth((prev) => {
@@ -371,7 +371,7 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(monthName, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
 
   const revertToValue = useCallback(async (month: string, field: string, value: number) => {
     const monthIndex = MONTHS.indexOf(month);
