@@ -439,17 +439,27 @@ export const useDashboardData = () => {
 
   const resetData = useCallback(async () => {
     const initial = createInitialData();
-    setData(initial);
-    setUnitSalesByMonth({});
-    try { await supabase.from('vendas_unitarias').delete().neq('id', '00000000-0000-0000-0000-000000000000'); } catch (e) { console.error(e); }
-    try { await supabase.from('reunioes_entries' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000'); } catch (e) { console.error(e); }
-    for (const month of MONTHS) {
-      await supabase.from('dados_realizados').update({
-        realizado_vendas: 0, realizado_faturamento: 0,
-        realizado_primeira_reuniao: 0, realizado_segunda_reuniao: 0, ticket_realizado: VALOR_POR_VENDA,
-      }).eq('month', month);
+    try {
+      const { error: salesError } = await supabase.from('vendas_unitarias').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (salesError) throw salesError;
+      const { error: reunioesError } = await supabase.from('reunioes_entries' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (reunioesError) throw reunioesError;
+      for (const month of MONTHS) {
+        const { error } = await supabase.from('dados_realizados').update({
+          realizado_vendas: 0, realizado_faturamento: 0,
+          realizado_primeira_reuniao: 0, realizado_segunda_reuniao: 0, ticket_realizado: VALOR_POR_VENDA,
+        }).eq('month', month);
+        if (error) throw error;
+      }
+      setData(initial);
+      setUnitSalesByMonth({});
+      setReunioesEntries([]);
+      toast.success('Dashboard resetado e salvo no banco.');
+    } catch (e) {
+      handlePersistenceError('Erro ao resetar dados:', e);
+      loadFromDatabase();
     }
-  }, []);
+  }, [handlePersistenceError, loadFromDatabase]);
 
   // Agendamentos
   const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => {
