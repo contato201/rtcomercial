@@ -471,19 +471,19 @@ export const useDashboardData = () => {
     const payload: any = { month: m.data, pessoa: p.data, quantidade: q.data };
     if (dataLancamento) payload.data_lancamento = dataLancamento;
     const { data: inserted, error } = await supabase.from('agendamentos' as any).insert(payload).select('*').single();
-    if (error) { console.error('Erro ao inserir agendamento:', error); return; }
+    if (error) { handlePersistenceError('Erro ao inserir agendamento:', error); throw error; }
     const newRow: AgendamentoRow = {
       id: (inserted as any).id, month: (inserted as any).month, pessoa: (inserted as any).pessoa,
       quantidade: (inserted as any).quantidade, data_lancamento: (inserted as any).data_lancamento, created_at: (inserted as any).created_at,
     };
     setAgendamentos((prev) => [newRow, ...prev]);
-  }, []);
+  }, [handlePersistenceError]);
 
   const deleteAgendamento = useCallback(async (id: string) => {
     const { error } = await supabase.from('agendamentos' as any).delete().eq('id', id);
-    if (error) { console.error('Erro ao excluir agendamento:', error); return; }
+    if (error) { handlePersistenceError('Erro ao excluir agendamento:', error); throw error; }
     setAgendamentos((prev) => prev.filter((a) => a.id !== id));
-  }, []);
+  }, [handlePersistenceError]);
 
   // Reuniões entries
   const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string) => {
