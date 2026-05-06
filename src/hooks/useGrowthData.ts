@@ -184,7 +184,8 @@ export const useGrowthData = () => {
           });
 
         if (upsertError) {
-          console.error('Erro ao salvar dados:', upsertError);
+          handlePersistenceError('Erro ao salvar dados:', upsertError);
+          throw upsertError;
         }
 
         await loadFromDatabase();
@@ -193,12 +194,11 @@ export const useGrowthData = () => {
         toast.success(`${monthResponse.count} campanhas de CAPTAÇÃO carregadas para ${monthName}!`);
       }
     } catch (error) {
-      console.error('Erro ao sincronizar:', error);
       toast.error('Erro ao sincronizar dados do Sheets');
     } finally {
       setIsSyncing(false);
     }
-  }, [loadFromDatabase, selectedMonth]);
+  }, [loadFromDatabase, selectedMonth, handlePersistenceError]);
 
   const updateManualData = useCallback(async (
     monthIndex: number,
@@ -222,8 +222,8 @@ export const useGrowthData = () => {
       });
 
     if (error) {
-      console.error('Erro ao atualizar:', error);
-      throw new Error('Erro ao salvar dados');
+      handlePersistenceError('Erro ao atualizar:', error);
+      throw new Error(getPersistenceErrorMessage(error));
     }
 
     setData(prevData => {
@@ -234,7 +234,7 @@ export const useGrowthData = () => {
       });
       return newData;
     });
-  }, []);
+  }, [handlePersistenceError]);
 
   const clearFilters = useCallback(() => {
     setActiveFilters({ campaign: null, adset: null, status: null });
