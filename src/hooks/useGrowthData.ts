@@ -10,6 +10,7 @@ import {
   calculateMetrics 
 } from '@/types/growth';
 import { toast } from 'sonner';
+import { ensureFreshSession, isAuthError } from '@/lib/sessionGuard';
 
 // Module-level flag: persiste entre mount/unmount, reseta apenas ao recarregar a aba
 let hasAutoSyncedThisSession = false;
@@ -105,9 +106,17 @@ export const useGrowthData = () => {
   const loadFromDatabase = useCallback(async () => {
     try {
       lastLoadAtRef.current = Date.now();
-      const { data: dbData, error } = await supabase
+      await ensureFreshSession();
+
+      const runQuery = () => supabase
         .from('dados_trafego' as any)
-        .select('*') as { data: DadosTrafego[] | null; error: any };
+        .select('*') as unknown as Promise<{ data: DadosTrafego[] | null; error: any }>;
+
+      let { data: dbData, error } = await runQuery();
+      if (isAuthError(error)) {
+        const refreshed = await ensureFreshSession();
+        if (refreshed) ({ data: dbData, error } = await runQuery());
+      }
 
       if (error) throw error;
 

@@ -4,6 +4,7 @@ import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createIn
 import { supabase } from '@/integrations/supabase/client';
 import { safeVariation, toFiniteNumber } from '@/lib/formatters';
 import { toast } from 'sonner';
+import { ensureFreshSession, isAuthError } from '@/lib/sessionGuard';
 
 type UnitSaleRow = {
   id: string;
@@ -90,22 +91,37 @@ export const useDashboardData = () => {
   const loadFromDatabase = useCallback(async () => {
     try {
       lastLoadAtRef.current = Date.now();
-      const [
-        { data: dbData, error },
-        { data: unitData, error: unitError },
-        { data: agendamentosData, error: agendamentosError },
-        { data: reunioesData, error: reunioesError },
-      ] = await Promise.all([
+      // Garante token válido antes de buscar (evita listas vazias por JWT expirado)
+      await ensureFreshSession();
+
+      const runQueries = () => Promise.all([
         supabase.from('dados_realizados').select('*'),
         supabase.from('vendas_unitarias').select('*').order('created_at', { ascending: true }),
         supabase.from('agendamentos' as any).select('*').order('data_lancamento', { ascending: false }),
         supabase.from('reunioes_entries' as any).select('*').order('data_lancamento', { ascending: false }),
       ]);
 
+      let results = await runQueries();
+
+      // Retry once after refresh if any query returned auth error
+      if (results.some(r => isAuthError(r.error))) {
+        const refreshed = await ensureFreshSession();
+        if (refreshed) results = await runQueries();
+      }
+
+      const [
+        { data: dbData, error },
+        { data: unitData, error: unitError },
+        { data: agendamentosData, error: agendamentosError },
+        { data: reunioesData, error: reunioesError },
+      ] = results;
+
       if (error) { handlePersistenceError('Erro ao carregar dados:', error); return; }
       if (unitError) { handlePersistenceError('Erro ao carregar vendas unitárias:', unitError); return; }
       if (agendamentosError) { handlePersistenceError('Erro ao carregar agendamentos:', agendamentosError); return; }
       if (reunioesError) { handlePersistenceError('Erro ao carregar reuniões:', reunioesError); return; }
+
+
 
       // Process agendamentos
       const processedAgendamentos: AgendamentoRow[] = ((agendamentosData as any[]) ?? []).map((row: any) => ({
