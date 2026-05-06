@@ -1,8 +1,9 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { supabase } from '@/integrations/supabase/client';
 import { safeVariation, toFiniteNumber } from '@/lib/formatters';
+import { toast } from 'sonner';
 
 type UnitSaleRow = {
   id: string;
@@ -48,6 +49,25 @@ const quantidadeSchema = z
 
 const tipoReuniaoSchema = z.enum(['primeira', 'segunda']);
 
+const getPersistenceErrorMessage = (error: unknown) => {
+  const message = String((error as { message?: string } | null)?.message ?? 'Erro desconhecido');
+  const lower = message.toLowerCase();
+
+  if (lower.includes('row-level security') || lower.includes('permission denied') || lower.includes('not authorized')) {
+    return 'Seu login não tem permissão para salvar. Entre novamente com um email autorizado.';
+  }
+
+  if (lower.includes('jwt') || lower.includes('session') || lower.includes('refresh token')) {
+    return 'Sua sessão expirou. Faça login novamente antes de lançar dados.';
+  }
+
+  if (!navigator.onLine) {
+    return 'Você está sem internet. Reconecte e tente salvar novamente.';
+  }
+
+  return 'Não foi possível salvar no banco. Recarregue a página e tente novamente.';
+};
+
 export const useDashboardData = () => {
   const [data, setData] = useState<MonthData[]>(createInitialData());
   const [unitSalesByMonth, setUnitSalesByMonth] = useState<Record<string, UnitSaleRow[]>>({});
@@ -57,9 +77,19 @@ export const useDashboardData = () => {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedQuarter, setSelectedQuarter] = useState<QuarterType>('Q1');
   const [isLoading, setIsLoading] = useState(true);
+  const lastLoadAtRef = useRef(0);
+
+  const handlePersistenceError = useCallback((context: string, error: unknown) => {
+    console.error(context, error);
+    toast.error('Alteração não salva', {
+      description: getPersistenceErrorMessage(error),
+      duration: 7000,
+    });
+  }, []);
 
   const loadFromDatabase = useCallback(async () => {
     try {
+      lastLoadAtRef.current = Date.now();
       const [
         { data: dbData, error },
         { data: unitData, error: unitError },
@@ -72,10 +102,10 @@ export const useDashboardData = () => {
         supabase.from('reunioes_entries' as any).select('*').order('data_lancamento', { ascending: false }),
       ]);
 
-      if (error) { console.error('Erro ao carregar dados:', error); return; }
-      if (unitError) console.error('Erro ao carregar vendas unitárias:', unitError);
-      if (agendamentosError) console.error('Erro ao carregar agendamentos:', agendamentosError);
-      if (reunioesError) console.error('Erro ao carregar reuniões:', reunioesError);
+      if (error) { handlePersistenceError('Erro ao carregar dados:', error); return; }
+      if (unitError) { handlePersistenceError('Erro ao carregar vendas unitárias:', unitError); return; }
+      if (agendamentosError) { handlePersistenceError('Erro ao carregar agendamentos:', agendamentosError); return; }
+      if (reunioesError) { handlePersistenceError('Erro ao carregar reuniões:', reunioesError); return; }
 
       // Process agendamentos
       const processedAgendamentos: AgendamentoRow[] = ((agendamentosData as any[]) ?? []).map((row: any) => ({
@@ -164,11 +194,11 @@ export const useDashboardData = () => {
         setData(updatedData);
       }
     } catch (e) {
-      console.error('Erro ao carregar dados:', e);
+      handlePersistenceError('Erro ao carregar dados:', e);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [handlePersistenceError]);
 
   const applyUnitSalesAggregateToMonth = useCallback((monthName: string, list: UnitSaleRow[]) => {
     const count = list.length;
@@ -190,9 +220,34 @@ export const useDashboardData = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas_unitarias' }, () => loadFromDatabase())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agendamentos' }, () => loadFromDatabase())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reunioes_entries' }, () => loadFromDatabase())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [loadFromDatabase]);
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          loadFromDatabase();
+          return;
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          handlePersistenceError('Realtime desconectado:', new Error('A atualização em tempo real caiu. A página vai recarregar os dados.'));
+          loadFromDatabase();
+        }
+      });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadFromDatabase();
+    };
+    const handleOnline = () => {
+      if (Date.now() - lastLoadAtRef.current > 1500) loadFromDatabase();
+    };
+    window.addEventListener('focus', handleOnline);
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleOnline);
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      supabase.removeChannel(channel);
+    };
+  }, [loadFromDatabase, handlePersistenceError]);
 
   const saveToHistory = useCallback(async (
     dadosRealizadosId: string, monthName: string, field: string, oldValue: number, newValue: number
@@ -210,8 +265,8 @@ export const useDashboardData = () => {
         dados_realizados_id: dadosRealizadosId, month: monthName,
         campo_alterado: dbField, valor_anterior: oldValue, valor_novo: newValue,
       });
-    } catch (error) { console.error('Erro ao salvar histórico:', error); }
-  }, []);
+    } catch (error) { handlePersistenceError('Erro ao salvar histórico:', error); }
+  }, [handlePersistenceError]);
 
   const updateMonthData = useCallback(async (monthIndex: number, updates: Partial<MonthData>) => {
     const monthName = MONTHS[monthIndex];
@@ -235,7 +290,8 @@ export const useDashboardData = () => {
     if (sanitizedUpdates.realizadoSegundaReuniao !== undefined) dbUpdates.realizado_segunda_reuniao = sanitizedUpdates.realizadoSegundaReuniao;
 
     try {
-      const { data: existingRecord } = await supabase.from('dados_realizados').select('id').eq('month', monthName).maybeSingle();
+      const { data: existingRecord, error: selectError } = await supabase.from('dados_realizados').select('id').eq('month', monthName).maybeSingle();
+      if (selectError) throw selectError;
       if (existingRecord) {
         for (const [field, newValue] of Object.entries(sanitizedUpdates)) {
           const oldValue = currentMonthData[field as keyof MonthData];
@@ -243,10 +299,14 @@ export const useDashboardData = () => {
             await saveToHistory(existingRecord.id, monthName, field, oldValue, newValue);
           }
         }
-        await supabase.from('dados_realizados').update(dbUpdates).eq('month', monthName);
+        const { error } = await supabase.from('dados_realizados').update(dbUpdates).eq('month', monthName);
+        if (error) throw error;
       }
-    } catch (error) { console.error('Erro ao salvar dados:', error); }
-  }, [data, saveToHistory]);
+    } catch (error) {
+      handlePersistenceError('Erro ao salvar dados:', error);
+      loadFromDatabase();
+    }
+  }, [data, saveToHistory, handlePersistenceError, loadFromDatabase]);
 
   const addUnitSale = useCallback(async (monthIndex: number, valor: number, cliente: string = '') => {
     const monthName = MONTHS[monthIndex];
@@ -259,7 +319,7 @@ export const useDashboardData = () => {
       .insert({ month: m.data, valor: v.data, cliente } as any)
       .select('*')
       .single();
-    if (error) { console.error('Erro ao inserir venda unitária:', error); return; }
+    if (error) { handlePersistenceError('Erro ao inserir venda unitária:', error); throw error; }
 
     setUnitSalesByMonth((prev) => {
       const next = { ...prev };
@@ -273,7 +333,7 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(m.data, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
 
   const updateUnitSale = useCallback(async (id: string, valor: number, cliente: string = '') => {
     const v = valorSchema.safeParse(valor);
@@ -285,7 +345,7 @@ export const useDashboardData = () => {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) { console.error('Erro ao atualizar venda unitária:', error); return; }
+    if (error) { handlePersistenceError('Erro ao atualizar venda unitária:', error); throw error; }
 
     setUnitSalesByMonth((prev) => {
       const next = { ...prev };
@@ -299,11 +359,11 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(monthName, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
 
   const deleteUnitSale = useCallback(async (id: string) => {
     const { data: deleted, error } = await supabase.from('vendas_unitarias').delete().eq('id', id).select('*').maybeSingle();
-    if (error) { console.error('Erro ao excluir venda unitária:', error); return; }
+    if (error) { handlePersistenceError('Erro ao excluir venda unitária:', error); throw error; }
     if (!deleted) return;
     const monthName = String(deleted.month);
     setUnitSalesByMonth((prev) => {
@@ -313,7 +373,7 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(monthName, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
 
   const revertToValue = useCallback(async (month: string, field: string, value: number) => {
     const monthIndex = MONTHS.indexOf(month);
@@ -381,17 +441,27 @@ export const useDashboardData = () => {
 
   const resetData = useCallback(async () => {
     const initial = createInitialData();
-    setData(initial);
-    setUnitSalesByMonth({});
-    try { await supabase.from('vendas_unitarias').delete().neq('id', '00000000-0000-0000-0000-000000000000'); } catch (e) { console.error(e); }
-    try { await supabase.from('reunioes_entries' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000'); } catch (e) { console.error(e); }
-    for (const month of MONTHS) {
-      await supabase.from('dados_realizados').update({
-        realizado_vendas: 0, realizado_faturamento: 0,
-        realizado_primeira_reuniao: 0, realizado_segunda_reuniao: 0, ticket_realizado: VALOR_POR_VENDA,
-      }).eq('month', month);
+    try {
+      const { error: salesError } = await supabase.from('vendas_unitarias').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (salesError) throw salesError;
+      const { error: reunioesError } = await supabase.from('reunioes_entries' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (reunioesError) throw reunioesError;
+      for (const month of MONTHS) {
+        const { error } = await supabase.from('dados_realizados').update({
+          realizado_vendas: 0, realizado_faturamento: 0,
+          realizado_primeira_reuniao: 0, realizado_segunda_reuniao: 0, ticket_realizado: VALOR_POR_VENDA,
+        }).eq('month', month);
+        if (error) throw error;
+      }
+      setData(initial);
+      setUnitSalesByMonth({});
+      setReunioesEntries([]);
+      toast.success('Dashboard resetado e salvo no banco.');
+    } catch (e) {
+      handlePersistenceError('Erro ao resetar dados:', e);
+      loadFromDatabase();
     }
-  }, []);
+  }, [handlePersistenceError, loadFromDatabase]);
 
   // Agendamentos
   const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => {
@@ -403,19 +473,19 @@ export const useDashboardData = () => {
     const payload: any = { month: m.data, pessoa: p.data, quantidade: q.data };
     if (dataLancamento) payload.data_lancamento = dataLancamento;
     const { data: inserted, error } = await supabase.from('agendamentos' as any).insert(payload).select('*').single();
-    if (error) { console.error('Erro ao inserir agendamento:', error); return; }
+    if (error) { handlePersistenceError('Erro ao inserir agendamento:', error); throw error; }
     const newRow: AgendamentoRow = {
       id: (inserted as any).id, month: (inserted as any).month, pessoa: (inserted as any).pessoa,
       quantidade: (inserted as any).quantidade, data_lancamento: (inserted as any).data_lancamento, created_at: (inserted as any).created_at,
     };
     setAgendamentos((prev) => [newRow, ...prev]);
-  }, []);
+  }, [handlePersistenceError]);
 
   const deleteAgendamento = useCallback(async (id: string) => {
     const { error } = await supabase.from('agendamentos' as any).delete().eq('id', id);
-    if (error) { console.error('Erro ao excluir agendamento:', error); return; }
+    if (error) { handlePersistenceError('Erro ao excluir agendamento:', error); throw error; }
     setAgendamentos((prev) => prev.filter((a) => a.id !== id));
-  }, []);
+  }, [handlePersistenceError]);
 
   // Reuniões entries
   const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string) => {
@@ -433,7 +503,7 @@ export const useDashboardData = () => {
       .insert(payload)
       .select('*')
       .single();
-    if (error) { console.error('Erro ao inserir reunião:', error); return; }
+    if (error) { handlePersistenceError('Erro ao inserir reunião:', error); throw error; }
 
     const newRow: ReuniaoEntryRow = {
       id: (inserted as any).id, month: (inserted as any).month, tipo: (inserted as any).tipo,
@@ -459,13 +529,13 @@ export const useDashboardData = () => {
           : currentMonth.realizadoSegundaReuniao;
         const field = tipo === 'primeira' ? 'realizado_primeira_reuniao' : 'realizado_segunda_reuniao';
         supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', m.data).then(({ error }) => {
-          if (error) console.error('Erro ao sincronizar dados_realizados:', error);
+          if (error) handlePersistenceError('Erro ao sincronizar dados_realizados:', error);
         });
       }
 
       return updated;
     });
-  }, []);
+  }, [handlePersistenceError]);
 
   const deleteReuniaoEntry = useCallback(async (id: string) => {
     // Read entry from current state to avoid stale closure
@@ -476,7 +546,7 @@ export const useDashboardData = () => {
     });
 
     const { error } = await supabase.from('reunioes_entries' as any).delete().eq('id', id);
-    if (error) { console.error('Erro ao excluir reunião:', error); return; }
+    if (error) { handlePersistenceError('Erro ao excluir reunião:', error); throw error; }
     setReunioesEntries((prev) => prev.filter((e) => e.id !== id));
 
     if (entry) {
@@ -496,14 +566,14 @@ export const useDashboardData = () => {
             : currentMonth.realizadoSegundaReuniao;
           const field = capturedEntry.tipo === 'primeira' ? 'realizado_primeira_reuniao' : 'realizado_segunda_reuniao';
           supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', capturedEntry.month).then(({ error }) => {
-            if (error) console.error('Erro ao sincronizar dados_realizados:', error);
+            if (error) handlePersistenceError('Erro ao sincronizar dados_realizados:', error);
           });
         }
 
         return updated;
       });
     }
-  }, []);
+  }, [handlePersistenceError]);
 
   const getMetaAgendamentos = useCallback((monthIndex: number) => {
     const monthData = data[monthIndex];
@@ -512,7 +582,7 @@ export const useDashboardData = () => {
   }, [data]);
 
   return {
-    data,
+    data: computedData,
     unitSalesByMonth,
     agendamentos,
     reunioesEntries,

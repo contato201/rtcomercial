@@ -14,6 +14,20 @@ import { toast } from 'sonner';
 // Module-level flag: persiste entre mount/unmount, reseta apenas ao recarregar a aba
 let hasAutoSyncedThisSession = false;
 
+const getPersistenceErrorMessage = (error: unknown) => {
+  const message = String((error as { message?: string } | null)?.message ?? 'Erro desconhecido');
+  const lower = message.toLowerCase();
+
+  if (lower.includes('row-level security') || lower.includes('permission denied') || lower.includes('not authorized')) {
+    return 'Seu login não tem permissão para salvar. Entre novamente com um email autorizado.';
+  }
+  if (lower.includes('jwt') || lower.includes('session') || lower.includes('refresh token')) {
+    return 'Sua sessão expirou. Faça login novamente antes de lançar dados.';
+  }
+  if (!navigator.onLine) return 'Você está sem internet. Reconecte e tente novamente.';
+  return 'Não foi possível salvar no banco. Recarregue a página e tente novamente.';
+};
+
 interface DadosTrafego {
   id: string;
   month: string;
@@ -51,6 +65,15 @@ export const useGrowthData = () => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const hasAutoSynced = useRef(hasAutoSyncedThisSession);
   const syncedMonth = useRef<number>(new Date().getMonth());
+  const lastLoadAtRef = useRef(0);
+
+  const handlePersistenceError = useCallback((context: string, error: unknown) => {
+    console.error(context, error);
+    toast.error('Alteração não salva', {
+      description: getPersistenceErrorMessage(error),
+      duration: 7000,
+    });
+  }, []);
 
   // Campanhas filtradas
   const filteredCampaigns = useMemo(() => {
@@ -81,6 +104,7 @@ export const useGrowthData = () => {
 
   const loadFromDatabase = useCallback(async () => {
     try {
+      lastLoadAtRef.current = Date.now();
       const { data: dbData, error } = await supabase
         .from('dados_trafego' as any)
         .select('*') as { data: DadosTrafego[] | null; error: any };
@@ -119,11 +143,11 @@ export const useGrowthData = () => {
         return newData;
       });
     } catch (error) {
-      console.error('Erro ao carregar dados de tráfego:', error);
+      handlePersistenceError('Erro ao carregar dados de tráfego:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [handlePersistenceError]);
 
   const [investimentoAcumulado, setInvestimentoAcumulado] = useState<number>(0);
 
@@ -160,7 +184,8 @@ export const useGrowthData = () => {
           });
 
         if (upsertError) {
-          console.error('Erro ao salvar dados:', upsertError);
+          handlePersistenceError('Erro ao salvar dados:', upsertError);
+          throw upsertError;
         }
 
         await loadFromDatabase();
@@ -169,12 +194,11 @@ export const useGrowthData = () => {
         toast.success(`${monthResponse.count} campanhas de CAPTAÇÃO carregadas para ${monthName}!`);
       }
     } catch (error) {
-      console.error('Erro ao sincronizar:', error);
       toast.error('Erro ao sincronizar dados do Sheets');
     } finally {
       setIsSyncing(false);
     }
-  }, [loadFromDatabase, selectedMonth]);
+  }, [loadFromDatabase, selectedMonth, handlePersistenceError]);
 
   const updateManualData = useCallback(async (
     monthIndex: number,
@@ -198,8 +222,8 @@ export const useGrowthData = () => {
       });
 
     if (error) {
-      console.error('Erro ao atualizar:', error);
-      throw new Error('Erro ao salvar dados');
+      handlePersistenceError('Erro ao atualizar:', error);
+      throw new Error(getPersistenceErrorMessage(error));
     }
 
     setData(prevData => {
@@ -210,7 +234,7 @@ export const useGrowthData = () => {
       });
       return newData;
     });
-  }, []);
+  }, [handlePersistenceError]);
 
   const clearFilters = useCallback(() => {
     setActiveFilters({ campaign: null, adset: null, status: null });
@@ -227,12 +251,31 @@ export const useGrowthData = () => {
         { event: '*', schema: 'public', table: 'dados_trafego' },
         () => loadFromDatabase()
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') loadFromDatabase();
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          handlePersistenceError('Realtime Growth desconectado:', new Error('A atualização em tempo real caiu. A página vai recarregar os dados.'));
+          loadFromDatabase();
+        }
+      });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadFromDatabase();
+    };
+    const handleOnline = () => {
+      if (Date.now() - lastLoadAtRef.current > 1500) loadFromDatabase();
+    };
+    window.addEventListener('focus', handleOnline);
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      window.removeEventListener('focus', handleOnline);
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
-  }, [loadFromDatabase]);
+  }, [loadFromDatabase, handlePersistenceError]);
 
   // Auto-sync from Google Sheets on mount (only if authenticated)
   useEffect(() => {
