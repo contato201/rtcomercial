@@ -501,7 +501,7 @@ export const useDashboardData = () => {
       .insert(payload)
       .select('*')
       .single();
-    if (error) { console.error('Erro ao inserir reunião:', error); return; }
+    if (error) { handlePersistenceError('Erro ao inserir reunião:', error); throw error; }
 
     const newRow: ReuniaoEntryRow = {
       id: (inserted as any).id, month: (inserted as any).month, tipo: (inserted as any).tipo,
@@ -527,13 +527,13 @@ export const useDashboardData = () => {
           : currentMonth.realizadoSegundaReuniao;
         const field = tipo === 'primeira' ? 'realizado_primeira_reuniao' : 'realizado_segunda_reuniao';
         supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', m.data).then(({ error }) => {
-          if (error) console.error('Erro ao sincronizar dados_realizados:', error);
+          if (error) handlePersistenceError('Erro ao sincronizar dados_realizados:', error);
         });
       }
 
       return updated;
     });
-  }, []);
+  }, [handlePersistenceError]);
 
   const deleteReuniaoEntry = useCallback(async (id: string) => {
     // Read entry from current state to avoid stale closure
@@ -544,7 +544,7 @@ export const useDashboardData = () => {
     });
 
     const { error } = await supabase.from('reunioes_entries' as any).delete().eq('id', id);
-    if (error) { console.error('Erro ao excluir reunião:', error); return; }
+    if (error) { handlePersistenceError('Erro ao excluir reunião:', error); throw error; }
     setReunioesEntries((prev) => prev.filter((e) => e.id !== id));
 
     if (entry) {
@@ -564,14 +564,14 @@ export const useDashboardData = () => {
             : currentMonth.realizadoSegundaReuniao;
           const field = capturedEntry.tipo === 'primeira' ? 'realizado_primeira_reuniao' : 'realizado_segunda_reuniao';
           supabase.from('dados_realizados').update({ [field]: newTotal }).eq('month', capturedEntry.month).then(({ error }) => {
-            if (error) console.error('Erro ao sincronizar dados_realizados:', error);
+            if (error) handlePersistenceError('Erro ao sincronizar dados_realizados:', error);
           });
         }
 
         return updated;
       });
     }
-  }, []);
+  }, [handlePersistenceError]);
 
   const getMetaAgendamentos = useCallback((monthIndex: number) => {
     const monthData = data[monthIndex];
