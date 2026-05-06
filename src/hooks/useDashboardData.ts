@@ -263,8 +263,8 @@ export const useDashboardData = () => {
         dados_realizados_id: dadosRealizadosId, month: monthName,
         campo_alterado: dbField, valor_anterior: oldValue, valor_novo: newValue,
       });
-    } catch (error) { console.error('Erro ao salvar histórico:', error); }
-  }, []);
+    } catch (error) { handlePersistenceError('Erro ao salvar histórico:', error); }
+  }, [handlePersistenceError]);
 
   const updateMonthData = useCallback(async (monthIndex: number, updates: Partial<MonthData>) => {
     const monthName = MONTHS[monthIndex];
@@ -288,7 +288,8 @@ export const useDashboardData = () => {
     if (sanitizedUpdates.realizadoSegundaReuniao !== undefined) dbUpdates.realizado_segunda_reuniao = sanitizedUpdates.realizadoSegundaReuniao;
 
     try {
-      const { data: existingRecord } = await supabase.from('dados_realizados').select('id').eq('month', monthName).maybeSingle();
+      const { data: existingRecord, error: selectError } = await supabase.from('dados_realizados').select('id').eq('month', monthName).maybeSingle();
+      if (selectError) throw selectError;
       if (existingRecord) {
         for (const [field, newValue] of Object.entries(sanitizedUpdates)) {
           const oldValue = currentMonthData[field as keyof MonthData];
@@ -296,10 +297,14 @@ export const useDashboardData = () => {
             await saveToHistory(existingRecord.id, monthName, field, oldValue, newValue);
           }
         }
-        await supabase.from('dados_realizados').update(dbUpdates).eq('month', monthName);
+        const { error } = await supabase.from('dados_realizados').update(dbUpdates).eq('month', monthName);
+        if (error) throw error;
       }
-    } catch (error) { console.error('Erro ao salvar dados:', error); }
-  }, [data, saveToHistory]);
+    } catch (error) {
+      handlePersistenceError('Erro ao salvar dados:', error);
+      loadFromDatabase();
+    }
+  }, [data, saveToHistory, handlePersistenceError, loadFromDatabase]);
 
   const addUnitSale = useCallback(async (monthIndex: number, valor: number, cliente: string = '') => {
     const monthName = MONTHS[monthIndex];
