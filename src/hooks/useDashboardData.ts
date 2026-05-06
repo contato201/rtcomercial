@@ -220,8 +220,31 @@ export const useDashboardData = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas_unitarias' }, () => loadFromDatabase())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agendamentos' }, () => loadFromDatabase())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reunioes_entries' }, () => loadFromDatabase())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          loadFromDatabase();
+          return;
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          handlePersistenceError('Realtime desconectado:', new Error('A atualização em tempo real caiu. A página vai recarregar os dados.'));
+          loadFromDatabase();
+        }
+      });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadFromDatabase();
+    };
+    const handleOnline = () => loadFromDatabase();
+    window.addEventListener('focus', handleOnline);
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleOnline);
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      supabase.removeChannel(channel);
+    };
   }, [loadFromDatabase]);
 
   const saveToHistory = useCallback(async (
