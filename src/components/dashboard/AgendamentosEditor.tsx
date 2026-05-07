@@ -237,15 +237,18 @@ export const AgendamentosEditor = ({
   const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
 
   useEffect(() => {
+    fetchSdrNamesFromDb().then(setSdrNames);
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'sdr_names_v2') setSdrNames(loadSdrNames());
     };
     const onCustom = () => setSdrNames(loadSdrNames());
     window.addEventListener('storage', onStorage);
     window.addEventListener('sdr-names-updated', onCustom);
+    const unsub = subscribeSdrNames(setSdrNames);
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('sdr-names-updated', onCustom);
+      unsub();
     };
   }, []);
 
