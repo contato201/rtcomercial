@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
-import { loadSdrNames, type SdrNames } from '@/lib/sdrNames';
+import { loadSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface ReuniaoEntry {
   id: string;
