@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
-import { loadSdrNames, type SdrNames } from '@/lib/sdrNames';
+import { loadSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface ReuniaoEntry {
   id: string;
@@ -55,17 +55,20 @@ export const ReunioesEditor = ({
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const refresh = () => {
-      const names = loadSdrNames();
+    const apply = (names: SdrNames) => {
       setSdrNames(names);
       setPessoa((p) => (names.includes(p) ? p : names[0]));
     };
+    fetchSdrNamesFromDb().then(apply);
+    const refresh = () => apply(loadSdrNames());
     const onStorage = (e: StorageEvent) => { if (e.key === 'sdr_names_v2') refresh(); };
     window.addEventListener('storage', onStorage);
     window.addEventListener('sdr-names-updated', refresh);
+    const unsub = subscribeSdrNames(apply);
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('sdr-names-updated', refresh);
+      unsub();
     };
   }, []);
 

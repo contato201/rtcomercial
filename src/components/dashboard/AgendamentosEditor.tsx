@@ -9,7 +9,7 @@ import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
-import { SDR_COUNT, loadSdrNames, saveSdrNames, type SdrNames } from '@/lib/sdrNames';
+import { SDR_COUNT, loadSdrNames, saveSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface AgendamentoRow {
   id: string;
@@ -237,15 +237,18 @@ export const AgendamentosEditor = ({
   const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
 
   useEffect(() => {
+    fetchSdrNamesFromDb().then(setSdrNames);
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'sdr_names_v2') setSdrNames(loadSdrNames());
     };
     const onCustom = () => setSdrNames(loadSdrNames());
     window.addEventListener('storage', onStorage);
     window.addEventListener('sdr-names-updated', onCustom);
+    const unsub = subscribeSdrNames(setSdrNames);
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('sdr-names-updated', onCustom);
+      unsub();
     };
   }, []);
 
