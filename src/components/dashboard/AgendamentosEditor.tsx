@@ -9,7 +9,7 @@ import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
-import { SDR_COUNT, loadSdrNames, saveSdrNames, type SdrNames } from '@/lib/sdrNames';
+import { SDR_COUNT, loadSdrNames, saveSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface AgendamentoRow {
   id: string;
