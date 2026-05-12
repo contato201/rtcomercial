@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { UnitSalesEditor, type UnitSale } from '@/components/dashboard/UnitSalesEditor';
 import { AgendamentosEditor, type AgendamentoRow } from '@/components/dashboard/AgendamentosEditor';
 import { ReunioesEditor, type ReuniaoEntry } from '@/components/dashboard/ReunioesEditor';
+import { TaxasPorSdr } from '@/components/dashboard/TaxasPorSdr';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 
 interface DataEntryFormProps {
@@ -18,8 +19,8 @@ interface DataEntryFormProps {
   metaAgendamentos: number;
   filterType?: 'month' | 'quarter' | 'year';
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
-  onAddUnitSale: (monthIndex: number, valor: number, cliente: string) => Promise<void> | void;
-  onUpdateUnitSale: (id: string, valor: number, cliente: string) => Promise<void> | void;
+  onAddUnitSale: (monthIndex: number, valor: number, cliente: string, pessoa: string) => Promise<void> | void;
+  onUpdateUnitSale: (id: string, valor: number, cliente: string, pessoa: string) => Promise<void> | void;
   onDeleteUnitSale: (id: string) => Promise<void> | void;
   onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
@@ -231,7 +232,17 @@ export const DataEntryForm = ({
         />
       </div>
 
-      {/* 3. FATURAMENTO - Final do funil */}
+      {/* 3. TAXAS DE CONVERSÃO POR SDR */}
+      <div className="mb-6">
+        <TaxasPorSdr
+          selectedMonth={selectedMonth}
+          agendamentos={agendamentos}
+          reunioesEntries={reunioesEntries}
+          unitSales={unitSales}
+        />
+      </div>
+
+      {/* 4. FATURAMENTO - Final do funil */}
       <div className="p-5 bg-gradient-to-r from-primary/5 to-accent rounded-xl border border-primary/20">
         <div className="flex items-center gap-2 mb-4">
           <div className="bg-primary/10 p-2 rounded-lg">
@@ -248,7 +259,7 @@ export const DataEntryForm = ({
             monthLabel={MONTHS[selectedMonth]}
             sales={unitSales}
             canEdit={canEdit}
-            onAdd={(valor, cliente) => onAddUnitSale(selectedMonth, valor, cliente)}
+            onAdd={(valor, cliente, pessoa) => onAddUnitSale(selectedMonth, valor, cliente, pessoa)}
             onUpdate={onUpdateUnitSale}
             onDelete={onDeleteUnitSale}
           />
