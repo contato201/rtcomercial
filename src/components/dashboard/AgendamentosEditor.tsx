@@ -118,7 +118,12 @@ const SdrSlot = ({
     }
   };
 
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('pt-BR');
+  const formatDate = (dateStr: string) => {
+    // Parse YYYY-MM-DD as local date to avoid UTC shifting back one day
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return dateStr;
+    return new Date(y, m - 1, d).toLocaleDateString('pt-BR');
+  };
 
   return (
     <div className="border border-border/50 rounded-lg p-4 space-y-3">
@@ -271,7 +276,11 @@ export const AgendamentosEditor = ({
 
   const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
   const metaPorDia = Math.ceil(metaPorPessoa / Math.max(diasUteis, 1));
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = (() => {
+    const now = new Date();
+    const tz = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - tz).toISOString().slice(0, 10);
+  })();
 
   const iconColors = ['text-primary', 'text-secondary-foreground', 'text-accent-foreground'];
 
