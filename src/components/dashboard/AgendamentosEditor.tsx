@@ -276,7 +276,11 @@ export const AgendamentosEditor = ({
 
   const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
   const metaPorDia = Math.ceil(metaPorPessoa / Math.max(diasUteis, 1));
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = (() => {
+    const now = new Date();
+    const tz = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - tz).toISOString().slice(0, 10);
+  })();
 
   const iconColors = ['text-primary', 'text-secondary-foreground', 'text-accent-foreground'];
 
