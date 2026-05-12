@@ -1,0 +1,1 @@
+ALTER TABLE public.vendas_unitarias ADD COLUMN IF NOT EXISTS pessoa text NOT NULL DEFAULT '';

@@ -262,6 +262,7 @@ export type Database = {
           created_at: string
           id: string
           month: string
+          pessoa: string
           updated_at: string
           valor: number
         }
@@ -270,6 +271,7 @@ export type Database = {
           created_at?: string
           id?: string
           month: string
+          pessoa?: string
           updated_at?: string
           valor?: number
         }
@@ -278,6 +280,7 @@ export type Database = {
           created_at?: string
           id?: string
           month?: string
+          pessoa?: string
           updated_at?: string
           valor?: number
         }
