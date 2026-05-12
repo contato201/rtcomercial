@@ -1,14 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Trash2, Pencil, Check, X, Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  fetchSdrNamesFromDb,
+  loadSdrNames,
+  subscribeSdrNames,
+  type SdrNames,
+} from "@/lib/sdrNames";
 
 export type UnitSale = {
   id: string;
   month: string;
   valor: number;
   cliente: string;
+  pessoa: string;
   created_at: string;
   updated_at: string;
 };
@@ -36,8 +43,8 @@ interface UnitSalesEditorProps {
   monthLabel: string;
   sales: UnitSale[];
   canEdit: boolean;
-  onAdd: (valor: number, cliente: string) => Promise<void> | void;
-  onUpdate: (id: string, valor: number, cliente: string) => Promise<void> | void;
+  onAdd: (valor: number, cliente: string, pessoa: string) => Promise<void> | void;
+  onUpdate: (id: string, valor: number, cliente: string, pessoa: string) => Promise<void> | void;
   onDelete: (id: string) => Promise<void> | void;
 }
 
@@ -49,15 +56,24 @@ export const UnitSalesEditor = ({
   onUpdate,
   onDelete,
 }: UnitSalesEditorProps) => {
+  const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames());
   const [newValue, setNewValue] = useState("");
   const [newCliente, setNewCliente] = useState("");
+  const [newPessoa, setNewPessoa] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [editingCliente, setEditingCliente] = useState("");
+  const [editingPessoa, setEditingPessoa] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+
+  useEffect(() => {
+    fetchSdrNamesFromDb().then(setSdrNames).catch(() => {});
+    const unsub = subscribeSdrNames(setSdrNames);
+    return unsub;
+  }, []);
 
   const totals = useMemo(() => {
     const count = sales.length;
@@ -89,9 +105,10 @@ export const UnitSalesEditor = ({
     try {
       setIsAdding(true);
       setFormError(null);
-      await onAdd(parsed.data, newCliente.trim());
+      await onAdd(parsed.data, newCliente.trim(), newPessoa.trim());
       setNewValue("");
       setNewCliente("");
+      setNewPessoa("");
     } finally {
       setIsAdding(false);
     }
@@ -102,6 +119,7 @@ export const UnitSalesEditor = ({
     setEditingId(sale.id);
     setEditingValue(String(sale.valor ?? ""));
     setEditingCliente(sale.cliente ?? "");
+    setEditingPessoa(sale.pessoa ?? "");
     setEditError(null);
   };
 
@@ -109,6 +127,7 @@ export const UnitSalesEditor = ({
     setEditingId(null);
     setEditingValue("");
     setEditingCliente("");
+    setEditingPessoa("");
     setEditError(null);
   };
 
@@ -123,7 +142,7 @@ export const UnitSalesEditor = ({
     try {
       setBusyId(id);
       setEditError(null);
-      await onUpdate(id, parsed.data, editingCliente.trim());
+      await onUpdate(id, parsed.data, editingCliente.trim(), editingPessoa.trim());
       cancelEdit();
     } finally {
       setBusyId(null);
@@ -156,8 +175,24 @@ export const UnitSalesEditor = ({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-col sm:flex-row gap-2">
-        <div className="flex-1">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-2">
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1 font-medium">
+            SDR responsável
+          </label>
+          <select
+            value={newPessoa}
+            onChange={(e) => setNewPessoa(e.target.value)}
+            disabled={!canEdit || isAdding}
+            className={`input-field ${!canEdit ? "cursor-not-allowed opacity-60" : ""}`}
+          >
+            <option value="">— Sem SDR —</option>
+            {sdrNames.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="text-xs text-muted-foreground block mb-1 font-medium">
             Nome do cliente
           </label>
@@ -170,7 +205,7 @@ export const UnitSalesEditor = ({
             className={`input-field ${!canEdit ? "cursor-not-allowed opacity-60" : ""}`}
           />
         </div>
-        <div className="flex-1">
+        <div>
           <label className="text-xs text-muted-foreground block mb-1 font-medium">
             Valor da venda
           </label>
@@ -189,7 +224,7 @@ export const UnitSalesEditor = ({
             type="button"
             onClick={handleAdd}
             disabled={!canEdit || isAdding}
-            className="w-full sm:w-auto"
+            className="w-full"
           >
             <Plus className="w-4 h-4 mr-2" />
             Adicionar
@@ -220,6 +255,15 @@ export const UnitSalesEditor = ({
                           {sale.cliente}
                         </span>
                       )}
+                      {sale.pessoa ? (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          SDR: {sale.pessoa}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="ml-2 text-xs opacity-70">
+                          Sem SDR
+                        </Badge>
+                      )}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {sale.created_at ? `Criada em ${formatDate(sale.created_at)}` : ""}
@@ -228,6 +272,17 @@ export const UnitSalesEditor = ({
 
                   {isEditing ? (
                     <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        value={editingPessoa}
+                        onChange={(e) => setEditingPessoa(e.target.value)}
+                        disabled={!canEdit || isBusy}
+                        className="input-field h-9 w-32"
+                      >
+                        <option value="">— Sem SDR —</option>
+                        {sdrNames.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
                       <input
                         type="text"
                         value={editingCliente}
