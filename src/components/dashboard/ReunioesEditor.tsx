@@ -124,8 +124,10 @@ export const ReunioesEditor = ({
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR');
+    // Parse YYYY-MM-DD as local date to avoid UTC shifting back one day
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return dateStr;
+    return new Date(y, m - 1, d).toLocaleDateString('pt-BR');
   };
 
   return (
