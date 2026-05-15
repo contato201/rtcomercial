@@ -230,6 +230,95 @@ export const MetasSemanais = ({
       <p className="text-xs text-muted-foreground mt-3">
         💡 Os valores realizados consideram apenas lançamentos com data dentro da semana atual (segunda a domingo).
       </p>
+
+      {/* Gráfico de barras: Meta total × Realizado × Esperado até agora */}
+      <div className="mt-6 pt-5 border-t border-border">
+        <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="bg-primary/10 p-1.5 rounded-md">
+              <BarChart3 className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-foreground text-sm">📊 Pacing visual: Meta × Realizado × Esperado</h4>
+              <p className="text-xs text-muted-foreground">
+                "Esperado até agora" = meta proporcional às {currentWeekIndex} semana(s) decorrida(s) de {weeksInMonth}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {[
+              { key: 'all', label: 'Unidades' },
+              ...allMetrics.map((m) => ({ key: m.key, label: m.label })),
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setActiveMetric(opt.key)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+                  activeMetric === opt.key
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 16, right: 12, left: -8, bottom: 5 }} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={fmtAxis}
+              />
+              <Tooltip
+                cursor={{ fill: 'hsl(var(--accent))', opacity: 0.3 }}
+                content={({ active, payload, label }: any) => {
+                  if (!active || !payload?.length) return null;
+                  const row = payload[0]?.payload;
+                  const f = (v: number) => (row?.isCurrency ? formatBRL(v) : Math.round(v).toLocaleString('pt-BR'));
+                  const meta = row?.meta ?? 0;
+                  const realizado = row?.realizado ?? 0;
+                  const esperado = row?.esperado ?? 0;
+                  const gap = realizado - esperado;
+                  return (
+                    <div className="bg-card border border-border rounded-xl p-3 shadow-xl text-sm">
+                      <p className="font-semibold text-foreground mb-2 border-b border-border pb-1.5">{label}</p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between gap-6"><span className="text-primary">Meta total:</span><span className="font-bold">{f(meta)}</span></div>
+                        <div className="flex justify-between gap-6"><span className="text-[hsl(var(--success))]">Realizado:</span><span className="font-bold">{f(realizado)}</span></div>
+                        <div className="flex justify-between gap-6"><span className="text-warning">Esperado até agora:</span><span className="font-bold">{f(esperado)}</span></div>
+                        <div className={`flex justify-between gap-6 pt-1.5 border-t border-border ${gap >= 0 ? 'text-[hsl(var(--success))]' : 'text-destructive'}`}>
+                          <span className="font-medium">vs. esperado:</span>
+                          <span className="font-bold">{gap >= 0 ? '+' : ''}{f(gap)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="meta" name="Meta total" fill="hsl(var(--chart-meta))" radius={[6, 6, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="realizado" name="Realizado" radius={[6, 6, 0, 0]} maxBarSize={50}>
+                {chartData.map((entry, i) => (
+                  <Cell key={`r-${i}`} fill={entry.realizado >= entry.esperado ? 'hsl(var(--chart-realizado))' : 'hsl(var(--destructive))'} />
+                ))}
+              </Bar>
+              <Bar dataKey="esperado" name="Esperado até agora" fill="hsl(var(--warning))" radius={[6, 6, 0, 0]} maxBarSize={50} fillOpacity={0.75} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 };
