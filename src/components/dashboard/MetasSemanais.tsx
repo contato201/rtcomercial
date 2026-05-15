@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { MONTHS } from '@/types/dashboard';
-import { CalendarRange, TrendingUp, TrendingDown } from 'lucide-react';
+import { CalendarRange, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import type { AgendamentoRow } from './AgendamentosEditor';
 import type { ReuniaoEntry } from './ReunioesEditor';
 import type { UnitSale } from './UnitSalesEditor';
