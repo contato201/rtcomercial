@@ -119,7 +119,10 @@ const Index = () => {
           aggregatedData={aggregatedData}
           filterType={filterType}
           selectedQuarter={selectedQuarter}
+          selectedMonth={selectedMonth}
           agendamentos={agendamentos}
+          reunioesEntries={reunioesEntries}
+          unitSales={unitSalesByMonth[data[selectedMonth].month] ?? []}
           isLoading={isLoading}
         />
       </div>
