@@ -8,6 +8,7 @@ import { UnitSalesEditor, type UnitSale } from '@/components/dashboard/UnitSales
 import { AgendamentosEditor, type AgendamentoRow } from '@/components/dashboard/AgendamentosEditor';
 import { ReunioesEditor, type ReuniaoEntry } from '@/components/dashboard/ReunioesEditor';
 import { TaxasPorSdr } from '@/components/dashboard/TaxasPorSdr';
+import { MetasSemanais } from '@/components/dashboard/MetasSemanais';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 
 interface DataEntryFormProps {
@@ -232,7 +233,22 @@ export const DataEntryForm = ({
         />
       </div>
 
-      {/* 3. TAXAS DE CONVERSÃO POR SDR */}
+      {/* 3. METAS SEMANAIS - Pacing semanal vs meta proporcional */}
+      <div className="mb-6">
+        <MetasSemanais
+          selectedMonth={selectedMonth}
+          metaAgendamentos={metaAgendamentos}
+          metaPrimeiraReuniao={currentData.metaPrimeiraReuniao}
+          metaSegundaReuniao={currentData.metaSegundaReuniao}
+          metaVendas={currentData.metaVendas}
+          metaFaturamento={currentData.metaFaturamento}
+          agendamentos={agendamentos}
+          reunioesEntries={reunioesEntries}
+          unitSales={unitSales}
+        />
+      </div>
+
+      {/* 4. TAXAS DE CONVERSÃO POR SDR */}
       <div className="mb-6">
         <TaxasPorSdr
           selectedMonth={selectedMonth}
