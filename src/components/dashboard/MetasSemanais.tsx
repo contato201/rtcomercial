@@ -104,7 +104,16 @@ export const MetasSemanais = ({
   const realVendasSemana = vendasSemanaList.length;
   const realFatSemana = vendasSemanaList.reduce((s, v) => s + Number(v.valor || 0), 0);
 
+  // Acumulado do mês (todos os lançamentos do mês selecionado)
+  const realAgendMes = agendMonth.reduce((s, a) => s + a.quantidade, 0);
+  const real1Mes = reunMonth.filter((r) => r.tipo === 'primeira').reduce((s, r) => s + r.quantidade, 0);
+  const real2Mes = reunMonth.filter((r) => r.tipo === 'segunda').reduce((s, r) => s + r.quantidade, 0);
+  const realVendasMes = vendasMonth.length;
+  const realFatMes = vendasMonth.reduce((s, v) => s + Number(v.valor || 0), 0);
+
   const metaSemanal = (meta: number) => meta / weeksInMonth;
+  // Meta proporcional ao tempo decorrido (semanas decorridas / total)
+  const esperadoAteAgora = (meta: number) => (meta / weeksInMonth) * currentWeekIndex;
 
   type Row = {
     label: string;
@@ -120,6 +129,31 @@ export const MetasSemanais = ({
     { label: 'Vendas', metaSemana: metaSemanal(metaVendas), realSemana: realVendasSemana },
     { label: 'Faturamento', metaSemana: metaSemanal(metaFaturamento), realSemana: realFatSemana, isCurrency: true },
   ];
+
+  // Filtro de métricas exibidas no gráfico
+  const allMetrics = [
+    { key: 'agendamentos', label: 'Agendamentos', meta: metaAgendamentos, realizado: realAgendMes, isCurrency: false },
+    { key: 'primeira', label: '1ª Reuniões', meta: metaPrimeiraReuniao, realizado: real1Mes, isCurrency: false },
+    { key: 'segunda', label: '2ª Reuniões', meta: metaSegundaReuniao, realizado: real2Mes, isCurrency: false },
+    { key: 'vendas', label: 'Vendas', meta: metaVendas, realizado: realVendasMes, isCurrency: false },
+    { key: 'faturamento', label: 'Faturamento', meta: metaFaturamento, realizado: realFatMes, isCurrency: true },
+  ] as const;
+
+  const [activeMetric, setActiveMetric] = useState<string>('all');
+
+  const visibleMetrics = activeMetric === 'all'
+    ? allMetrics.filter((m) => !m.isCurrency) // evita misturar R$ com unidades no mesmo eixo
+    : allMetrics.filter((m) => m.key === activeMetric);
+
+  const chartData = visibleMetrics.map((m) => ({
+    name: m.label,
+    meta: m.meta,
+    realizado: m.realizado,
+    esperado: esperadoAteAgora(m.meta),
+    isCurrency: m.isCurrency,
+  }));
+
+  const fmtAxis = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`);
 
   const fmt = (v: number, currency?: boolean) =>
     currency ? formatBRL(v) : (Number.isInteger(v) ? v.toString() : v.toFixed(1));
