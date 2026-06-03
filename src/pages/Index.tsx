@@ -11,11 +11,13 @@ import { exportDashboardCsv } from '@/lib/exportCsv';
 import { Download, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FunnelOverview } from '@/components/dashboard/FunnelOverview';
+import { CommandPalette, useCommandPalette } from '@/components/CommandPalette';
 
 
 const Index = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const { canEdit } = useAuth();
+  const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette();
   
   const {
     data,
@@ -164,6 +166,25 @@ const Index = () => {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         onRevert={revertToValue}
+      />
+
+      {/* Paleta de comandos ⌘K */}
+      <CommandPalette
+        open={cmdOpen}
+        onOpenChange={setCmdOpen}
+        onSelectMonth={(i) => setSelectedMonth(i)}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+        onExportCsv={() => {
+          const label = filterType === 'month'
+            ? data[selectedMonth].month
+            : filterType === 'quarter'
+              ? selectedQuarter
+              : 'Anual';
+          exportDashboardCsv(
+            filterType === 'month' ? [data[selectedMonth]] : filteredData,
+            `dashboard-${label}-2025`,
+          );
+        }}
       />
     </div>
   );

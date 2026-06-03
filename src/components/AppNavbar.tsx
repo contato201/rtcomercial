@@ -59,6 +59,16 @@ export const AppNavbar = () => {
 
           {/* Ações */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
+              }}
+              className="hidden md:inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              title="Abrir paleta de comandos"
+            >
+              <span>Buscar</span>
+              <kbd className="rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-foreground/80 border border-border">⌘K</kbd>
+            </button>
             <ThemeToggle />
 
             {canEdit && (

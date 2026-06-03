@@ -1,6 +1,8 @@
 import { MonthData, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { Calendar, Users, UserCheck, ShoppingCart, DollarSign, LucideIcon } from 'lucide-react';
+import { useCountUp } from '@/hooks/useCountUp';
+
 
 interface FunnelOverviewProps {
   data: MonthData;
@@ -31,6 +33,9 @@ const Stage = ({ label, realizado, meta, highlight, formatter = formatNumber, ic
   const pct = safePercentage(realizado, meta);
   const width = clampPercentage(pct);
   const delay = `${index * 80}ms`;
+  const animatedRealizado = useCountUp(realizado);
+  const displayRealizado = formatter === formatNumber ? Math.round(animatedRealizado) : animatedRealizado;
+
 
   if (highlight) {
     return (
@@ -47,7 +52,7 @@ const Stage = ({ label, realizado, meta, highlight, formatter = formatNumber, ic
           </div>
         </div>
         <div className="mt-4 flex flex-col">
-          <span className="text-2xl font-bold leading-tight tabular-nums text-black">{formatter(realizado)}</span>
+          <span className="text-2xl font-bold leading-tight tabular-nums text-black">{formatter(displayRealizado)}</span>
           <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-black/60">
             Meta: {formatter(meta)}
           </span>
@@ -72,7 +77,7 @@ const Stage = ({ label, realizado, meta, highlight, formatter = formatNumber, ic
         </div>
       </div>
       <div className="mt-4 flex items-baseline gap-2">
-        <span className="text-3xl font-bold leading-none tabular-nums text-foreground">{formatter(realizado)}</span>
+        <span className="text-3xl font-bold leading-none tabular-nums text-foreground">{formatter(displayRealizado)}</span>
         <span className="text-xs font-semibold italic text-muted-foreground">/ {formatter(meta)}</span>
       </div>
       <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-muted">

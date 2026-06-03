@@ -27,7 +27,7 @@ export const FilterBar = ({
   };
 
   return (
-    <div className="dashboard-card p-4 mb-6">
+    <div className="sticky top-16 z-30 mb-6 rounded-2xl border border-border/60 bg-card/70 p-4 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/50">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground">Visualizar:</span>

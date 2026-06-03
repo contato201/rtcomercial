@@ -322,25 +322,30 @@ export const AgendamentosEditor = ({
   };
 
   return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+    <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-sm">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-primary" />
-          📅 Agendamentos - {monthName}
+        <CardTitle className="flex items-center gap-3 text-lg">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[hsl(var(--gold))] to-[hsl(var(--gold-dark))] text-primary-foreground shadow-[0_4px_14px_-4px_hsl(var(--gold)/0.5)]">
+            <Calendar className="h-4 w-4" strokeWidth={2.5} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Etapa 1 · Funil</span>
+            <span className="text-base font-bold text-foreground">Agendamentos · {monthName}</span>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+        <div className="rounded-xl border border-border/60 bg-gradient-to-br from-[hsl(var(--gold)/0.08)] to-transparent p-4 space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Meta Total</span>
-            <span className="font-bold text-lg">{Math.ceil(metaAgendamentos)}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Meta Total</span>
+            <span className="text-2xl font-bold tabular-nums text-foreground">{Math.ceil(metaAgendamentos)}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Realizado Total</span>
-            <span className="font-bold text-lg text-primary">{totalGeral}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Realizado Total</span>
+            <span className="text-2xl font-bold tabular-nums text-primary">{totalGeral}</span>
           </div>
           <Progress value={clampPercentage(progressoGeral)} className="h-2" />
-          <div className="text-xs text-muted-foreground text-right">
+          <div className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground text-right">
             {progressoGeral.toFixed(1)}% da meta
           </div>
         </div>
