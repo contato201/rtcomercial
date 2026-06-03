@@ -198,6 +198,23 @@ export const ReunioesEditor = ({
             onChange={(e) => setDataLancamento(e.target.value)}
             className="text-xs"
           />
+          <Input
+            type="text"
+            placeholder="Nome do lead (opcional)"
+            value={leadNome}
+            onChange={(e) => setLeadNome(e.target.value)}
+            className="text-xs"
+          />
+          <Select value={origem} onValueChange={setOrigem}>
+            <SelectTrigger className="text-xs h-9">
+              <SelectValue placeholder="Origem do lead (opcional)" />
+            </SelectTrigger>
+            <SelectContent>
+              {ORIGENS_LEAD.map((o) => (
+                <SelectItem key={o} value={o}>{o}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex gap-2">
             <Input
               type="number"
@@ -225,12 +242,30 @@ export const ReunioesEditor = ({
           {monthEntries.map((entry) => (
             <div
               key={entry.id}
-              className="flex items-center justify-between gap-2 text-xs bg-muted/50 rounded px-2 py-1"
+              className="flex items-start justify-between gap-2 text-xs bg-muted/50 rounded px-2 py-1"
             >
-              <span className="text-muted-foreground">{formatDate(entry.data_lancamento)}</span>
-              <span className="font-medium truncate flex-1" title={entry.pessoa || '—'}>
-                {entry.pessoa || '—'}
-              </span>
+              <div className="flex flex-col flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">{formatDate(entry.data_lancamento)}</span>
+                  <span className="font-medium truncate" title={entry.pessoa || '—'}>
+                    {entry.pessoa || '—'}
+                  </span>
+                </div>
+                {(entry.lead_nome || entry.origem) && (
+                  <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                    {entry.lead_nome && (
+                      <span className="text-foreground/80 truncate" title={entry.lead_nome}>
+                        👤 {entry.lead_nome}
+                      </span>
+                    )}
+                    {entry.origem && (
+                      <span className="text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5">
+                        {entry.origem}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               <span className="font-bold">+{entry.quantidade}</span>
               {canEdit && (
                 <Button
