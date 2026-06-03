@@ -11,7 +11,7 @@ import { exportDashboardCsv } from '@/lib/exportCsv';
 import { Download, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FunnelOverview } from '@/components/dashboard/FunnelOverview';
-import { MONTHS } from '@/types/dashboard';
+
 
 const Index = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
