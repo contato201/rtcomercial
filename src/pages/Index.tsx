@@ -167,6 +167,25 @@ const Index = () => {
         onClose={() => setIsHistoryOpen(false)}
         onRevert={revertToValue}
       />
+
+      {/* Paleta de comandos ⌘K */}
+      <CommandPalette
+        open={cmdOpen}
+        onOpenChange={setCmdOpen}
+        onSelectMonth={(i) => setSelectedMonth(i)}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+        onExportCsv={() => {
+          const label = filterType === 'month'
+            ? data[selectedMonth].month
+            : filterType === 'quarter'
+              ? selectedQuarter
+              : 'Anual';
+          exportDashboardCsv(
+            filterType === 'month' ? [data[selectedMonth]] : filteredData,
+            `dashboard-${label}-2025`,
+          );
+        }}
+      />
     </div>
   );
 };
