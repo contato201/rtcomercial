@@ -200,14 +200,13 @@ export const ReunioesEditor = ({
           />
           <Input
             type="text"
-            placeholder="Nome do lead (opcional)"
+            placeholder="Nome do interessado (opcional)"
             value={leadNome}
             onChange={(e) => setLeadNome(e.target.value)}
-            className="text-xs"
           />
           <Select value={origem} onValueChange={setOrigem}>
-            <SelectTrigger className="text-xs h-9">
-              <SelectValue placeholder="Origem do lead (opcional)" />
+            <SelectTrigger>
+              <SelectValue placeholder="Origem do interessado (opcional)" />
             </SelectTrigger>
             <SelectContent>
               {ORIGENS_LEAD.map((o) => (
