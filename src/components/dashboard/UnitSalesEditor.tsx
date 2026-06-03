@@ -242,7 +242,11 @@ export const UnitSalesEditor = ({
 
       <div className="mt-4 space-y-2">
         {sales.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma venda lançada neste mês.</p>
+          <EmptyState
+            icon={Receipt}
+            title="Nenhuma venda lançada"
+            description={`Comece registrando a primeira venda de ${monthLabel} no formulário acima.`}
+          />
         ) : (
           sales.map((sale, idx) => {
             const isEditing = editingId === sale.id;
