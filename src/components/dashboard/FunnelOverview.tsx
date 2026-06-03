@@ -33,6 +33,9 @@ const Stage = ({ label, realizado, meta, highlight, formatter = formatNumber, ic
   const pct = safePercentage(realizado, meta);
   const width = clampPercentage(pct);
   const delay = `${index * 80}ms`;
+  const animatedRealizado = useCountUp(realizado);
+  const displayRealizado = formatter === formatNumber ? Math.round(animatedRealizado) : animatedRealizado;
+
 
   if (highlight) {
     return (
