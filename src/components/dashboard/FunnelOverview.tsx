@@ -52,7 +52,7 @@ const Stage = ({ label, realizado, meta, highlight, formatter = formatNumber, ic
           </div>
         </div>
         <div className="mt-4 flex flex-col">
-          <span className="text-2xl font-bold leading-tight tabular-nums text-black">{formatter(realizado)}</span>
+          <span className="text-2xl font-bold leading-tight tabular-nums text-black">{formatter(displayRealizado)}</span>
           <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-black/60">
             Meta: {formatter(meta)}
           </span>
