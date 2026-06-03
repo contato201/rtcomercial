@@ -55,7 +55,7 @@ const Index = () => {
     filterType === 'month' ? data[selectedMonth].month : filterType === 'quarter' ? selectedQuarter : 'Visão Anual';
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <AppNavbar />
 
       <div className="mx-auto max-w-[1600px] p-6 lg:p-8">
