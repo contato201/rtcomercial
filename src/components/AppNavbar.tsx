@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface NavItem {
   label: string;
@@ -23,7 +24,7 @@ export const AppNavbar = () => {
   const { user, signOut, canEdit, isAuthenticated } = useAuth();
 
   return (
-    <header className="bg-card border-b border-border sticky top-0 z-50">
+    <header className="sticky top-0 z-50 border-b border-border/60 bg-card/70 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
       <div className="max-w-[1600px] mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo e Navegação */}
@@ -58,6 +59,8 @@ export const AppNavbar = () => {
 
           {/* Ações */}
           <div className="flex items-center gap-3">
+            <ThemeToggle />
+
             {canEdit && (
               <TooltipProvider>
                 <Tooltip delayDuration={0}>

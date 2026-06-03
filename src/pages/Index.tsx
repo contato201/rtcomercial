@@ -55,19 +55,25 @@ const Index = () => {
     filterType === 'month' ? data[selectedMonth].month : filterType === 'quarter' ? selectedQuarter : 'Visão Anual';
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
+    <div className="relative min-h-screen bg-background text-foreground">
+      {/* Decorative gold glow background */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[480px] bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,hsl(var(--gold)/0.18),transparent_60%)]"
+      />
+
       <AppNavbar />
 
-      <div className="mx-auto max-w-[1600px] p-6 lg:p-8">
+      <div className="relative z-10 mx-auto max-w-[1600px] p-6 lg:p-8">
         {/* Header premium */}
-        <div className="mb-8 flex flex-col gap-4 border-b border-[hsl(var(--gold)/0.2)] pb-6 md:flex-row md:items-end md:justify-between">
+        <div className="mb-8 flex flex-col gap-4 border-b border-border/60 pb-6 md:flex-row md:items-end md:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--gold))] text-background shadow-[0_8px_24px_-8px_hsl(var(--gold)/0.6)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(var(--gold))] to-[hsl(var(--gold-dark))] text-primary-foreground shadow-[0_10px_30px_-10px_hsl(var(--gold)/0.7)] ring-1 ring-[hsl(var(--gold)/0.3)]">
               <BarChart3 className="h-6 w-6" strokeWidth={2.5} />
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-                Dashboard <span className="text-[hsl(var(--gold))]">Comercial</span>
+                Dashboard <span className="bg-gradient-to-r from-[hsl(var(--gold))] to-[hsl(var(--gold-dark))] bg-clip-text text-transparent">Comercial</span>
               </h1>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 {periodLabel} · Metas vs Realizado
@@ -77,7 +83,7 @@ const Index = () => {
           <Button
             variant="outline"
             size="sm"
-            className="border-white/10 bg-white/5 text-foreground hover:border-[hsl(var(--gold)/0.4)] hover:bg-white/10"
+            className="border-border/60 bg-card/50 backdrop-blur-sm hover:border-primary/40 hover:bg-accent"
             onClick={() => {
               const label = filterType === 'month'
                 ? data[selectedMonth].month
