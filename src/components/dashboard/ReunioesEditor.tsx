@@ -15,9 +15,21 @@ export interface ReuniaoEntry {
   tipo: 'primeira' | 'segunda';
   quantidade: number;
   pessoa: string;
+  lead_nome: string;
+  origem: string;
   data_lancamento: string;
   created_at: string;
 }
+
+export const ORIGENS_LEAD = [
+  'Tráfego Pago',
+  'Social Selling',
+  'Prospecção Fria',
+  'Indicação',
+  'Recuperação',
+  'Orgânico',
+  'Outros',
+] as const;
 
 interface ReunioesEditorProps {
   selectedMonth: number;
@@ -26,7 +38,7 @@ interface ReunioesEditorProps {
   icon?: React.ReactNode;
   entries: ReuniaoEntry[];
   meta: number;
-  onAdd: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string) => Promise<void>;
+  onAdd: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   canEdit: boolean;
 }
