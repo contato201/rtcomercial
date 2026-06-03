@@ -24,7 +24,7 @@ export const AppNavbar = () => {
   const { user, signOut, canEdit, isAuthenticated } = useAuth();
 
   return (
-    <header className="bg-card border-b border-border sticky top-0 z-50">
+    <header className="sticky top-0 z-50 border-b border-border/60 bg-card/70 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
       <div className="max-w-[1600px] mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo e Navegação */}
