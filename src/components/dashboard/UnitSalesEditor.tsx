@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import { Trash2, Pencil, Check, X, Plus, User } from "lucide-react";
+import { Trash2, Pencil, Check, X, Plus, User, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   fetchSdrNamesFromDb,
   loadSdrNames,
