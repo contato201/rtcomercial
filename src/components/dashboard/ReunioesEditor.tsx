@@ -62,6 +62,8 @@ export const ReunioesEditor = ({
   const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
   const [pessoa, setPessoa] = useState<string>(() => loadSdrNames()[0]);
   const [quantidade, setQuantidade] = useState('');
+  const [leadNome, setLeadNome] = useState('');
+  const [origem, setOrigem] = useState<string>('');
   const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
@@ -124,8 +126,10 @@ export const ReunioesEditor = ({
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(selectedMonth, tipo, qtd, dataLancamento, pessoa);
+      await onAdd(selectedMonth, tipo, qtd, dataLancamento, pessoa, leadNome, origem);
       setQuantidade('');
+      setLeadNome('');
+      setOrigem('');
       setDataLancamento(todayISO());
     } catch (e) {
       console.error(e);
