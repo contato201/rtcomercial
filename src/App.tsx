@@ -10,6 +10,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Growth from "./pages/Growth";
 import ProfileAnalysis from "./pages/ProfileAnalysis";
 import NotFound from "./pages/NotFound";
+import { ThemeProvider } from "@/hooks/useTheme";
 
 const queryClient = new QueryClient();
 
