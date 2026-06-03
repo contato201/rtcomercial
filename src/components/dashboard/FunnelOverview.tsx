@@ -1,6 +1,8 @@
 import { MonthData, TAXA_COMPARECIMENTO } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { Calendar, Users, UserCheck, ShoppingCart, DollarSign, LucideIcon } from 'lucide-react';
+import { useCountUp } from '@/hooks/useCountUp';
+
 
 interface FunnelOverviewProps {
   data: MonthData;
