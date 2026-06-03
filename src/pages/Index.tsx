@@ -11,6 +11,7 @@ import { exportDashboardCsv } from '@/lib/exportCsv';
 import { Download, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FunnelOverview } from '@/components/dashboard/FunnelOverview';
+import { CommandPalette, useCommandPalette } from '@/components/CommandPalette';
 
 
 const Index = () => {
