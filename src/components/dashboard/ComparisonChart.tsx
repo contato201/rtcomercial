@@ -82,14 +82,28 @@ export const ComparisonChart = ({ title, data, formatValue = (v) => v.toLocaleSt
       <div className="h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 5 }} barCategoryGap="20%">
+            <defs>
+              <linearGradient id={`meta-grad-${title}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(var(--gold-light))" stopOpacity={0.95} />
+                <stop offset="100%" stopColor="hsl(var(--gold-dark))" stopOpacity={0.85} />
+              </linearGradient>
+              <linearGradient id={`success-grad-${title}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={1} />
+                <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0.7} />
+              </linearGradient>
+              <linearGradient id={`danger-grad-${title}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={1} />
+                <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.7} />
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
-            <XAxis 
-              dataKey="name" 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+            <XAxis
+              dataKey="name"
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 600 }}
               axisLine={{ stroke: 'hsl(var(--border))' }}
               tickLine={false}
             />
-            <YAxis 
+            <YAxis
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
@@ -99,23 +113,29 @@ export const ComparisonChart = ({ title, data, formatValue = (v) => v.toLocaleSt
               }}
             />
             <Tooltip content={renderCustomTooltip} cursor={{ fill: 'hsl(var(--accent))', opacity: 0.3 }} />
-            <Bar 
-              dataKey="meta" 
-              name="Meta" 
-              fill="hsl(var(--chart-meta))" 
+            <Bar
+              dataKey="meta"
+              name="Meta"
+              fill={`url(#meta-grad-${title})`}
               radius={[6, 6, 0, 0]}
               maxBarSize={45}
+              animationDuration={800}
             />
-            <Bar 
-              dataKey="realizado" 
-              name="Realizado" 
+            <Bar
+              dataKey="realizado"
+              name="Realizado"
               radius={[6, 6, 0, 0]}
               maxBarSize={45}
+              animationDuration={1000}
             >
               {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={toFiniteNumber(entry.realizado) >= toFiniteNumber(entry.meta) ? 'hsl(var(--chart-realizado))' : 'hsl(var(--destructive))'} 
+                <Cell
+                  key={`cell-${index}`}
+                  fill={
+                    toFiniteNumber(entry.realizado) >= toFiniteNumber(entry.meta)
+                      ? `url(#success-grad-${title})`
+                      : `url(#danger-grad-${title})`
+                  }
                 />
               ))}
             </Bar>
