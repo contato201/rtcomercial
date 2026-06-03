@@ -17,6 +17,7 @@ import { CommandPalette, useCommandPalette } from '@/components/CommandPalette';
 const Index = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const { canEdit } = useAuth();
+  const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette();
   
   const {
     data,
