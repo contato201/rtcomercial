@@ -147,10 +147,15 @@ export const ReunioesEditor = ({
   };
 
   return (
-    <div className="border border-border/50 rounded-lg p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Users className="h-4 w-4 text-primary" />
-        <span className="font-semibold">{label}</span>
+    <div className="rounded-xl border border-border/60 bg-card/60 p-4 space-y-3 backdrop-blur-sm transition-shadow hover:shadow-md">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[hsl(var(--gold))] to-[hsl(var(--gold-dark))] text-primary-foreground shadow-[0_4px_14px_-4px_hsl(var(--gold)/0.5)]">
+          <Users className="h-4 w-4" strokeWidth={2.5} />
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Etapa funil</p>
+          <span className="text-sm font-bold text-foreground">{label}</span>
+        </div>
       </div>
 
       <div className="flex justify-between text-sm">
