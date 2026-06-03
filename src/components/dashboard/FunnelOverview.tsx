@@ -77,7 +77,7 @@ const Stage = ({ label, realizado, meta, highlight, formatter = formatNumber, ic
         </div>
       </div>
       <div className="mt-4 flex items-baseline gap-2">
-        <span className="text-3xl font-bold leading-none tabular-nums text-foreground">{formatter(realizado)}</span>
+        <span className="text-3xl font-bold leading-none tabular-nums text-foreground">{formatter(displayRealizado)}</span>
         <span className="text-xs font-semibold italic text-muted-foreground">/ {formatter(meta)}</span>
       </div>
       <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-muted">
