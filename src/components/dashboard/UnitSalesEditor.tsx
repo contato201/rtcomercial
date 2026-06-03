@@ -161,18 +161,21 @@ export const UnitSalesEditor = ({
   };
 
   return (
-    <div className="bg-card rounded-xl p-4 border border-primary/20">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h4 className="font-semibold text-foreground">Vendas unitárias</h4>
-          <p className="text-xs text-muted-foreground">
-            Lançamento por venda (valores diferentes) — {monthLabel}
-          </p>
+    <div className="rounded-xl border border-border/60 bg-card/60 p-5 backdrop-blur-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[hsl(var(--gold))] to-[hsl(var(--gold-dark))] text-primary-foreground shadow-[0_4px_14px_-4px_hsl(var(--gold)/0.5)]">
+            <Receipt className="h-4 w-4" strokeWidth={2.5} />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Faturamento</p>
+            <h4 className="text-base font-bold text-foreground">Vendas unitárias · {monthLabel}</h4>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">Qtd: {totals.count}</Badge>
-          <Badge variant="secondary">Total: {formatCurrency(totals.sum)}</Badge>
-          <Badge variant="outline">Ticket médio: {formatCurrency(totals.avg || 0)}</Badge>
+          <Badge variant="secondary" className="font-semibold tabular-nums">Qtd: {totals.count}</Badge>
+          <Badge variant="secondary" className="font-semibold tabular-nums">Total: {formatCurrency(totals.sum)}</Badge>
+          <Badge variant="outline" className="border-[hsl(var(--gold)/0.4)] font-semibold tabular-nums text-primary">Ticket médio: {formatCurrency(totals.avg || 0)}</Badge>
         </div>
       </div>
 
