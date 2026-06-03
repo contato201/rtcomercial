@@ -31,6 +31,8 @@ export type ReuniaoEntryRow = {
   tipo: 'primeira' | 'segunda';
   quantidade: number;
   pessoa: string;
+  lead_nome: string;
+  origem: string;
   data_lancamento: string;
   created_at: string;
 };
@@ -142,6 +144,8 @@ export const useDashboardData = () => {
         tipo: row.tipo as 'primeira' | 'segunda',
         quantidade: toFiniteNumber(row.quantidade),
         pessoa: String(row.pessoa ?? ''),
+        lead_nome: String(row.lead_nome ?? ''),
+        origem: String(row.origem ?? ''),
         data_lancamento: row.data_lancamento,
         created_at: row.created_at,
       }));
@@ -514,7 +518,7 @@ export const useDashboardData = () => {
   }, [handlePersistenceError]);
 
   // Reuniões entries
-  const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string) => {
+  const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string) => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const t = tipoReuniaoSchema.safeParse(tipo);
@@ -523,6 +527,8 @@ export const useDashboardData = () => {
 
     const payload: any = { month: m.data, tipo: t.data, quantidade: q.data, pessoa: (pessoa ?? '').trim() };
     if (dataLancamento) payload.data_lancamento = dataLancamento;
+    if (leadNome !== undefined) payload.lead_nome = leadNome.trim() || null;
+    if (origem !== undefined) payload.origem = origem || null;
 
     const { data: inserted, error } = await supabase
       .from('reunioes_entries' as any)
@@ -534,6 +540,8 @@ export const useDashboardData = () => {
     const newRow: ReuniaoEntryRow = {
       id: (inserted as any).id, month: (inserted as any).month, tipo: (inserted as any).tipo,
       quantidade: (inserted as any).quantidade, pessoa: String((inserted as any).pessoa ?? ''),
+      lead_nome: String((inserted as any).lead_nome ?? ''),
+      origem: String((inserted as any).origem ?? ''),
       data_lancamento: (inserted as any).data_lancamento,
       created_at: (inserted as any).created_at,
     };
