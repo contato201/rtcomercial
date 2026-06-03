@@ -48,7 +48,7 @@ const Index = () => {
   // Realizado de agendamentos do período filtrado
   const monthsInFilter = new Set(filteredData.map((d) => d.month));
   const realizadoAgendamentos = agendamentos
-    .filter((a) => monthsInFilter.has(MONTHS[a.monthIndex]))
+    .filter((a) => monthsInFilter.has(a.month))
     .reduce((sum, a) => sum + (a.quantidade ?? 0), 0);
 
   const periodLabel =
