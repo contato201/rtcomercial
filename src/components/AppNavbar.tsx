@@ -59,6 +59,8 @@ export const AppNavbar = () => {
 
           {/* Ações */}
           <div className="flex items-center gap-3">
+            <ThemeToggle />
+
             {canEdit && (
               <TooltipProvider>
                 <Tooltip delayDuration={0}>
