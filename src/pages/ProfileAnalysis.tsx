@@ -243,7 +243,11 @@ const ProfileAnalysis = () => {
   const filledCount = [pdfText, pageUrl, scripts].filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background text-foreground">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[480px] bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,hsl(var(--gold)/0.18),transparent_60%)]"
+      />
       <AppNavbar />
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Header */}
