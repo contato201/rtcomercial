@@ -8,8 +8,10 @@ import { DataEntryForm } from '@/components/dashboard/DataEntryForm';
 import { ChartsGrid } from '@/components/dashboard/ChartsGrid';
 import { HistoryPanel } from '@/components/dashboard/HistoryPanel';
 import { exportDashboardCsv } from '@/lib/exportCsv';
-import { Download } from 'lucide-react';
+import { Download, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FunnelOverview } from '@/components/dashboard/FunnelOverview';
+import { MONTHS } from '@/types/dashboard';
 
 const Index = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
