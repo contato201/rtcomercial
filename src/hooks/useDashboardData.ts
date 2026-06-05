@@ -195,17 +195,14 @@ export const useDashboardData = () => {
           const agg = unitAgg[month.month] ?? { count: 0, sum: 0, avg: 0 };
           const rAgg = reunioesAgg[month.month] ?? { primeira: 0, segunda: 0 };
           
-          // Use reunioes entries as source of truth if there are entries, otherwise fall back to db value
-          const hasReuniaoEntries = processedReunioes.some(e => e.month === month.month);
-          
           if (dbMonth) {
             return {
               ...month,
               realizadoVendas: toFiniteNumber(agg.count),
               realizadoFaturamento: toFiniteNumber(agg.sum),
               ticketRealizado: agg.count > 0 ? toFiniteNumber(agg.avg) : (toFiniteNumber(dbMonth.ticket_realizado) || VALOR_POR_VENDA),
-              realizadoPrimeiraReuniao: hasReuniaoEntries ? toFiniteNumber(rAgg.primeira) : toFiniteNumber(dbMonth.realizado_primeira_reuniao),
-              realizadoSegundaReuniao: hasReuniaoEntries ? toFiniteNumber(rAgg.segunda) : toFiniteNumber(dbMonth.realizado_segunda_reuniao),
+              realizadoPrimeiraReuniao: toFiniteNumber(rAgg.primeira),
+              realizadoSegundaReuniao: toFiniteNumber(rAgg.segunda),
             };
           }
           return {
@@ -424,7 +421,6 @@ export const useDashboardData = () => {
       const avg = count > 0 ? sum / count : month.ticketRealizado;
 
       const monthReunioes = reunioesEntries.filter(e => e.month === month.month);
-      const hasReuniaoEntries = monthReunioes.length > 0;
       const primeira = monthReunioes.filter(e => e.tipo === 'primeira').reduce((s, e) => s + e.quantidade, 0);
       const segunda = monthReunioes.filter(e => e.tipo === 'segunda').reduce((s, e) => s + e.quantidade, 0);
 
@@ -433,8 +429,8 @@ export const useDashboardData = () => {
         realizadoVendas: count,
         realizadoFaturamento: sum,
         ticketRealizado: avg,
-        realizadoPrimeiraReuniao: hasReuniaoEntries ? primeira : month.realizadoPrimeiraReuniao,
-        realizadoSegundaReuniao: hasReuniaoEntries ? segunda : month.realizadoSegundaReuniao,
+        realizadoPrimeiraReuniao: primeira,
+        realizadoSegundaReuniao: segunda,
       };
     });
   }, [data, unitSalesByMonth, reunioesEntries]);
