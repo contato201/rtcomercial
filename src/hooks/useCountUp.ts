@@ -1,39 +1,65 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * Animates a number from 0 (or current value) to `value` over `duration` ms.
+ * Animates a number from the current display value to `value` over `duration` ms.
  * Uses requestAnimationFrame with an ease-out cubic curve.
+ * Guarantees the final displayed value equals `value` exactly (no float drift).
  */
 export const useCountUp = (value: number, duration = 900): number => {
   const [display, setDisplay] = useState(value);
-  const fromRef = useRef(value);
-  const startRef = useRef<number | null>(null);
+  const displayRef = useRef(value);
   const rafRef = useRef<number | null>(null);
 
+  // Keep a ref of the latest display so we always animate from the current value.
   useEffect(() => {
-    // Respect reduced motion
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    displayRef.current = display;
+  }, [display]);
+
+  useEffect(() => {
+    // Respect reduced motion or invalid values — snap immediately.
+    if (
+      typeof window === 'undefined' ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      !Number.isFinite(value)
+    ) {
       setDisplay(value);
       return;
     }
-    fromRef.current = display;
-    startRef.current = null;
+
+    const from = displayRef.current;
+    if (from === value) {
+      return;
+    }
+
+    let start: number | null = null;
 
     const step = (ts: number) => {
-      if (startRef.current === null) startRef.current = ts;
-      const elapsed = ts - startRef.current;
-      const t = Math.min(elapsed / duration, 1);
+      if (start === null) start = ts;
+      const elapsed = ts - start;
+      const t = elapsed / duration;
+
+      if (t >= 1) {
+        // Snap to the exact target value to avoid floating-point drift.
+        setDisplay(value);
+        rafRef.current = null;
+        return;
+      }
+
       const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
-      const next = fromRef.current + (value - fromRef.current) * eased;
-      setDisplay(next);
-      if (t < 1) rafRef.current = requestAnimationFrame(step);
+      setDisplay(from + (value - from) * eased);
+      rafRef.current = requestAnimationFrame(step);
     };
+
     rafRef.current = requestAnimationFrame(step);
 
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      // Ensure we always end on the latest target if a new animation supersedes us.
+      setDisplay(value);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, duration]);
 
   return display;
