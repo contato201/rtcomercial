@@ -38,6 +38,7 @@ interface ReunioesEditorProps {
   icon?: React.ReactNode;
   entries: ReuniaoEntry[];
   meta: number;
+  realizadoFallback?: number;
   onAdd: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   canEdit: boolean;
@@ -55,6 +56,7 @@ export const ReunioesEditor = ({
   label,
   entries,
   meta,
+  realizadoFallback = 0,
   onAdd,
   onDelete,
   canEdit,
@@ -88,7 +90,8 @@ export const ReunioesEditor = ({
 
   const monthName = MONTHS[selectedMonth];
   const monthEntries = entries.filter(e => e.month === monthName && e.tipo === tipo);
-  const total = monthEntries.reduce((sum, e) => sum + Number(e.quantidade || 0), 0);
+  const totalLancamentos = monthEntries.reduce((sum, e) => sum + Number(e.quantidade || 0), 0);
+  const total = monthEntries.length > 0 ? totalLancamentos : Number(realizadoFallback || 0);
   const progresso = safePercentage(total, meta);
 
   const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
@@ -199,6 +202,7 @@ export const ReunioesEditor = ({
           <div key={s.name} className="bg-muted/40 rounded px-2 py-1 text-center">
             <div className="text-muted-foreground truncate" title={s.name}>{s.name}</div>
             <div className="font-bold">{s.total}</div>
+            <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Realizado</div>
           </div>
         ))}
       </div>
