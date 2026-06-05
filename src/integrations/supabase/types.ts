@@ -302,6 +302,10 @@ export type Database = {
         Args: { new_name: string; old_name: string }
         Returns: number
       }
+      sync_dados_realizados_for_month: {
+        Args: { _month: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
