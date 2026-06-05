@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { clearInvalidAuthStorage } from '@/lib/sessionGuard';
 
 // E-mails autorizados para edição
 const AUTHORIZED_EMAILS = [
@@ -30,7 +31,8 @@ export const useAuth = () => {
         if (error) {
           // Refresh token inválido / expirado — limpa para evitar loops
           console.warn('[useAuth] getSession error, signing out:', error.message);
-          supabase.auth.signOut().catch(() => {});
+          clearInvalidAuthStorage();
+          supabase.auth.signOut({ scope: 'local' }).catch(() => {});
           setSession(null);
           setUser(null);
         } else {
@@ -40,6 +42,7 @@ export const useAuth = () => {
       })
       .catch((err) => {
         console.warn('[useAuth] getSession threw:', err);
+        clearInvalidAuthStorage();
         if (!mounted) return;
         setSession(null);
         setUser(null);
