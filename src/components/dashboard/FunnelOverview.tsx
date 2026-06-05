@@ -34,7 +34,7 @@ const Stage = ({ label, realizado, meta, highlight, formatter = formatNumber, ic
   const width = clampPercentage(pct);
   const delay = `${index * 80}ms`;
   const isCurrency = formatter === formatBRL;
-  const animatedRealizado = useCountUp(isCurrency ? realizado : realizado);
+  const animatedRealizado = useCountUp(realizado, isCurrency ? 0 : 900);
   const displayRealizado = isCurrency ? realizado : Math.round(animatedRealizado);
 
 
