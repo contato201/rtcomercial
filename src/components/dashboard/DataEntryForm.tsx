@@ -10,6 +10,7 @@ import { ReunioesEditor, type ReuniaoEntry } from '@/components/dashboard/Reunio
 import { TaxasPorSdr } from '@/components/dashboard/TaxasPorSdr';
 import { MetasSemanais } from '@/components/dashboard/MetasSemanais';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
+import { businessDaysInMonth, businessDaysRemainingInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
 
 interface DataEntryFormProps {
   selectedMonth: number;
@@ -53,6 +54,12 @@ export const DataEntryForm = ({
   canEdit,
 }: DataEntryFormProps) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const monthName = MONTHS[selectedMonth];
+  const diasUteisMes = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
+  const diasUteisRestantes = businessDaysRemainingInMonth(DASHBOARD_YEAR, selectedMonth);
+  const realizadoAgendamentosMes = agendamentos
+    .filter((a) => a.month === monthName)
+    .reduce((sum, a) => sum + Number(a.quantidade || 0), 0);
 
   const handleInputChange = (field: keyof MonthData, value: string) => {
     if (!canEdit) return;
@@ -82,6 +89,14 @@ export const DataEntryForm = ({
     if (percent >= 70) return { percent, status: 'warning' };
     return { percent, status: 'danger' };
   };
+
+  const pacingRows = [
+    { label: 'Agendamentos', meta: metaAgendamentos, realizado: realizadoAgendamentosMes },
+    { label: '1ª Reuniões', meta: currentData.metaPrimeiraReuniao, realizado: currentData.realizadoPrimeiraReuniao },
+    { label: '2ª Reuniões', meta: currentData.metaSegundaReuniao, realizado: currentData.realizadoSegundaReuniao },
+    { label: 'Vendas', meta: currentData.metaVendas, realizado: currentData.realizadoVendas },
+    { label: 'Faturamento', meta: currentData.metaFaturamento, realizado: currentData.realizadoFaturamento, currency: true },
+  ];
 
   // Grupos de entrada - apenas campos REALIZADOS são editáveis (Vendas movido para seção de Faturamento)
   const inputGroups = [
@@ -197,6 +212,35 @@ export const DataEntryForm = ({
         </div>
       </div>
 
+      <div className="mb-6 rounded-xl border border-border/60 bg-card/70 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Ritmo comercial</p>
+            <h3 className="text-base font-bold text-foreground">{monthName}: {diasUteisRestantes} dias úteis restantes</h3>
+          </div>
+          <Badge variant="outline" className="border-primary/30 text-primary">
+            {diasUteisMes} dias úteis no mês
+          </Badge>
+        </div>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+          {pacingRows.map((row) => {
+            const falta = Math.max(0, row.meta - row.realizado);
+            const ritmo = diasUteisRestantes > 0 ? Math.ceil(falta / diasUteisRestantes) : falta;
+            return (
+              <div key={row.label} className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{row.label}</div>
+                <div className="mt-2 text-sm font-bold text-foreground">
+                  {row.currency ? formatCurrency(row.realizado) : row.realizado} / {row.currency ? formatCurrency(row.meta) : row.meta}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Faltam {row.currency ? formatCurrency(falta) : falta} · ritmo {row.currency ? `${formatCurrency(ritmo)}/dia` : `${ritmo}/dia`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 1. AGENDAMENTOS - Primeiro do funil */}
       <div className="mb-6">
         <AgendamentosEditor
@@ -217,6 +261,7 @@ export const DataEntryForm = ({
           label="1ª Reuniões"
           entries={reunioesEntries}
           meta={currentData.metaPrimeiraReuniao}
+          realizadoFallback={currentData.realizadoPrimeiraReuniao}
           onAdd={onAddReuniaoEntry}
           onDelete={onDeleteReuniaoEntry}
           canEdit={canEdit}
@@ -227,6 +272,7 @@ export const DataEntryForm = ({
           label="2ª Reuniões"
           entries={reunioesEntries}
           meta={currentData.metaSegundaReuniao}
+          realizadoFallback={currentData.realizadoSegundaReuniao}
           onAdd={onAddReuniaoEntry}
           onDelete={onDeleteReuniaoEntry}
           canEdit={canEdit}

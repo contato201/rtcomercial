@@ -8,7 +8,7 @@ import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
+import { businessDaysInMonth, businessDaysRemainingInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
 import { SDR_COUNT, loadSdrNames, saveSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface AgendamentoRow {
@@ -33,6 +33,7 @@ interface SdrSlotProps {
   name: string;
   metaPorPessoa: number;
   metaPorDia: number;
+  diasUteisRestantes: number;
   realizadoHoje: number;
   total: number;
   entries: AgendamentoRow[];
@@ -54,6 +55,7 @@ const SdrSlot = ({
   name,
   metaPorPessoa,
   metaPorDia,
+  diasUteisRestantes,
   realizadoHoje,
   total,
   entries,
@@ -73,6 +75,8 @@ const SdrSlot = ({
 
   const progresso = safePercentage(total, metaPorPessoa);
   const progressoDia = safePercentage(realizadoHoje, metaPorDia);
+  const faltaParaMeta = Math.max(0, metaPorPessoa - total);
+  const metaDiariaRestante = diasUteisRestantes > 0 ? Math.ceil(faltaParaMeta / diasUteisRestantes) : faltaParaMeta;
   const getProgressColor = (p: number) =>
     p >= 100 ? 'bg-green-500' : p >= 70 ? 'bg-yellow-500' : 'bg-red-500';
 
@@ -179,6 +183,21 @@ const SdrSlot = ({
         <span>Hoje: <strong className={realizadoHoje >= metaPorDia ? 'text-green-600' : 'text-destructive'}>{realizadoHoje}</strong></span>
       </div>
 
+      <div className="grid grid-cols-3 gap-1 rounded-lg border border-border/60 bg-muted/20 p-2 text-center text-[10px]">
+        <div>
+          <div className="text-muted-foreground">Faltam</div>
+          <div className="font-bold text-foreground">{faltaParaMeta}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Dias úteis</div>
+          <div className="font-bold text-foreground">{diasUteisRestantes}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Ritmo</div>
+          <div className="font-bold text-primary">{metaDiariaRestante}/dia</div>
+        </div>
+      </div>
+
       {canEdit && (
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -275,6 +294,7 @@ export const AgendamentosEditor = ({
   const progressoGeral = safePercentage(totalGeral, metaAgendamentos);
 
   const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
+  const diasUteisRestantes = businessDaysRemainingInMonth(DASHBOARD_YEAR, selectedMonth);
   const metaPorDia = Math.ceil(metaPorPessoa / Math.max(diasUteis, 1));
   const todayStr = (() => {
     const now = new Date();
@@ -361,6 +381,7 @@ export const AgendamentosEditor = ({
                 name={slot.name}
                 metaPorPessoa={metaPorPessoa}
                 metaPorDia={metaPorDia}
+                diasUteisRestantes={diasUteisRestantes}
                 realizadoHoje={realizadoHoje}
                 total={slot.total}
                 entries={slot.entries}
@@ -378,6 +399,7 @@ export const AgendamentosEditor = ({
         <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 space-y-1">
           <div><strong>Cálculo Mensal:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)} (dividida entre {SDR_COUNT} SDRs)</div>
           <div><strong>Cálculo Diário:</strong> Meta por SDR ({metaPorPessoa}) ÷ {diasUteis} dias úteis em {monthName} = <strong>{metaPorDia}/dia</strong></div>
+          <div><strong>Ritmo Restante:</strong> {diasUteisRestantes} dias úteis até o fim do mês para bater a meta de {monthName}.</div>
         </div>
       </CardContent>
     </Card>

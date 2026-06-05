@@ -6,7 +6,7 @@ import { Plus, Trash2, Users } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
-import { businessDaysInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
+import { businessDaysInMonth, businessDaysRemainingInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
 import { loadSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface ReuniaoEntry {
@@ -38,6 +38,7 @@ interface ReunioesEditorProps {
   icon?: React.ReactNode;
   entries: ReuniaoEntry[];
   meta: number;
+  realizadoFallback?: number;
   onAdd: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   canEdit: boolean;
@@ -55,6 +56,7 @@ export const ReunioesEditor = ({
   label,
   entries,
   meta,
+  realizadoFallback = 0,
   onAdd,
   onDelete,
   canEdit,
@@ -88,11 +90,15 @@ export const ReunioesEditor = ({
 
   const monthName = MONTHS[selectedMonth];
   const monthEntries = entries.filter(e => e.month === monthName && e.tipo === tipo);
-  const total = monthEntries.reduce((sum, e) => sum + Number(e.quantidade || 0), 0);
+  const totalLancamentos = monthEntries.reduce((sum, e) => sum + Number(e.quantidade || 0), 0);
+  const total = monthEntries.length > 0 ? totalLancamentos : Number(realizadoFallback || 0);
   const progresso = safePercentage(total, meta);
 
   const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
+  const diasUteisRestantes = businessDaysRemainingInMonth(DASHBOARD_YEAR, selectedMonth);
+  const faltaParaMeta = Math.max(0, meta - total);
   const metaPorDia = Math.ceil(meta / Math.max(diasUteis, 1));
+  const metaDiariaRestante = diasUteisRestantes > 0 ? Math.ceil(faltaParaMeta / diasUteisRestantes) : faltaParaMeta;
   const todayStr = todayISO();
   const realizadoHoje = monthEntries
     .filter((e) => e.data_lancamento === todayStr)
@@ -158,9 +164,9 @@ export const ReunioesEditor = ({
         </div>
       </div>
 
-      <div className="flex justify-between text-sm">
+      <div className="flex justify-between gap-3 text-sm">
         <span>Meta: {meta}</span>
-        <span className="font-medium">Realizado: {total}</span>
+        <span className="font-bold text-primary">Realizado: {total}</span>
       </div>
 
       <Progress
@@ -176,11 +182,27 @@ export const ReunioesEditor = ({
         <span>Hoje: <strong className={realizadoHoje >= metaPorDia ? 'text-green-600' : 'text-destructive'}>{realizadoHoje}</strong></span>
       </div>
 
+      <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/60 bg-muted/20 p-2 text-center text-[11px]">
+        <div>
+          <div className="text-muted-foreground">Faltam</div>
+          <div className="font-bold text-foreground">{faltaParaMeta}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Dias úteis</div>
+          <div className="font-bold text-foreground">{diasUteisRestantes}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Ritmo</div>
+          <div className="font-bold text-primary">{metaDiariaRestante}/dia</div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-3 gap-1 text-[11px]">
         {totalsPorSdr.map((s) => (
           <div key={s.name} className="bg-muted/40 rounded px-2 py-1 text-center">
             <div className="text-muted-foreground truncate" title={s.name}>{s.name}</div>
             <div className="font-bold">{s.total}</div>
+            <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Realizado</div>
           </div>
         ))}
       </div>
@@ -287,7 +309,7 @@ export const ReunioesEditor = ({
       )}
 
       <div className="text-[10px] text-muted-foreground bg-muted/20 rounded px-2 py-1">
-        {diasUteis} dias úteis em {monthName}
+        {diasUteis} dias úteis no mês · {diasUteisRestantes} até o fim de {monthName}
       </div>
     </div>
   );
