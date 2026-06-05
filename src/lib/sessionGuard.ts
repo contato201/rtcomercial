@@ -1,5 +1,16 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export function clearInvalidAuthStorage() {
+  if (typeof window === 'undefined') return;
+  try {
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith('sb-') && key.endsWith('-auth-token'))
+      .forEach((key) => window.localStorage.removeItem(key));
+  } catch (e) {
+    console.warn('[sessionGuard] failed to clear auth storage:', e);
+  }
+}
+
 /**
  * Garante que o token JWT esteja válido antes de fazer requests ao banco.
  * Se estiver perto de expirar (≤ 60s) ou já expirado, tenta renovar via refresh token.
@@ -19,12 +30,14 @@ export async function ensureFreshSession(): Promise<boolean> {
       const { data, error } = await supabase.auth.refreshSession();
       if (error || !data.session) {
         console.warn('[sessionGuard] refresh failed:', error?.message);
+        clearInvalidAuthStorage();
         return false;
       }
     }
     return true;
   } catch (e) {
     console.warn('[sessionGuard] error:', e);
+    clearInvalidAuthStorage();
     return false;
   }
 }
