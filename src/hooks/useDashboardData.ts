@@ -82,6 +82,7 @@ export const useDashboardData = () => {
   const [selectedQuarter, setSelectedQuarter] = useState<QuarterType>('Q1');
   const [isLoading, setIsLoading] = useState(true);
   const lastLoadAtRef = useRef(0);
+  const loadRequestIdRef = useRef(0);
 
   const handlePersistenceError = useCallback((context: string, error: unknown) => {
     console.error(context, error);
@@ -92,9 +93,10 @@ export const useDashboardData = () => {
   }, []);
 
   const loadFromDatabase = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current;
     try {
       lastLoadAtRef.current = Date.now();
-      // Garante token válido antes de buscar (evita listas vazias por JWT expirado)
+      // Limpa sessão quebrada quando existir, mas não bloqueia leituras públicas do dashboard.
       await ensureFreshSession();
 
       const runQueries = () => Promise.all([
@@ -123,6 +125,8 @@ export const useDashboardData = () => {
       if (unitError) { handlePersistenceError('Erro ao carregar vendas unitárias:', unitError); return; }
       if (agendamentosError) { handlePersistenceError('Erro ao carregar agendamentos:', agendamentosError); return; }
       if (reunioesError) { handlePersistenceError('Erro ao carregar reuniões:', reunioesError); return; }
+
+      if (requestId !== loadRequestIdRef.current) return;
 
 
 
@@ -218,7 +222,7 @@ export const useDashboardData = () => {
     } catch (e) {
       handlePersistenceError('Erro ao carregar dados:', e);
     } finally {
-      setIsLoading(false);
+      if (requestId === loadRequestIdRef.current) setIsLoading(false);
     }
   }, [handlePersistenceError]);
 
