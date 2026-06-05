@@ -198,11 +198,11 @@ export const useDashboardData = () => {
           if (dbMonth) {
             return {
               ...month,
-              realizadoVendas: toFiniteNumber(agg.count),
-              realizadoFaturamento: toFiniteNumber(agg.sum),
+              realizadoVendas: agg.count > 0 ? toFiniteNumber(agg.count) : toFiniteNumber(dbMonth.realizado_vendas),
+              realizadoFaturamento: agg.count > 0 ? toFiniteNumber(agg.sum) : toFiniteNumber(dbMonth.realizado_faturamento),
               ticketRealizado: agg.count > 0 ? toFiniteNumber(agg.avg) : (toFiniteNumber(dbMonth.ticket_realizado) || VALOR_POR_VENDA),
-              realizadoPrimeiraReuniao: toFiniteNumber(rAgg.primeira),
-              realizadoSegundaReuniao: toFiniteNumber(rAgg.segunda),
+              realizadoPrimeiraReuniao: rAgg.primeira > 0 ? toFiniteNumber(rAgg.primeira) : toFiniteNumber(dbMonth.realizado_primeira_reuniao),
+              realizadoSegundaReuniao: rAgg.segunda > 0 ? toFiniteNumber(rAgg.segunda) : toFiniteNumber(dbMonth.realizado_segunda_reuniao),
             };
           }
           return {
@@ -421,16 +421,18 @@ export const useDashboardData = () => {
       const avg = count > 0 ? sum / count : month.ticketRealizado;
 
       const monthReunioes = reunioesEntries.filter(e => e.month === month.month);
-      const primeira = monthReunioes.filter(e => e.tipo === 'primeira').reduce((s, e) => s + e.quantidade, 0);
-      const segunda = monthReunioes.filter(e => e.tipo === 'segunda').reduce((s, e) => s + e.quantidade, 0);
+      const primeiraEntries = monthReunioes.filter(e => e.tipo === 'primeira');
+      const segundaEntries = monthReunioes.filter(e => e.tipo === 'segunda');
+      const primeira = primeiraEntries.reduce((s, e) => s + e.quantidade, 0);
+      const segunda = segundaEntries.reduce((s, e) => s + e.quantidade, 0);
 
       return {
         ...month,
-        realizadoVendas: count,
-        realizadoFaturamento: sum,
+        realizadoVendas: count > 0 ? count : month.realizadoVendas,
+        realizadoFaturamento: count > 0 ? sum : month.realizadoFaturamento,
         ticketRealizado: avg,
-        realizadoPrimeiraReuniao: primeira,
-        realizadoSegundaReuniao: segunda,
+        realizadoPrimeiraReuniao: primeiraEntries.length > 0 ? primeira : month.realizadoPrimeiraReuniao,
+        realizadoSegundaReuniao: segundaEntries.length > 0 ? segunda : month.realizadoSegundaReuniao,
       };
     });
   }, [data, unitSalesByMonth, reunioesEntries]);
