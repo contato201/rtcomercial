@@ -19,6 +19,7 @@ export const useCountUp = (value: number, duration = 900): number => {
     // Respect reduced motion or invalid values — snap immediately.
     if (
       typeof window === 'undefined' ||
+      duration <= 0 ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
       !Number.isFinite(value)
     ) {
