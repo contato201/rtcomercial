@@ -11,4 +11,30 @@ export const businessDaysInMonth = (year: number, monthIndex: number): number =>
   return count;
 };
 
+export const isBusinessDay = (date: Date): boolean => {
+  const dow = date.getDay();
+  return dow !== 0 && dow !== 6;
+};
+
+export const businessDaysRemainingInMonth = (
+  year: number,
+  monthIndex: number,
+  fromDate: Date = new Date(),
+): number => {
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+  const today = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  const start = today < monthStart ? monthStart : today;
+
+  if (start > monthEnd) return 0;
+
+  let count = 0;
+  const cursor = new Date(start);
+  while (cursor <= monthEnd) {
+    if (isBusinessDay(cursor)) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+};
+
 export const DASHBOARD_YEAR = 2026;
