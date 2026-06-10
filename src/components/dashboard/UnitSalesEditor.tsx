@@ -110,6 +110,9 @@ export const UnitSalesEditor = ({
       setNewValue("");
       setNewCliente("");
       setNewPessoa("");
+    } catch (error) {
+      console.error("Erro ao adicionar venda:", error);
+      setFormError("Venda não salva. Faça login novamente com o email autorizado e tente de novo.");
     } finally {
       setIsAdding(false);
     }
@@ -145,6 +148,9 @@ export const UnitSalesEditor = ({
       setEditError(null);
       await onUpdate(id, parsed.data, editingCliente.trim(), editingPessoa.trim());
       cancelEdit();
+    } catch (error) {
+      console.error("Erro ao atualizar venda:", error);
+      setEditError("Venda não atualizada. Faça login novamente com o email autorizado.");
     } finally {
       setBusyId(null);
     }
