@@ -491,6 +491,7 @@ export const useDashboardData = () => {
   const resetData = useCallback(async () => {
     const initial = createInitialData();
     try {
+      await requireFreshEditorSession();
       const { error: salesError } = await supabase.from('vendas_unitarias').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (salesError) throw salesError;
       const { error: reunioesError } = await supabase.from('reunioes_entries' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -510,7 +511,7 @@ export const useDashboardData = () => {
       handlePersistenceError('Erro ao resetar dados:', e);
       loadFromDatabase();
     }
-  }, [handlePersistenceError, loadFromDatabase]);
+  }, [handlePersistenceError, loadFromDatabase, requireFreshEditorSession]);
 
   // Agendamentos
   const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => {
@@ -519,6 +520,7 @@ export const useDashboardData = () => {
     const p = pessoaSchema.safeParse(pessoa);
     const q = quantidadeSchema.safeParse(quantidade);
     if (!m.success || !p.success || !q.success) return;
+    await requireFreshEditorSession();
     const payload: any = { month: m.data, pessoa: p.data, quantidade: q.data };
     if (dataLancamento) payload.data_lancamento = dataLancamento;
     const { data: inserted, error } = await supabase.from('agendamentos' as any).insert(payload).select('*').single();
@@ -528,13 +530,14 @@ export const useDashboardData = () => {
       quantidade: (inserted as any).quantidade, data_lancamento: (inserted as any).data_lancamento, created_at: (inserted as any).created_at,
     };
     setAgendamentos((prev) => [newRow, ...prev]);
-  }, [handlePersistenceError]);
+  }, [handlePersistenceError, requireFreshEditorSession]);
 
   const deleteAgendamento = useCallback(async (id: string) => {
+    await requireFreshEditorSession();
     const { error } = await supabase.from('agendamentos' as any).delete().eq('id', id);
     if (error) { handlePersistenceError('Erro ao excluir agendamento:', error); throw error; }
     setAgendamentos((prev) => prev.filter((a) => a.id !== id));
-  }, [handlePersistenceError]);
+  }, [handlePersistenceError, requireFreshEditorSession]);
 
   // Reuniões entries
   const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string) => {
@@ -543,6 +546,8 @@ export const useDashboardData = () => {
     const t = tipoReuniaoSchema.safeParse(tipo);
     const q = quantidadeSchema.safeParse(quantidade);
     if (!m.success || !t.success || !q.success) return;
+
+    await requireFreshEditorSession();
 
     const payload: any = { month: m.data, tipo: t.data, quantidade: q.data, pessoa: (pessoa ?? '').trim() };
     if (dataLancamento) payload.data_lancamento = dataLancamento;
@@ -588,9 +593,10 @@ export const useDashboardData = () => {
 
       return updated;
     });
-  }, [handlePersistenceError]);
+  }, [handlePersistenceError, requireFreshEditorSession]);
 
   const deleteReuniaoEntry = useCallback(async (id: string) => {
+    await requireFreshEditorSession();
     // Read entry from current state to avoid stale closure
     let entry: ReuniaoEntryRow | undefined;
     setReunioesEntries((prev) => {
@@ -626,7 +632,7 @@ export const useDashboardData = () => {
         return updated;
       });
     }
-  }, [handlePersistenceError]);
+  }, [handlePersistenceError, requireFreshEditorSession]);
 
   const getMetaAgendamentos = useCallback((monthIndex: number) => {
     const monthData = data[monthIndex];
