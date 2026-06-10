@@ -92,6 +92,11 @@ export const useDashboardData = () => {
     });
   }, []);
 
+  const requireFreshEditorSession = useCallback(async () => {
+    const ok = await ensureFreshSession();
+    if (!ok) throw new Error('Sessão expirada ou inválida. Faça login novamente antes de salvar.');
+  }, []);
+
   const loadFromDatabase = useCallback(async () => {
     const requestId = ++loadRequestIdRef.current;
     try {
@@ -302,6 +307,13 @@ export const useDashboardData = () => {
     // (they are now managed via incremental entries)
     if (Object.keys(sanitizedUpdates).length === 0) return;
 
+    try {
+      await requireFreshEditorSession();
+    } catch (error) {
+      handlePersistenceError('Sessão inválida ao salvar dados:', error);
+      return;
+    }
+
     setData(prevData => {
       const newData = [...prevData];
       newData[monthIndex] = { ...newData[monthIndex], ...sanitizedUpdates };
@@ -329,13 +341,15 @@ export const useDashboardData = () => {
       handlePersistenceError('Erro ao salvar dados:', error);
       loadFromDatabase();
     }
-  }, [data, saveToHistory, handlePersistenceError, loadFromDatabase]);
+  }, [data, saveToHistory, handlePersistenceError, loadFromDatabase, requireFreshEditorSession]);
 
   const addUnitSale = useCallback(async (monthIndex: number, valor: number, cliente: string = '', pessoa: string = '') => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const v = valorSchema.safeParse(valor);
     if (!m.success || !v.success) return;
+
+    await requireFreshEditorSession();
 
     const { data: inserted, error } = await supabase
       .from('vendas_unitarias')
@@ -358,11 +372,13 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(m.data, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError, requireFreshEditorSession]);
 
   const updateUnitSale = useCallback(async (id: string, valor: number, cliente: string = '', pessoa: string = '') => {
     const v = valorSchema.safeParse(valor);
     if (!v.success) return;
+
+    await requireFreshEditorSession();
 
     const { data: updated, error } = await supabase
       .from('vendas_unitarias')
@@ -390,9 +406,10 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(monthName, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError, requireFreshEditorSession]);
 
   const deleteUnitSale = useCallback(async (id: string) => {
+    await requireFreshEditorSession();
     const { data: deleted, error } = await supabase.from('vendas_unitarias').delete().eq('id', id).select('*').maybeSingle();
     if (error) { handlePersistenceError('Erro ao excluir venda unitária:', error); throw error; }
     if (!deleted) return;
@@ -404,7 +421,7 @@ export const useDashboardData = () => {
       applyUnitSalesAggregateToMonth(monthName, list);
       return next;
     });
-  }, [applyUnitSalesAggregateToMonth, handlePersistenceError]);
+  }, [applyUnitSalesAggregateToMonth, handlePersistenceError, requireFreshEditorSession]);
 
   const revertToValue = useCallback(async (month: string, field: string, value: number) => {
     const monthIndex = MONTHS.indexOf(month);
