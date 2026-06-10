@@ -94,8 +94,12 @@ export const useDashboardData = () => {
 
   const requireFreshEditorSession = useCallback(async () => {
     const ok = await ensureFreshSession();
-    if (!ok) throw new Error('Sessão expirada ou inválida. Faça login novamente antes de salvar.');
-  }, []);
+    if (!ok) {
+      const error = new Error('Sessão expirada ou inválida. Faça login novamente antes de salvar.');
+      handlePersistenceError('Sessão inválida ao salvar:', error);
+      throw error;
+    }
+  }, [handlePersistenceError]);
 
   const loadFromDatabase = useCallback(async () => {
     const requestId = ++loadRequestIdRef.current;
@@ -309,8 +313,7 @@ export const useDashboardData = () => {
 
     try {
       await requireFreshEditorSession();
-    } catch (error) {
-      handlePersistenceError('Sessão inválida ao salvar dados:', error);
+    } catch {
       return;
     }
 
