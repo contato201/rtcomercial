@@ -110,6 +110,9 @@ export const UnitSalesEditor = ({
       setNewValue("");
       setNewCliente("");
       setNewPessoa("");
+    } catch (error) {
+      console.error("Erro ao adicionar venda:", error);
+      setFormError("Venda não salva. Faça login novamente com o email autorizado e tente de novo.");
     } finally {
       setIsAdding(false);
     }
@@ -145,6 +148,9 @@ export const UnitSalesEditor = ({
       setEditError(null);
       await onUpdate(id, parsed.data, editingCliente.trim(), editingPessoa.trim());
       cancelEdit();
+    } catch (error) {
+      console.error("Erro ao atualizar venda:", error);
+      setEditError("Venda não atualizada. Faça login novamente com o email autorizado.");
     } finally {
       setBusyId(null);
     }
@@ -154,7 +160,11 @@ export const UnitSalesEditor = ({
     if (!canEdit) return;
     try {
       setBusyId(id);
+      setEditError(null);
       await onDelete(id);
+    } catch (error) {
+      console.error("Erro ao excluir venda:", error);
+      setEditError("Venda não excluída. Faça login novamente com o email autorizado.");
     } finally {
       setBusyId(null);
     }
@@ -255,24 +265,24 @@ export const UnitSalesEditor = ({
               <div key={sale.id} className="space-y-1">
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      Venda #{idx + 1}: {formatCurrency(Number(sale.valor || 0))}
+                    <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+                      <span>Venda #{idx + 1}: {formatCurrency(Number(sale.valor || 0))}</span>
                       {sale.cliente && (
-                        <span className="ml-2 text-muted-foreground font-normal">
-                          <User className="w-3 h-3 inline mr-1" />
-                          {sale.cliente}
+                        <span className="inline-flex min-w-0 items-center text-muted-foreground font-normal">
+                          <User className="w-3 h-3 mr-1 shrink-0" />
+                          <span className="truncate">{sale.cliente}</span>
                         </span>
                       )}
                       {sale.pessoa ? (
-                        <Badge variant="outline" className="ml-2 text-xs">
+                        <Badge variant="outline" className="text-xs">
                           SDR: {sale.pessoa}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="ml-2 text-xs opacity-70">
+                        <Badge variant="secondary" className="text-xs opacity-70">
                           Sem SDR
                         </Badge>
                       )}
-                    </p>
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {sale.created_at ? `Criada em ${formatDate(sale.created_at)}` : ""}
                     </p>

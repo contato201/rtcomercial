@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import type { AgendamentoRow } from './AgendamentosEditor';
 import type { ReuniaoEntry } from './ReunioesEditor';
 import type { UnitSale } from './UnitSalesEditor';
+import { DASHBOARD_YEAR } from '@/lib/businessDays';
 
 interface MetasSemanaisProps {
   selectedMonth: number;
@@ -78,15 +79,14 @@ export const MetasSemanais = ({
   unitSales,
 }: MetasSemanaisProps) => {
   const monthName = MONTHS[selectedMonth];
-  const year = new Date().getFullYear();
 
-  const weeks = useMemo(() => buildMonthWeeks(year, selectedMonth), [year, selectedMonth]);
+  const weeks = useMemo(() => buildMonthWeeks(DASHBOARD_YEAR, selectedMonth), [selectedMonth]);
   const weeksInMonth = weeks.length;
 
   const isCurrentMonth = useMemo(() => {
     const now = new Date();
-    return now.getMonth() === selectedMonth && now.getFullYear() === year;
-  }, [selectedMonth, year]);
+    return now.getMonth() === selectedMonth && now.getFullYear() === DASHBOARD_YEAR;
+  }, [selectedMonth]);
 
   const defaultWeekIndex = useMemo(() => {
     const now = new Date();

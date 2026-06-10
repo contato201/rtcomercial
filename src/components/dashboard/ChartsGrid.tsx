@@ -6,6 +6,7 @@ import type { AgendamentoRow } from '@/hooks/useDashboardData';
 import type { ReuniaoEntry } from './ReunioesEditor';
 import type { UnitSale } from './UnitSalesEditor';
 import { CalendarRange } from 'lucide-react';
+import { DASHBOARD_YEAR } from '@/lib/businessDays';
 
 interface ChartsGridProps {
   filteredData: MonthData[];
@@ -69,10 +70,9 @@ export const ChartsGrid = ({
   unitSales = [],
   isLoading = false,
 }: ChartsGridProps) => {
-  const year = new Date().getFullYear();
   const weeks = useMemo(
-    () => (filterType === 'month' ? buildMonthWeeks(year, selectedMonth) : []),
-    [filterType, selectedMonth, year]
+    () => (filterType === 'month' ? buildMonthWeeks(DASHBOARD_YEAR, selectedMonth) : []),
+    [filterType, selectedMonth]
   );
 
   // 0 = mês inteiro; >0 = semana específica
