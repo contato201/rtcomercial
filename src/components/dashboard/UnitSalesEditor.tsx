@@ -160,7 +160,11 @@ export const UnitSalesEditor = ({
     if (!canEdit) return;
     try {
       setBusyId(id);
+      setEditError(null);
       await onDelete(id);
+    } catch (error) {
+      console.error("Erro ao excluir venda:", error);
+      setEditError("Venda não excluída. Faça login novamente com o email autorizado.");
     } finally {
       setBusyId(null);
     }
