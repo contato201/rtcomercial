@@ -6,6 +6,7 @@ import type { AgendamentoRow } from './AgendamentosEditor';
 import type { ReuniaoEntry } from './ReunioesEditor';
 import type { UnitSale } from './UnitSalesEditor';
 import { DASHBOARD_YEAR } from '@/lib/businessDays';
+import { fetchSdrNamesFromDb, loadSdrNames, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 interface MetasSemanaisProps {
   selectedMonth: number;
@@ -94,18 +95,35 @@ export const MetasSemanais = ({
   }, [weeks, isCurrentMonth]);
 
   const [selectedWeek, setSelectedWeek] = useState<number>(defaultWeekIndex);
+  const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
   // If the month changes, reset to default week for that month
   useEffect(() => {
     setSelectedWeek(defaultWeekIndex);
   }, [defaultWeekIndex]);
 
+  useEffect(() => {
+    const apply = (names: SdrNames) => setSdrNames(names);
+    fetchSdrNamesFromDb().then(apply);
+    const refresh = () => apply(loadSdrNames());
+    window.addEventListener('sdr-names-updated', refresh);
+    const unsub = subscribeSdrNames(apply);
+    return () => {
+      window.removeEventListener('sdr-names-updated', refresh);
+      unsub();
+    };
+  }, []);
+
   const currentWeek = weeks.find((w) => w.index === selectedWeek) ?? weeks[0];
   const weekStart = currentWeek.start;
   const weekEnd = currentWeek.end;
 
-  const inSelectedWeek = (dateStr: string) => {
+  const isDateInWeek = (dateStr: string, week: (typeof weeks)[number]) => {
     const d = parseLocalDate(dateStr).getTime();
-    return d >= weekStart.getTime() && d <= weekEnd.getTime();
+    return d >= week.start.getTime() && d <= week.end.getTime();
+  };
+
+  const inSelectedWeek = (dateStr: string) => {
+    return isDateInWeek(dateStr, currentWeek);
   };
   const inSelectedWeekIso = (iso: string) => {
     const d = new Date(iso);
@@ -113,9 +131,25 @@ export const MetasSemanais = ({
     return local >= weekStart.getTime() && local <= weekEnd.getTime();
   };
 
-  const agendMonth = agendamentos.filter((a) => a.month === monthName);
-  const reunMonth = reunioesEntries.filter((r) => r.month === monthName);
+  const agendMonth = useMemo(() => agendamentos.filter((a) => a.month === monthName), [agendamentos, monthName]);
+  const reunMonth = useMemo(() => reunioesEntries.filter((r) => r.month === monthName), [reunioesEntries, monthName]);
   const vendasMonth = unitSales;
+
+  const agendamentosPorSdrSemana = useMemo(() => {
+    const nomesDoMes = agendMonth.map((a) => String(a.pessoa || '').trim()).filter(Boolean);
+    const pessoas = Array.from(new Set([...sdrNames, ...nomesDoMes]));
+
+    return pessoas.map((pessoa) => {
+      const weekTotals = weeks.map((week) => agendMonth
+        .filter((a) => String(a.pessoa || '').trim() === pessoa && isDateInWeek(a.data_lancamento, week))
+        .reduce((s, a) => s + Number(a.quantidade || 0), 0));
+      return {
+        pessoa,
+        weekTotals,
+        total: weekTotals.reduce((s, value) => s + value, 0),
+      };
+    });
+  }, [agendMonth, sdrNames, weeks]);
 
   // Realizado da SEMANA SELECIONADA
   const realAgendSemana = agendMonth.filter((a) => inSelectedWeek(a.data_lancamento)).reduce((s, a) => s + a.quantidade, 0);
@@ -264,6 +298,46 @@ export const MetasSemanais = ({
       <p className="text-xs text-muted-foreground mt-3">
         💡 Meta semana = Meta do mês ÷ {weeksInMonth} semanas. Realizado = lançamentos com data dentro da semana selecionada (segunda a domingo).
       </p>
+
+      <div className="mt-5 rounded-xl border border-border/60 bg-muted/20 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="text-sm font-bold text-foreground">Agendamentos por SDR na semana</h4>
+            <p className="text-xs text-muted-foreground">{monthName} · {formatRange(weekStart, weekEnd)}</p>
+          </div>
+          <span className="rounded-md border border-border bg-card px-2 py-1 text-xs font-semibold text-foreground">
+            Total semana: {realAgendSemana}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="py-2 pr-3 font-medium">SDR</th>
+                {weeks.map((week) => (
+                  <th key={week.index} className={`px-2 py-2 text-center font-medium ${week.index === selectedWeek ? 'text-primary' : ''}`}>
+                    Sem {week.index}
+                  </th>
+                ))}
+                <th className="py-2 pl-3 text-right font-medium">Mês</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agendamentosPorSdrSemana.map((row) => (
+                <tr key={row.pessoa} className="border-b border-border/50 last:border-0">
+                  <td className="py-2.5 pr-3 font-semibold text-foreground">{row.pessoa}</td>
+                  {row.weekTotals.map((value, index) => (
+                    <td key={`${row.pessoa}-${index}`} className={`px-2 py-2.5 text-center font-bold ${index + 1 === selectedWeek ? 'rounded-md bg-primary/10 text-primary' : 'text-foreground'}`}>
+                      {value}
+                    </td>
+                  ))}
+                  <td className="py-2.5 pl-3 text-right font-bold text-foreground">{row.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Gráfico */}
       <div className="mt-6 pt-5 border-t border-border">
