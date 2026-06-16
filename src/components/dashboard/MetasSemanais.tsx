@@ -68,6 +68,102 @@ const getCurrentWeekIndex = (weeks: ReturnType<typeof buildMonthWeeks>, ref: Dat
   return 1;
 };
 
+type WeekInfo = { index: number; start: Date; end: Date; label: string };
+type SdrMetricOption = { key: string; label: string; isCurrency?: boolean };
+type SdrRow = { pessoa: string; weekTotals: number[]; total: number };
+
+const SdrWeeklyBreakdown = ({
+  monthName,
+  rangeLabel,
+  weeks,
+  selectedWeek,
+  options,
+  buildRows,
+}: {
+  monthName: string;
+  rangeLabel: string;
+  weeks: WeekInfo[];
+  selectedWeek: number;
+  options: SdrMetricOption[];
+  buildRows: (key: any) => SdrRow[];
+}) => {
+  const [metric, setMetric] = useState<string>(options[0]?.key ?? 'agendamentos');
+  const opt = options.find((o) => o.key === metric) ?? options[0];
+  const rows = useMemo(() => buildRows(metric), [buildRows, metric]);
+  const totalsPorSemana = useMemo(
+    () => weeks.map((_, i) => rows.reduce((s, r) => s + (r.weekTotals[i] || 0), 0)),
+    [rows, weeks],
+  );
+  const totalMes = totalsPorSemana.reduce((s, v) => s + v, 0);
+  const fmt = (v: number) => (opt?.isCurrency ? formatBRL(v) : String(v));
+
+  return (
+    <div className="mt-5 rounded-xl border border-border/60 bg-muted/20 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h4 className="text-sm font-bold text-foreground">{opt?.label} por SDR na semana</h4>
+          <p className="text-xs text-muted-foreground">{monthName} · {rangeLabel}</p>
+        </div>
+        <span className="rounded-md border border-border bg-card px-2 py-1 text-xs font-semibold text-foreground">
+          Total semana: {fmt(totalsPorSemana[selectedWeek - 1] ?? 0)}
+        </span>
+      </div>
+      <div className="mb-3 flex flex-wrap gap-1">
+        {options.map((o) => (
+          <button
+            key={o.key}
+            onClick={() => setMetric(o.key)}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+              metric === o.key
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <th className="py-2 pr-3 font-medium">SDR</th>
+              {weeks.map((week) => (
+                <th key={week.index} className={`px-2 py-2 text-center font-medium ${week.index === selectedWeek ? 'text-primary' : ''}`}>
+                  Sem {week.index}
+                </th>
+              ))}
+              <th className="py-2 pl-3 text-right font-medium">Mês</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.pessoa} className="border-b border-border/50 last:border-0">
+                <td className="py-2.5 pr-3 font-semibold text-foreground">{row.pessoa}</td>
+                {row.weekTotals.map((value, index) => (
+                  <td key={`${row.pessoa}-${index}`} className={`px-2 py-2.5 text-center font-bold ${index + 1 === selectedWeek ? 'rounded-md bg-primary/10 text-primary' : 'text-foreground'}`}>
+                    {fmt(value)}
+                  </td>
+                ))}
+                <td className="py-2.5 pl-3 text-right font-bold text-foreground">{fmt(row.total)}</td>
+              </tr>
+            ))}
+            <tr className="bg-accent/40 font-bold">
+              <td className="py-2.5 pr-3">Total</td>
+              {totalsPorSemana.map((value, index) => (
+                <td key={`total-${index}`} className={`px-2 py-2.5 text-center ${index + 1 === selectedWeek ? 'text-primary' : 'text-foreground'}`}>
+                  {fmt(value)}
+                </td>
+              ))}
+              <td className="py-2.5 pl-3 text-right">{fmt(totalMes)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 export const MetasSemanais = ({
   selectedMonth,
   metaAgendamentos,
