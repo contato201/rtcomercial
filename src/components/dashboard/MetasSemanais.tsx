@@ -135,21 +135,51 @@ export const MetasSemanais = ({
   const reunMonth = useMemo(() => reunioesEntries.filter((r) => r.month === monthName), [reunioesEntries, monthName]);
   const vendasMonth = unitSales;
 
-  const agendamentosPorSdrSemana = useMemo(() => {
-    const nomesDoMes = agendMonth.map((a) => String(a.pessoa || '').trim()).filter(Boolean);
-    const pessoas = Array.from(new Set([...sdrNames, ...nomesDoMes]));
+  type SdrMetricKey = 'agendamentos' | 'primeira' | 'segunda' | 'vendas' | 'faturamento';
+  const sdrMetricOptions: { key: SdrMetricKey; label: string; isCurrency?: boolean }[] = [
+    { key: 'agendamentos', label: 'Agendamentos' },
+    { key: 'primeira', label: '1ª Reuniões' },
+    { key: 'segunda', label: '2ª Reuniões' },
+    { key: 'vendas', label: 'Vendas' },
+    { key: 'faturamento', label: 'Faturamento', isCurrency: true },
+  ];
 
-    return pessoas.map((pessoa) => {
-      const weekTotals = weeks.map((week) => agendMonth
-        .filter((a) => String(a.pessoa || '').trim() === pessoa && isDateInWeek(a.data_lancamento, week))
-        .reduce((s, a) => s + Number(a.quantidade || 0), 0));
-      return {
-        pessoa,
-        weekTotals,
-        total: weekTotals.reduce((s, value) => s + value, 0),
-      };
+  const pessoasUniverso = useMemo(() => {
+    const nomes = [
+      ...agendMonth.map((a) => String(a.pessoa || '').trim()),
+      ...reunMonth.map((r) => String(r.pessoa || '').trim()),
+      ...vendasMonth.map((v) => String((v as any).pessoa || '').trim()),
+    ].filter(Boolean);
+    return Array.from(new Set([...sdrNames, ...nomes]));
+  }, [agendMonth, reunMonth, vendasMonth, sdrNames]);
+
+  const isoInWeek = (iso: string, week: (typeof weeks)[number]) => {
+    const d = new Date(iso);
+    const local = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    return local >= week.start.getTime() && local <= week.end.getTime();
+  };
+
+  const buildSdrRows = (metric: SdrMetricKey) => pessoasUniverso.map((pessoa) => {
+    const weekTotals = weeks.map((week) => {
+      if (metric === 'agendamentos') {
+        return agendMonth
+          .filter((a) => String(a.pessoa || '').trim() === pessoa && isDateInWeek(a.data_lancamento, week))
+          .reduce((s, a) => s + Number(a.quantidade || 0), 0);
+      }
+      if (metric === 'primeira' || metric === 'segunda') {
+        return reunMonth
+          .filter((r) => String(r.pessoa || '').trim() === pessoa && r.tipo === metric && isDateInWeek(r.data_lancamento, week))
+          .reduce((s, r) => s + Number(r.quantidade || 0), 0);
+      }
+      if (metric === 'vendas') {
+        return vendasMonth.filter((v) => String((v as any).pessoa || '').trim() === pessoa && isoInWeek(v.created_at, week)).length;
+      }
+      return vendasMonth
+        .filter((v) => String((v as any).pessoa || '').trim() === pessoa && isoInWeek(v.created_at, week))
+        .reduce((s, v) => s + Number(v.valor || 0), 0);
     });
-  }, [agendMonth, sdrNames, weeks]);
+    return { pessoa, weekTotals, total: weekTotals.reduce((s, v) => s + v, 0) };
+  });
 
   // Realizado da SEMANA SELECIONADA
   const realAgendSemana = agendMonth.filter((a) => inSelectedWeek(a.data_lancamento)).reduce((s, a) => s + a.quantidade, 0);
