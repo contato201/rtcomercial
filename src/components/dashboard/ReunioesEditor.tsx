@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, Users } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Trash2, User, Users, Pencil, Check, X } from 'lucide-react';
 import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { businessDaysInMonth, businessDaysRemainingInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
-import { loadSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
+import { SDR_COUNT, loadSdrNames, saveSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface ReuniaoEntry {
   id: string;
@@ -39,7 +42,15 @@ interface ReunioesEditorProps {
   entries: ReuniaoEntry[];
   meta: number;
   realizadoFallback?: number;
-  onAdd: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string) => Promise<void>;
+  onAdd: (
+    monthIndex: number,
+    tipo: 'primeira' | 'segunda',
+    quantidade: number,
+    dataLancamento?: string,
+    pessoa?: string,
+    leadNome?: string,
+    origem?: string,
+  ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   canEdit: boolean;
 }
@@ -50,70 +61,56 @@ const todayISO = () => {
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 };
 
-export const ReunioesEditor = ({
-  selectedMonth,
-  tipo,
-  label,
+const formatDate = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  return new Date(y, m - 1, d).toLocaleDateString('pt-BR');
+};
+
+interface SdrSlotProps {
+  name: string;
+  metaPorPessoa: number;
+  metaPorDia: number;
+  diasUteisRestantes: number;
+  realizadoHoje: number;
+  total: number;
+  entries: ReuniaoEntry[];
+  canEdit: boolean;
+  onAdd: (pessoa: string, qtd: number, dataLancamento: string, leadNome: string, origem: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onRename: (newName: string) => Promise<void>;
+  iconColor?: string;
+}
+
+const SdrSlot = ({
+  name,
+  metaPorPessoa,
+  metaPorDia,
+  diasUteisRestantes,
+  realizadoHoje,
+  total,
   entries,
-  meta,
-  realizadoFallback = 0,
+  canEdit,
   onAdd,
   onDelete,
-  canEdit,
-}: ReunioesEditorProps) => {
-  const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
-  const [pessoa, setPessoa] = useState<string>(() => loadSdrNames()[0]);
+  onRename,
+  iconColor = 'text-primary',
+}: SdrSlotProps) => {
   const [quantidade, setQuantidade] = useState('');
+  const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [leadNome, setLeadNome] = useState('');
   const [origem, setOrigem] = useState<string>('');
-  const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(name);
+  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const apply = (names: SdrNames) => {
-      setSdrNames(names);
-      setPessoa((p) => (names.includes(p) ? p : names[0]));
-    };
-    fetchSdrNamesFromDb().then(apply);
-    const refresh = () => apply(loadSdrNames());
-    const onStorage = (e: StorageEvent) => { if (e.key === 'sdr_names_v2') refresh(); };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('sdr-names-updated', refresh);
-    const unsub = subscribeSdrNames(apply);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('sdr-names-updated', refresh);
-      unsub();
-    };
-  }, []);
-
-  const monthName = MONTHS[selectedMonth];
-  const monthEntries = entries.filter(e => e.month === monthName && e.tipo === tipo);
-  const totalLancamentos = monthEntries.reduce((sum, e) => sum + Number(e.quantidade || 0), 0);
-  const total = monthEntries.length > 0 ? totalLancamentos : Number(realizadoFallback || 0);
-  const progresso = safePercentage(total, meta);
-
-  const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
-  const diasUteisRestantes = businessDaysRemainingInMonth(DASHBOARD_YEAR, selectedMonth);
-  const faltaParaMeta = Math.max(0, meta - total);
-  const metaPorDia = Math.ceil(meta / Math.max(diasUteis, 1));
+  const progresso = safePercentage(total, metaPorPessoa);
+  const faltaParaMeta = Math.max(0, metaPorPessoa - total);
   const metaDiariaRestante = diasUteisRestantes > 0 ? Math.ceil(faltaParaMeta / diasUteisRestantes) : faltaParaMeta;
-  const todayStr = todayISO();
-  const realizadoHoje = monthEntries
-    .filter((e) => e.data_lancamento === todayStr)
-    .reduce((s, e) => s + Number(e.quantidade || 0), 0);
-
-  const totalsPorSdr = sdrNames.map((name) => ({
-    name,
-    total: monthEntries.filter((e) => e.pessoa === name).reduce((s, e) => s + Number(e.quantidade || 0), 0),
-  }));
-
-  const getProgressColor = (progress: number) => {
-    if (progress >= 100) return 'bg-green-500';
-    if (progress >= 70) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
+  const getProgressColor = (p: number) =>
+    p >= 100 ? 'bg-green-500' : p >= 70 ? 'bg-yellow-500' : 'bg-red-500';
 
   const handleAdd = async () => {
     const qtd = parseInt(quantidade, 10);
@@ -125,14 +122,10 @@ export const ReunioesEditor = ({
       setError('Selecione a data');
       return;
     }
-    if (!pessoa) {
-      setError('Selecione o SDR');
-      return;
-    }
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(selectedMonth, tipo, qtd, dataLancamento, pessoa, leadNome, origem);
+      await onAdd(name, qtd, dataLancamento, leadNome, origem);
       setQuantidade('');
       setLeadNome('');
       setOrigem('');
@@ -145,44 +138,80 @@ export const ReunioesEditor = ({
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    // Parse YYYY-MM-DD as local date to avoid UTC shifting back one day
-    const [y, m, d] = dateStr.split('-').map(Number);
-    if (!y || !m || !d) return dateStr;
-    return new Date(y, m - 1, d).toLocaleDateString('pt-BR');
+  const handleSaveName = async () => {
+    const trimmed = editValue.trim();
+    if (!trimmed) {
+      toast({ title: 'Nome inválido', description: 'O nome não pode ficar vazio.', variant: 'destructive' });
+      return;
+    }
+    if (trimmed === name) {
+      setIsEditing(false);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onRename(trimmed);
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-4 space-y-3 backdrop-blur-sm transition-shadow hover:shadow-md">
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[hsl(var(--gold))] to-[hsl(var(--gold-dark))] text-primary-foreground shadow-[0_4px_14px_-4px_hsl(var(--gold)/0.5)]">
-          <Users className="h-4 w-4" strokeWidth={2.5} />
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Etapa funil</p>
-          <span className="text-sm font-bold text-foreground">{label}</span>
-        </div>
+    <div className="border border-border/50 rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <User className={`h-4 w-4 ${iconColor}`} />
+        {isEditing ? (
+          <div className="flex items-center gap-1 flex-1">
+            <Input
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveName();
+                if (e.key === 'Escape') { setIsEditing(false); setEditValue(name); }
+              }}
+              className="h-7 text-sm font-semibold"
+              autoFocus
+              disabled={isSaving}
+            />
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleSaveName} disabled={isSaving}>
+              <Check className="h-4 w-4 text-green-600" />
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsEditing(false); setEditValue(name); }} disabled={isSaving}>
+              <X className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <span className="font-semibold">{name}</span>
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 ml-auto"
+                onClick={() => { setEditValue(name); setIsEditing(true); }}
+                title="Renomear SDR"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
+          </>
+        )}
       </div>
 
-      <div className="flex justify-between gap-3 text-sm">
-        <span>Meta: {meta}</span>
-        <span className="font-bold text-primary">Realizado: {total}</span>
+      <div className="flex justify-between text-sm">
+        <span>Meta: {metaPorPessoa}</span>
+        <span className="font-medium">Realizado: {total}</span>
       </div>
 
-      <Progress
-        value={clampPercentage(progresso)}
-        className={`h-2 ${getProgressColor(progresso)}`}
-      />
-      <div className="text-xs text-muted-foreground text-right">
-        {progresso.toFixed(1)}% da meta
-      </div>
+      <Progress value={clampPercentage(progresso)} className={`h-2 ${getProgressColor(progresso)}`} />
 
       <div className="flex justify-between text-xs bg-muted/30 rounded px-2 py-1">
         <span>Meta/dia: <strong>{metaPorDia}</strong></span>
         <span>Hoje: <strong className={realizadoHoje >= metaPorDia ? 'text-green-600' : 'text-destructive'}>{realizadoHoje}</strong></span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/60 bg-muted/20 p-2 text-center text-[11px]">
+      <div className="grid grid-cols-3 gap-1 rounded-lg border border-border/60 bg-muted/20 p-2 text-center text-[10px]">
         <div>
           <div className="text-muted-foreground">Faltam</div>
           <div className="font-bold text-foreground">{faltaParaMeta}</div>
@@ -197,28 +226,8 @@ export const ReunioesEditor = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-1 text-[11px]">
-        {totalsPorSdr.map((s) => (
-          <div key={s.name} className="bg-muted/40 rounded px-2 py-1 text-center">
-            <div className="text-muted-foreground truncate" title={s.name}>{s.name}</div>
-            <div className="font-bold">{s.total}</div>
-            <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Realizado</div>
-          </div>
-        ))}
-      </div>
-
       {canEdit && (
         <div className="space-y-2">
-          <Select value={pessoa} onValueChange={setPessoa}>
-            <SelectTrigger className="text-xs h-9">
-              <SelectValue placeholder="Selecione o SDR" />
-            </SelectTrigger>
-            <SelectContent>
-              {sdrNames.map((n) => (
-                <SelectItem key={n} value={n}>{n}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Input
             type="date"
             value={dataLancamento}
@@ -232,8 +241,8 @@ export const ReunioesEditor = ({
             onChange={(e) => setLeadNome(e.target.value)}
           />
           <Select value={origem} onValueChange={setOrigem}>
-            <SelectTrigger>
-              <SelectValue placeholder="Origem do interessado (opcional)" />
+            <SelectTrigger className="text-xs h-9">
+              <SelectValue placeholder="Origem (opcional)" />
             </SelectTrigger>
             <SelectContent>
               {ORIGENS_LEAD.map((o) => (
@@ -251,11 +260,7 @@ export const ReunioesEditor = ({
               className="flex-1"
               min={1}
             />
-            <Button
-              size="sm"
-              onClick={handleAdd}
-              disabled={isAdding}
-            >
+            <Button size="sm" onClick={handleAdd} disabled={isAdding}>
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -263,20 +268,15 @@ export const ReunioesEditor = ({
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
 
-      {monthEntries.length > 0 && (
+      {entries.length > 0 && (
         <div className="max-h-40 overflow-y-auto space-y-1">
-          {monthEntries.map((entry) => (
+          {entries.map((entry) => (
             <div
               key={entry.id}
               className="flex items-start justify-between gap-2 text-xs bg-muted/50 rounded px-2 py-1"
             >
               <div className="flex flex-col flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{formatDate(entry.data_lancamento)}</span>
-                  <span className="font-medium truncate" title={entry.pessoa || '—'}>
-                    {entry.pessoa || '—'}
-                  </span>
-                </div>
+                <span className="text-muted-foreground">{formatDate(entry.data_lancamento)}</span>
                 {(entry.lead_nome || entry.origem) && (
                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                     {entry.lead_nome && (
@@ -307,10 +307,161 @@ export const ReunioesEditor = ({
           ))}
         </div>
       )}
-
-      <div className="text-[10px] text-muted-foreground bg-muted/20 rounded px-2 py-1">
-        {diasUteis} dias úteis no mês · {diasUteisRestantes} até o fim de {monthName}
-      </div>
     </div>
+  );
+};
+
+export const ReunioesEditor = ({
+  selectedMonth,
+  tipo,
+  label,
+  entries,
+  meta,
+  realizadoFallback = 0,
+  onAdd,
+  onDelete,
+  canEdit,
+}: ReunioesEditorProps) => {
+  const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
+
+  useEffect(() => {
+    fetchSdrNamesFromDb().then(setSdrNames);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'sdr_names_v2') setSdrNames(loadSdrNames());
+    };
+    const onCustom = () => setSdrNames(loadSdrNames());
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('sdr-names-updated', onCustom);
+    const unsub = subscribeSdrNames(setSdrNames);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('sdr-names-updated', onCustom);
+      unsub();
+    };
+  }, []);
+
+  const monthName = MONTHS[selectedMonth];
+  const monthEntries = useMemo(
+    () => entries.filter((e) => e.month === monthName && e.tipo === tipo),
+    [entries, monthName, tipo],
+  );
+
+  const slots = sdrNames.map((name) => {
+    const slotEntries = monthEntries.filter((e) => e.pessoa === name);
+    const total = slotEntries.reduce((s, e) => s + Number(e.quantidade || 0), 0);
+    return { name, entries: slotEntries, total };
+  });
+
+  const totalGeralLancamentos = slots.reduce((s, x) => s + x.total, 0);
+  const totalGeral = totalGeralLancamentos > 0 ? totalGeralLancamentos : Number(realizadoFallback || 0);
+  const metaPorPessoa = Math.ceil(meta / SDR_COUNT);
+  const progressoGeral = safePercentage(totalGeral, meta);
+
+  const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
+  const diasUteisRestantes = businessDaysRemainingInMonth(DASHBOARD_YEAR, selectedMonth);
+  const metaPorDia = Math.ceil(metaPorPessoa / Math.max(diasUteis, 1));
+  const todayStr = todayISO();
+  const iconColors = ['text-primary', 'text-secondary-foreground', 'text-accent-foreground'];
+
+  const handleRename = async (slotIndex: number, newName: string) => {
+    const oldName = sdrNames[slotIndex];
+    if (oldName === newName) return;
+
+    if (sdrNames.some((n, i) => i !== slotIndex && n === newName)) {
+      toast({ title: 'Nome duplicado', description: 'Os SDRs precisam ter nomes diferentes.', variant: 'destructive' });
+      throw new Error('duplicate');
+    }
+
+    try {
+      const { data: affected, error } = await supabase.rpc('rename_sdr' as any, {
+        old_name: oldName,
+        new_name: newName,
+      });
+      if (error) throw error;
+
+      const newNames = [...sdrNames] as SdrNames;
+      newNames[slotIndex] = newName;
+      setSdrNames(newNames);
+      saveSdrNames(newNames);
+      window.dispatchEvent(new Event('sdr-names-updated'));
+
+      toast({
+        title: 'SDR renomeado',
+        description: `"${oldName}" → "${newName}" (${affected ?? 0} lançamento${affected === 1 ? '' : 's'} atualizado${affected === 1 ? '' : 's'}).`,
+      });
+    } catch (e: any) {
+      console.error('Erro ao renomear SDR:', e);
+      toast({
+        title: 'Erro ao renomear',
+        description: e?.message ?? 'Tente novamente.',
+        variant: 'destructive',
+      });
+      throw e;
+    }
+  };
+
+  return (
+    <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-3 text-lg">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[hsl(var(--gold))] to-[hsl(var(--gold-dark))] text-primary-foreground shadow-[0_4px_14px_-4px_hsl(var(--gold)/0.5)]">
+            <Users className="h-4 w-4" strokeWidth={2.5} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Etapa funil</span>
+            <span className="text-base font-bold text-foreground">{label} · {monthName}</span>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="rounded-xl border border-border/60 bg-gradient-to-br from-[hsl(var(--gold)/0.08)] to-transparent p-4 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Meta Total</span>
+            <span className="text-2xl font-bold tabular-nums text-foreground">{Math.ceil(meta)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Realizado Total</span>
+            <span className="text-2xl font-bold tabular-nums text-primary">{totalGeral}</span>
+          </div>
+          <Progress value={clampPercentage(progressoGeral)} className="h-2" />
+          <div className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground text-right">
+            {progressoGeral.toFixed(1)}% da meta
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {slots.map((slot, i) => {
+            const realizadoHoje = slot.entries
+              .filter((e) => e.data_lancamento === todayStr)
+              .reduce((s, e) => s + Number(e.quantidade || 0), 0);
+            return (
+              <SdrSlot
+                key={i}
+                name={slot.name}
+                metaPorPessoa={metaPorPessoa}
+                metaPorDia={metaPorDia}
+                diasUteisRestantes={diasUteisRestantes}
+                realizadoHoje={realizadoHoje}
+                total={slot.total}
+                entries={slot.entries}
+                canEdit={canEdit}
+                onAdd={(pessoa, qtd, dataLancamento, leadNome, origem) =>
+                  onAdd(selectedMonth, tipo, qtd, dataLancamento, pessoa, leadNome, origem)
+                }
+                onDelete={onDelete}
+                onRename={(newName) => handleRename(i, newName)}
+                iconColor={iconColors[i]}
+              />
+            );
+          })}
+        </div>
+
+        <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 space-y-1">
+          <div><strong>Meta por SDR:</strong> {Math.ceil(meta)} ÷ {SDR_COUNT} = <strong>{metaPorPessoa}</strong></div>
+          <div><strong>Cálculo Diário:</strong> {metaPorPessoa} ÷ {diasUteis} dias úteis = <strong>{metaPorDia}/dia</strong></div>
+          <div><strong>Ritmo Restante:</strong> {diasUteisRestantes} dias úteis até o fim de {monthName}.</div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
