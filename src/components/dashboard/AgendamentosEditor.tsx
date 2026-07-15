@@ -290,7 +290,8 @@ export const AgendamentosEditor = ({
   });
 
   const totalGeral = slots.reduce((s, x) => s + x.total, 0);
-  const metaPorPessoa = Math.ceil(metaAgendamentos / SDR_COUNT);
+  const sdrCount = Math.max(1, sdrNames.length);
+  const metaPorPessoa = Math.ceil(metaAgendamentos / sdrCount);
   const progressoGeral = safePercentage(totalGeral, metaAgendamentos);
 
   const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
@@ -397,7 +398,7 @@ export const AgendamentosEditor = ({
         </div>
 
         <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 space-y-1">
-          <div><strong>Cálculo Mensal:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)} (dividida entre {SDR_COUNT} SDRs)</div>
+          <div><strong>Cálculo Mensal:</strong> Meta Agendamentos = Meta 1ª Reuniões ({Math.ceil(metaAgendamentos * 0.6)}) ÷ 60% comparecimento = {Math.ceil(metaAgendamentos)} (dividida entre {sdrCount} SDRs)</div>
           <div><strong>Cálculo Diário:</strong> Meta por SDR ({metaPorPessoa}) ÷ {diasUteis} dias úteis em {monthName} = <strong>{metaPorDia}/dia</strong></div>
           <div><strong>Ritmo Restante:</strong> {diasUteisRestantes} dias úteis até o fim do mês para bater a meta de {monthName}.</div>
         </div>

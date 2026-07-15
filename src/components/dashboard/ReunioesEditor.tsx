@@ -354,7 +354,8 @@ export const ReunioesEditor = ({
 
   const totalGeralLancamentos = slots.reduce((s, x) => s + x.total, 0);
   const totalGeral = totalGeralLancamentos > 0 ? totalGeralLancamentos : Number(realizadoFallback || 0);
-  const metaPorPessoa = Math.ceil(meta / SDR_COUNT);
+  const sdrCount = Math.max(1, sdrNames.length);
+  const metaPorPessoa = Math.ceil(meta / sdrCount);
   const progressoGeral = safePercentage(totalGeral, meta);
 
   const diasUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
@@ -457,7 +458,7 @@ export const ReunioesEditor = ({
         </div>
 
         <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 space-y-1">
-          <div><strong>Meta por SDR:</strong> {Math.ceil(meta)} ÷ {SDR_COUNT} = <strong>{metaPorPessoa}</strong></div>
+          <div><strong>Meta por SDR:</strong> {Math.ceil(meta)} ÷ {sdrCount} = <strong>{metaPorPessoa}</strong></div>
           <div><strong>Cálculo Diário:</strong> {metaPorPessoa} ÷ {diasUteis} dias úteis = <strong>{metaPorDia}/dia</strong></div>
           <div><strong>Ritmo Restante:</strong> {diasUteisRestantes} dias úteis até o fim de {monthName}.</div>
         </div>
