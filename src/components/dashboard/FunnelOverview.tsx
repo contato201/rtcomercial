@@ -1,4 +1,5 @@
-import { MonthData, TAXA_COMPARECIMENTO } from '@/types/dashboard';
+import { MonthData } from '@/types/dashboard';
+import { usePlanejamento } from '@/lib/planejamento';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { Calendar, Users, UserCheck, ShoppingCart, DollarSign, LucideIcon } from 'lucide-react';
 import { useCountUp } from '@/hooks/useCountUp';
@@ -93,7 +94,9 @@ const Stage = ({ label, realizado, meta, highlight, formatter = formatNumber, ic
 };
 
 export const FunnelOverview = ({ data, realizadoAgendamentos }: FunnelOverviewProps) => {
-  const metaAgendamentos = Math.ceil(data.metaPrimeiraReuniao / TAXA_COMPARECIMENTO);
+  const { taxaComparecimento } = usePlanejamento();
+  const metaAgendamentos = Math.ceil(data.metaPrimeiraReuniao / (taxaComparecimento || 0.6));
+
 
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
