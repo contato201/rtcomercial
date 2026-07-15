@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
-import { MonthData, FilterType, QuarterType, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
+import { MonthData, FilterType, QuarterType, MONTHS } from '@/types/dashboard';
+import { usePlanejamento } from '@/lib/planejamento';
 import { ComparisonChart } from './ComparisonChart';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AgendamentoRow } from '@/hooks/useDashboardData';
