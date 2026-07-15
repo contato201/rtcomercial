@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { z } from 'zod';
-import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
+import { MonthData, FilterType, QuarterType, QUARTERS, VALOR_POR_VENDA, createInitialData, MONTHS } from '@/types/dashboard';
+import { loadPlanejamento, subscribePlanejamento, getTaxaComparecimento } from '@/lib/planejamento';
 import { supabase } from '@/integrations/supabase/client';
 import { safeVariation, toFiniteNumber } from '@/lib/formatters';
 import { toast } from 'sonner';
@@ -245,7 +246,8 @@ export const useDashboardData = () => {
   }, []);
 
   useEffect(() => {
-    loadFromDatabase();
+    loadPlanejamento().then(() => loadFromDatabase());
+    const unsubPlan = subscribePlanejamento(() => loadFromDatabase());
     const channel = supabase
       .channel('dashboard_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dados_realizados' }, () => loadFromDatabase())
@@ -278,6 +280,7 @@ export const useDashboardData = () => {
       window.removeEventListener('online', handleOnline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
+      unsubPlan();
     };
   }, [loadFromDatabase, handlePersistenceError]);
 
@@ -640,7 +643,7 @@ export const useDashboardData = () => {
   const getMetaAgendamentos = useCallback((monthIndex: number) => {
     const monthData = data[monthIndex];
     if (!monthData) return 0;
-    return Math.ceil(monthData.metaPrimeiraReuniao / TAXA_COMPARECIMENTO);
+    return Math.ceil(monthData.metaPrimeiraReuniao / (getTaxaComparecimento() || 0.6));
   }, [data]);
 
   return {
