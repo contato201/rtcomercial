@@ -223,6 +223,36 @@ export type Database = {
           },
         ]
       }
+      planejamento_mensal: {
+        Row: {
+          created_at: string
+          id: string
+          meta_primeira_reuniao: number
+          meta_segunda_reuniao: number
+          meta_vendas: number
+          month_index: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meta_primeira_reuniao?: number
+          meta_segunda_reuniao?: number
+          meta_vendas?: number
+          month_index: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meta_primeira_reuniao?: number
+          meta_segunda_reuniao?: number
+          meta_vendas?: number
+          month_index?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reunioes_entries: {
         Row: {
           created_at: string

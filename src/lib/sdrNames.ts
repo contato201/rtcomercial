@@ -1,19 +1,20 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export const SDR_COUNT = 3;
-export const DEFAULT_SDRS: [string, string, string] = ['SDR 1', 'SDR 2', 'SDR 3'];
+export const DEFAULT_SDRS: string[] = ['SDR 1', 'SDR 2', 'SDR 3'];
 export const SDR_NAMES_KEY = 'sdr_names_v2';
 export const SDR_NAMES_EVENT = 'sdr-names-updated';
 
-export type SdrNames = [string, string, string];
+// Backwards compat: many components import SdrNames. Now it's a dynamic list.
+export type SdrNames = string[];
+
+// Deprecated but kept for compat where imports still exist.
+export const SDR_COUNT = 3;
 
 const normalize = (arr: any): SdrNames => {
-  if (Array.isArray(arr) && arr.length === SDR_COUNT) {
-    return [
-      String(arr[0] || DEFAULT_SDRS[0]),
-      String(arr[1] || DEFAULT_SDRS[1]),
-      String(arr[2] || DEFAULT_SDRS[2]),
-    ];
+  if (Array.isArray(arr) && arr.length > 0) {
+    return arr
+      .map((v) => String(v ?? '').trim())
+      .filter((v) => v.length > 0);
   }
   return [...DEFAULT_SDRS];
 };
@@ -27,8 +28,9 @@ export const loadSdrNames = (): SdrNames => {
 };
 
 export const saveSdrNames = (names: SdrNames) => {
+  const clean = normalize(names);
   try {
-    localStorage.setItem(SDR_NAMES_KEY, JSON.stringify(names));
+    localStorage.setItem(SDR_NAMES_KEY, JSON.stringify(clean));
   } catch {}
   window.dispatchEvent(new Event(SDR_NAMES_EVENT));
 };
@@ -48,6 +50,15 @@ export const fetchSdrNamesFromDb = async (): Promise<SdrNames> => {
     console.warn('[sdrNames] fetch failed, using local:', e);
     return loadSdrNames();
   }
+};
+
+export const persistSdrNamesToDb = async (names: SdrNames): Promise<void> => {
+  const clean = normalize(names);
+  const { error } = await (supabase as any)
+    .from('app_settings')
+    .upsert({ key: 'sdr_names', value: clean as any }, { onConflict: 'key' });
+  if (error) throw error;
+  saveSdrNames(clean);
 };
 
 export const subscribeSdrNames = (cb: (names: SdrNames) => void) => {

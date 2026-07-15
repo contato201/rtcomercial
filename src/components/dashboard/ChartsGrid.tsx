@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
-import { MonthData, FilterType, QuarterType, MONTHS, TAXA_COMPARECIMENTO } from '@/types/dashboard';
+import { MonthData, FilterType, QuarterType, MONTHS } from '@/types/dashboard';
+import { usePlanejamento } from '@/lib/planejamento';
 import { ComparisonChart } from './ComparisonChart';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AgendamentoRow } from '@/hooks/useDashboardData';
@@ -70,6 +71,7 @@ export const ChartsGrid = ({
   unitSales = [],
   isLoading = false,
 }: ChartsGridProps) => {
+  const { taxaComparecimento } = usePlanejamento();
   const weeks = useMemo(
     () => (filterType === 'month' ? buildMonthWeeks(DASHBOARD_YEAR, selectedMonth) : []),
     [filterType, selectedMonth]
@@ -144,7 +146,7 @@ export const ChartsGrid = ({
   const createAgendamentosChartData = () => {
     if (filterType === 'month') {
       const metaPrimeiraReuniao = aggregatedData.metaPrimeiraReuniao;
-      const metaAgendamentos = Math.ceil(metaPrimeiraReuniao / TAXA_COMPARECIMENTO);
+      const metaAgendamentos = Math.ceil(metaPrimeiraReuniao / (taxaComparecimento || 0.6));
       const filtered = agendamentos.filter((a) => a.month === monthName && (!isWeekFilter || inWeekDate(a.data_lancamento)));
       const realizadoAgendamentos = filtered.reduce((sum, a) => sum + a.quantidade, 0);
       return [{
@@ -154,7 +156,7 @@ export const ChartsGrid = ({
       }];
     }
     return filteredData.map((m) => {
-      const metaAgendamentos = Math.ceil(m.metaPrimeiraReuniao / TAXA_COMPARECIMENTO);
+      const metaAgendamentos = Math.ceil(m.metaPrimeiraReuniao / (taxaComparecimento || 0.6));
       const realizadoAgendamentos = agendamentos.filter((a) => a.month === m.month).reduce((s, a) => s + a.quantidade, 0);
       return { name: m.month.slice(0, 3), meta: metaAgendamentos, realizado: realizadoAgendamentos };
     });
