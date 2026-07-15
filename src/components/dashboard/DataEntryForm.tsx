@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MonthData, MONTHS, VALOR_POR_VENDA } from '@/types/dashboard';
+import { MonthData, MONTHS, VALOR_POR_VENDA, getValorPorVenda } from '@/types/dashboard';
 import { Save, RefreshCw, DollarSign, Users, Calendar, Lock, CheckCircle2, History, ShieldOff, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -379,7 +379,7 @@ export const DataEntryForm = ({
               />
             </div>
             <p className="text-xs text-muted-foreground mt-1 text-center">
-              Referência: {formatCurrency(VALOR_POR_VENDA)}
+              Referência: {formatCurrency(getValorPorVenda())}
             </p>
           </div>
 
