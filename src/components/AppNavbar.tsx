@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, UserSearch, LogIn, LogOut, Pencil } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, UserSearch, LogIn, LogOut, Pencil, Settings } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,20 @@ export const AppNavbar = () => {
                   </Link>
                 );
               })}
+              {canEdit && (
+                <Link
+                  to="/planejamento"
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                    location.pathname === '/planejamento'
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  <Settings className="w-4 h-4" />
+                  Planejamento
+                </Link>
+              )}
             </nav>
           </div>
 
