@@ -13,6 +13,7 @@ type UnitSaleRow = {
   valor: number;
   cliente: string;
   pessoa: string;
+  origem: string;
   created_at: string;
   updated_at: string;
 };
@@ -183,6 +184,7 @@ export const useDashboardData = () => {
           id: row.id, month, valor: Number(row.valor || 0),
           cliente: (row as any).cliente ?? '',
           pessoa: String((row as any).pessoa ?? ''),
+          origem: String((row as any).origem ?? ''),
           created_at: row.created_at, updated_at: row.updated_at,
         });
         return acc;
@@ -349,7 +351,7 @@ export const useDashboardData = () => {
     }
   }, [data, saveToHistory, handlePersistenceError, loadFromDatabase, requireFreshEditorSession]);
 
-  const addUnitSale = useCallback(async (monthIndex: number, valor: number, cliente: string = '', pessoa: string = '') => {
+  const addUnitSale = useCallback(async (monthIndex: number, valor: number, cliente: string = '', pessoa: string = '', origem: string = '') => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const v = valorSchema.safeParse(valor);
@@ -359,7 +361,7 @@ export const useDashboardData = () => {
 
     const { data: inserted, error } = await supabase
       .from('vendas_unitarias')
-      .insert({ month: m.data, valor: v.data, cliente, pessoa: (pessoa ?? '').trim() } as any)
+      .insert({ month: m.data, valor: v.data, cliente, pessoa: (pessoa ?? '').trim(), origem: (origem ?? '').trim() || null } as any)
       .select('*')
       .single();
     if (error) { handlePersistenceError('Erro ao inserir venda unitária:', error); throw error; }
@@ -371,6 +373,7 @@ export const useDashboardData = () => {
         id: inserted.id, month: inserted.month, valor: Number(inserted.valor || 0),
         cliente: (inserted as any).cliente ?? '',
         pessoa: String((inserted as any).pessoa ?? ''),
+        origem: String((inserted as any).origem ?? ''),
         created_at: inserted.created_at, updated_at: inserted.updated_at,
       };
       list.push(newRow);
@@ -380,7 +383,7 @@ export const useDashboardData = () => {
     });
   }, [applyUnitSalesAggregateToMonth, handlePersistenceError, requireFreshEditorSession]);
 
-  const updateUnitSale = useCallback(async (id: string, valor: number, cliente: string = '', pessoa: string = '') => {
+  const updateUnitSale = useCallback(async (id: string, valor: number, cliente: string = '', pessoa: string = '', origem: string = '') => {
     const v = valorSchema.safeParse(valor);
     if (!v.success) return;
 
@@ -388,7 +391,7 @@ export const useDashboardData = () => {
 
     const { data: updated, error } = await supabase
       .from('vendas_unitarias')
-      .update({ valor: v.data, cliente, pessoa: (pessoa ?? '').trim() } as any)
+      .update({ valor: v.data, cliente, pessoa: (pessoa ?? '').trim(), origem: (origem ?? '').trim() || null } as any)
       .eq('id', id)
       .select('*')
       .single();
@@ -405,6 +408,7 @@ export const useDashboardData = () => {
           valor: Number(updated.valor || 0),
           cliente: (updated as any).cliente ?? '',
           pessoa: String((updated as any).pessoa ?? ''),
+          origem: String((updated as any).origem ?? ''),
           updated_at: updated.updated_at,
         };
       }

@@ -286,33 +286,7 @@ export const useGrowthData = () => {
     };
   }, [loadFromDatabase, handlePersistenceError]);
 
-  // Auto-sync from Google Sheets on mount (only if authenticated)
-  useEffect(() => {
-    // Skip if already auto-synced
-    if (hasAutoSynced.current) return;
-    
-    let mounted = true;
-    
-    const autoSync = async () => {
-      // Check if user is authenticated before auto-syncing
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session && mounted) {
-        hasAutoSynced.current = true;
-        hasAutoSyncedThisSession = true;
-        console.log('Auto-syncing from Google Sheets...');
-        syncFromSheets();
-      }
-    };
-
-    // Small delay to ensure component is fully mounted
-    const timeoutId = setTimeout(autoSync, 500);
-    
-    return () => {
-      mounted = false;
-      clearTimeout(timeoutId);
-    };
-  }, [syncFromSheets]);
+  // (Removido) Auto-sync do Google Sheets — os dados de Growth agora vêm da Meta (tabela growth_diario).
 
   // currentMonthData usa syncedMonth (declarado no início do hook)
 

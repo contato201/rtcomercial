@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, UserSearch, LogIn, LogOut, Pencil, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, LogIn, LogOut, Pencil, Settings } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -16,12 +16,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Comercial', href: '/', icon: LayoutDashboard },
   { label: 'Growth', href: '/growth', icon: TrendingUp },
-  { label: 'Análise de Perfil', href: '/analise', icon: UserSearch },
 ];
 
 export const AppNavbar = () => {
   const location = useLocation();
-  const { user, signOut, canEdit, isAuthenticated } = useAuth();
+  const { user, signOut, canEdit, isAdmin, isAuthenticated } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-card/70 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
@@ -54,7 +53,7 @@ export const AppNavbar = () => {
                   </Link>
                 );
               })}
-              {canEdit && (
+              {isAdmin && (
                 <Link
                   to="/planejamento"
                   className={cn(

@@ -1,73 +1,61 @@
-# Welcome to your Lovable project
+# Dashboard Comercial — Reproduzindo Talentos
 
-## Project info
+Painel interno de acompanhamento comercial e growth: metas mensais, funil de vendas
+(agendamentos → 1ª reunião → 2ª reunião → venda), faturamento por origem, desempenho
+por SDR e tráfego pago (Meta Ads).
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**No ar:** https://comercial.reproduzindotalentos.com.br
 
-## How can I edit this code?
+## Tecnologias
 
-There are several ways of editing your application.
+- **Vite** + **React** + **TypeScript**
+- **Tailwind CSS** + **shadcn/ui**
+- **Supabase** (banco de dados, autenticação e edge functions)
+- **Cloudflare Pages** (hospedagem)
+- **Meta Graph API** (dados de tráfego pago, sincronizados automaticamente)
 
-**Use Lovable**
+## Páginas
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+| Rota | O que tem |
+|------|-----------|
+| `/` (Comercial) | Funil executivo, faturamento por origem, entrada de dados (vendas com origem, agendamentos, reuniões), metas semanais, taxas por SDR, gráficos |
+| `/growth` | Funil de tráfego Meta Ads com filtro por período (calendário), nível (campanha/conjunto/anúncio) e texto "contém"; 9 KPIs (CPL, CPC, CPM, CTR, C/Agendamento, CAC, ROAS…); tabela dia a dia com agendamentos editáveis e CPA |
+| `/planejamento` | Só admin. Funil reverso de metas: vendas × ticket → reuniões → agendamentos, com taxas de conversão editáveis e recálculo automático |
 
-Changes made via Lovable will be committed automatically to this repo.
+## Rodar localmente
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requisitos: [Node.js](https://nodejs.org) instalado.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm install    # instalar dependências
+npm run dev    # http://localhost:8080
 ```
 
-**Edit a file directly in GitHub**
+## Build e publicação
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+npm run build      # gera a pasta dist/
+npm run preview    # pré-visualiza o build localmente
+npm run deploy     # builda e publica no Cloudflare Pages (projeto rtcomercial)
+```
 
-**Use GitHub Codespaces**
+Se o wrangler pedir login: `npx wrangler login`.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Configuração
 
-## What technologies are used for this project?
+As chaves públicas do Supabase ficam em `.env` (não versionado — copie de `.env.example`):
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`.
 
-This project is built with:
+## Sincronização com a Meta Ads
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+A edge function `supabase/functions/sync-meta` roda todo dia à 01:00 (pg_cron) e puxa
+investimento, impressões, cliques e leads dos últimos 14 dias em 4 níveis (conta,
+campanha, conjunto e anúncio) para as tabelas `growth_*_diario`. Aceita `?days=N`
+(máx 90) para preencher histórico. Os segredos (`META_ACCESS_TOKEN`, `META_AD_ACCOUNT`,
+`SYNC_SECRET`) ficam no cofre de secrets do Supabase — nunca no código.
 
-## How can I deploy this project?
+## Regra de negócio importante
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+No funil de Growth, **Vendas, Faturamento, CAC e ROAS contam apenas as vendas marcadas
+com origem "Tráfego pago (Meta)"** no dashboard comercial. Por isso é essencial escolher
+a origem ao lançar cada venda (as origens estão em `src/lib/origens.ts`).

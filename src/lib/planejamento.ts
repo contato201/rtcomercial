@@ -12,6 +12,8 @@ export interface PlanejamentoState {
   metas: MetaMensal[];
   ticketMedio: number;
   taxaComparecimento: number;
+  taxaVendas2a: number; // Vendas → 2ª Reunião (ex: 0.35)
+  taxa2a1a: number; // 2ª → 1ª Reunião (ex: 0.34)
   loaded: boolean;
 }
 
@@ -33,11 +35,15 @@ const DEFAULT_METAS: MetaMensal[] = [
 
 const DEFAULT_TICKET = 2700;
 const DEFAULT_TAXA = 0.6;
+const DEFAULT_TAXA_V2 = 0.35; // Vendas → 2ª Reunião
+const DEFAULT_TAXA_21 = 0.34; // 2ª → 1ª Reunião
 
 const state: PlanejamentoState = {
   metas: [...DEFAULT_METAS],
   ticketMedio: DEFAULT_TICKET,
   taxaComparecimento: DEFAULT_TAXA,
+  taxaVendas2a: DEFAULT_TAXA_V2,
+  taxa2a1a: DEFAULT_TAXA_21,
   loaded: false,
 };
 
@@ -55,6 +61,8 @@ export const getMetaMes = (monthIndex: number): MetaMensal => {
 
 export const getTicketMedio = (): number => state.ticketMedio;
 export const getTaxaComparecimento = (): number => state.taxaComparecimento;
+export const getTaxaVendas2a = (): number => state.taxaVendas2a;
+export const getTaxa2a1a = (): number => state.taxa2a1a;
 export const getAllMetas = (): MetaMensal[] => [...state.metas];
 
 export const loadPlanejamento = async (): Promise<void> => {
@@ -64,7 +72,7 @@ export const loadPlanejamento = async (): Promise<void> => {
       (supabase as any)
         .from('app_settings')
         .select('key,value')
-        .in('key', ['ticket_medio', 'taxa_comparecimento']),
+        .in('key', ['ticket_medio', 'taxa_comparecimento', 'taxa_vendas_2a', 'taxa_2a_1a']),
     ]);
 
     if (!metasRes.error && Array.isArray(metasRes.data) && metasRes.data.length > 0) {
@@ -89,6 +97,12 @@ export const loadPlanejamento = async (): Promise<void> => {
         }
         if (row.key === 'taxa_comparecimento' && Number.isFinite(num) && num > 0) {
           state.taxaComparecimento = num;
+        }
+        if (row.key === 'taxa_vendas_2a' && Number.isFinite(num) && num > 0) {
+          state.taxaVendas2a = num;
+        }
+        if (row.key === 'taxa_2a_1a' && Number.isFinite(num) && num > 0) {
+          state.taxa2a1a = num;
         }
       }
     }
@@ -118,7 +132,7 @@ export const subscribePlanejamento = (cb: () => void): (() => void) => {
         event: '*',
         schema: 'public',
         table: 'app_settings',
-        filter: 'key=in.(ticket_medio,taxa_comparecimento)',
+        filter: 'key=in.(ticket_medio,taxa_comparecimento,taxa_vendas_2a,taxa_2a_1a)',
       },
       () => {
         loadPlanejamento();
@@ -187,5 +201,36 @@ export const saveTaxaComparecimento = async (value: number): Promise<void> => {
     .from('app_settings')
     .upsert({ key: 'taxa_comparecimento', value: num as any }, { onConflict: 'key' });
   if (error) throw error;
+  await loadPlanejamento();
+};
+
+export const saveTaxaVendas2a = async (value: number): Promise<void> => {
+  const num = Math.max(0.05, Math.min(1, value));
+  const { error } = await (supabase as any)
+    .from('app_settings')
+    .upsert({ key: 'taxa_vendas_2a', value: num as any }, { onConflict: 'key' });
+  if (error) throw error;
+  await loadPlanejamento();
+};
+
+export const saveTaxa2a1a = async (value: number): Promise<void> => {
+  const num = Math.max(0.05, Math.min(1, value));
+  const { error } = await (supabase as any)
+    .from('app_settings')
+    .upsert({ key: 'taxa_2a_1a', value: num as any }, { onConflict: 'key' });
+  if (error) throw error;
+  await loadPlanejamento();
+};
+
+// Recalcula meta de 1ª e 2ª reunião de cada mês a partir da meta de VENDAS e das taxas do funil.
+// Funil reverso: 2ª reunião = vendas ÷ taxaVendas2a ; 1ª reunião = 2ª ÷ taxa2a1a
+export const recalcularFunilMetas = async (): Promise<void> => {
+  const tV2 = state.taxaVendas2a || DEFAULT_TAXA_V2;
+  const t21 = state.taxa2a1a || DEFAULT_TAXA_21;
+  for (const m of state.metas) {
+    const segunda = Math.round(m.metaVendas / tV2);
+    const primeira = Math.round(segunda / t21);
+    await saveMetaMes(m.monthIndex, m.metaVendas, primeira, segunda);
+  }
   await loadPlanejamento();
 };

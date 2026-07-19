@@ -1,38 +1,43 @@
+import { useState } from 'react';
 import { useGrowthData } from '@/hooks/useGrowthData';
 import { useAuth } from '@/hooks/useAuth';
 import { AppNavbar } from '@/components/AppNavbar';
-import { GrowthMetricsCards } from '@/components/growth/GrowthMetricsCards';
-import { GrowthFunnel } from '@/components/growth/GrowthFunnel';
-import { GrowthDataForm } from '@/components/growth/GrowthDataForm';
-import { GrowthFiltersComponent } from '@/components/growth/GrowthFilters';
-import { CampaignsTable } from '@/components/growth/CampaignsTable';
-import { SyncStatusBanner } from '@/components/growth/SyncStatusBanner';
+import { GrowthFunnelMeta } from '@/components/growth/GrowthFunnelMeta';
+import { GrowthDiario } from '@/components/growth/GrowthDiario';
+import { GrowthDateRange, periodoPadrao, type Periodo } from '@/components/growth/GrowthDateRange';
+import { useTrafegoDiario, type NivelTrafego } from '@/hooks/useTrafegoDiario';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw } from 'lucide-react';
-import { MONTHS } from '@/types/growth';
+
+const FILTRO_STORAGE_KEY = 'growth-filtro-campanha';
+const NIVEL_STORAGE_KEY = 'growth-filtro-nivel';
 
 const Growth = () => {
   const { canEdit } = useAuth();
-  const {
-    currentMonthData,
-    campaigns,
-    filteredCampaigns,
-    availableFilters,
-    activeFilters,
-    setActiveFilters,
-    clearFilters,
-    selectedMonth,
-    setSelectedMonth,
-    isLoading,
-    isSyncing,
-    lastSyncTime,
-    hasData,
-    investimentoAcumulado,
-    syncFromSheets,
-    updateManualData,
-  } = useGrowthData();
+  const { isLoading } = useGrowthData();
+  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
+  // Filtro "contém" + nível (campanha/conjunto/anúncio) compartilhados entre o
+  // funil e o dia a dia. Ficam salvos no navegador até o usuário mudar.
+  const [filtro, setFiltroState] = useState<string>(() => {
+    try { return localStorage.getItem(FILTRO_STORAGE_KEY) ?? ''; } catch { return ''; }
+  });
+  const setFiltro = (v: string) => {
+    setFiltroState(v);
+    try {
+      if (v.trim()) localStorage.setItem(FILTRO_STORAGE_KEY, v);
+      else localStorage.removeItem(FILTRO_STORAGE_KEY);
+    } catch { /* armazenamento indisponível — filtro segue só em memória */ }
+  };
+  const [nivel, setNivelState] = useState<NivelTrafego>(() => {
+    try {
+      const s = localStorage.getItem(NIVEL_STORAGE_KEY);
+      return s === 'conjunto' || s === 'anuncio' ? s : 'campanha';
+    } catch { return 'campanha'; }
+  });
+  const setNivel = (n: NivelTrafego) => {
+    setNivelState(n);
+    try { localStorage.setItem(NIVEL_STORAGE_KEY, n); } catch { /* ok */ }
+  };
+  const { rows: trafegoRows, loading: trafegoLoading } = useTrafegoDiario(nivel);
 
   if (isLoading) {
     return (
@@ -40,11 +45,6 @@ const Growth = () => {
         <AppNavbar />
         <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           <Skeleton className="h-12 md:h-16 w-full" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-20 md:h-24" />
-            ))}
-          </div>
           <Skeleton className="h-64 md:h-96" />
         </div>
       </div>
@@ -59,100 +59,30 @@ const Growth = () => {
       />
       <AppNavbar />
 
-
       <div className="max-w-[1600px] mx-auto p-4 sm:p-5 md:p-6 lg:p-8">
-        {/* Título e Controles - Responsivo */}
-        <div className="flex flex-col gap-4 mb-4 md:mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard de Growth</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Funil de Tráfego & Métricas</p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-              <Select
-                value={selectedMonth.toString()}
-                onValueChange={(value) => setSelectedMonth(parseInt(value))}
-              >
-                <SelectTrigger className="w-full sm:w-[160px] min-h-[44px] sm:min-h-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((month, index) => (
-                    <SelectItem key={month} value={index.toString()}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button 
-                onClick={() => syncFromSheets()} 
-                disabled={isSyncing}
-                variant="outline"
-                size="sm"
-                className="min-h-[44px] sm:min-h-0"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span className="sm:inline">{isSyncing ? 'Sincronizando...' : 'Sincronizar Sheets'}</span>
-              </Button>
-            </div>
+        {/* Título e seletor de período */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 md:mb-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard de Growth</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Tráfego Meta Ads — escolha o período</p>
           </div>
+
+          <GrowthDateRange value={periodo} onChange={setPeriodo} />
         </div>
 
-        {/* Banner de Status de Sincronização */}
-        <SyncStatusBanner
-          lastSyncTime={lastSyncTime}
-          onSync={() => syncFromSheets()}
-          isSyncing={isSyncing}
-          hasData={hasData}
+        {/* Funil de Growth - Meta Ads (filtro por campanha/conjunto/anúncio) */}
+        <GrowthFunnelMeta
+          periodo={periodo}
+          filtro={filtro}
+          onFiltroChange={setFiltro}
+          nivel={nivel}
+          onNivelChange={setNivel}
+          rows={trafegoRows}
+          rowsLoading={trafegoLoading}
         />
 
-        {/* Filtros */}
-        {campaigns.length > 0 && (
-          <GrowthFiltersComponent
-            availableFilters={availableFilters}
-            activeFilters={activeFilters}
-            onFilterChange={setActiveFilters}
-            onClearFilters={clearFilters}
-            campaignCount={campaigns.length}
-            filteredCount={filteredCampaigns.length}
-          />
-        )}
-
-        {/* Métricas Principais */}
-        <div className="mb-4 md:mb-6">
-          <GrowthMetricsCards 
-            data={currentMonthData} 
-            lastSyncTime={lastSyncTime}
-            isLoading={isLoading}
-            isSyncing={isSyncing}
-            hasData={hasData}
-            investimentoAcumulado={investimentoAcumulado}
-          />
-        </div>
-
-        {/* Layout Responsivo: Funil + Form */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-6">
-          {/* Funil Visual */}
-          <GrowthFunnel 
-            data={currentMonthData} 
-            lastSyncTime={lastSyncTime}
-            isLoading={isLoading}
-            isSyncing={isSyncing}
-            hasData={hasData}
-          />
-
-          {/* Formulário de Dados Manuais */}
-          <GrowthDataForm
-            data={currentMonthData}
-            onUpdate={(updates) => updateManualData(selectedMonth, updates)}
-            canEdit={canEdit}
-          />
-        </div>
-
-        {/* Tabela de Campanhas */}
-        <CampaignsTable campaigns={filteredCampaigns} />
+        {/* Growth Diário - Meta Ads (dia a dia + CPA + conversão) */}
+        <GrowthDiario periodo={periodo} canEdit={canEdit} filtro={filtro} trafegoRows={trafegoRows} />
       </div>
     </div>
   );

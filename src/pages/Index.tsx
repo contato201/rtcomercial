@@ -11,6 +11,7 @@ import { exportDashboardCsv } from '@/lib/exportCsv';
 import { Download, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FunnelOverview } from '@/components/dashboard/FunnelOverview';
+import { FaturamentoPorOrigem } from '@/components/dashboard/FaturamentoPorOrigem';
 import { CommandPalette, useCommandPalette } from '@/components/CommandPalette';
 
 
@@ -55,6 +56,12 @@ const Index = () => {
 
   const periodLabel =
     filterType === 'month' ? data[selectedMonth].month : filterType === 'quarter' ? selectedQuarter : 'Visão Anual';
+
+  // Vendas do período filtrado (mês/trimestre/ano) para o painel de origem
+  const salesInFilter =
+    filterType === 'month'
+      ? (unitSalesByMonth[data[selectedMonth].month] ?? [])
+      : filteredData.flatMap((d) => unitSalesByMonth[d.month] ?? []);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
@@ -116,6 +123,9 @@ const Index = () => {
         <div className="mb-8">
           <FunnelOverview data={aggregatedData} realizadoAgendamentos={realizadoAgendamentos} />
         </div>
+
+        {/* Faturamento por origem — clareza de onde vem a receita */}
+        <FaturamentoPorOrigem sales={salesInFilter} periodLabel={periodLabel} />
 
         {/* Formulário de entrada */}
         <div className="mb-8">

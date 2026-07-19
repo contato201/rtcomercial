@@ -8,7 +8,6 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Growth from "./pages/Growth";
-import ProfileAnalysis from "./pages/ProfileAnalysis";
 import Planejamento from "./pages/Planejamento";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "@/hooks/useTheme";
@@ -28,7 +27,6 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/growth" element={<Growth />} />
-              <Route path="/analise" element={<ProfileAnalysis />} />
               <Route path="/planejamento" element={<Planejamento />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

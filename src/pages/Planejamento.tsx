@@ -10,15 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Settings, Users, Target, Percent } from 'lucide-react';
 
 const Planejamento = () => {
-  const { canEdit, isLoading } = useAuth();
+  const { isAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
   const plan = usePlanejamento();
 
   useEffect(() => {
-    if (!isLoading && !canEdit) navigate('/');
-  }, [canEdit, isLoading, navigate]);
+    if (!isLoading && !isAdmin) navigate('/');
+  }, [isAdmin, isLoading, navigate]);
 
-  if (isLoading || !canEdit) {
+  if (isLoading || !isAdmin) {
     return (
       <div className="min-h-screen bg-background">
         <AppNavbar />
@@ -63,7 +63,12 @@ const Planejamento = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ParametrosGlobais ticket={plan.ticketMedio} taxa={plan.taxaComparecimento} />
+            <ParametrosGlobais
+              ticket={plan.ticketMedio}
+              taxa={plan.taxaComparecimento}
+              taxaVendas2a={plan.taxaVendas2a}
+              taxa2a1a={plan.taxa2a1a}
+            />
           </CardContent>
         </Card>
 

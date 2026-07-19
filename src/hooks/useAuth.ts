@@ -3,11 +3,16 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { clearInvalidAuthStorage } from '@/lib/sessionGuard';
 
-// E-mails autorizados para edição
+// E-mails autorizados para edição (lançar dados, editar dashboard)
 const AUTHORIZED_EMAILS = [
   'contato@allancatao.com.br',
   'parceiros@reproduzindotalentos.com.br',
   'comercial@reproduzindotalentos.com.br',
+];
+
+// E-mails com acesso de administrador (painel de Planejamento de metas/SDRs)
+const ADMIN_EMAILS = [
+  'contato@allancatao.com.br',
 ];
 
 export const useAuth = () => {
@@ -66,6 +71,7 @@ export const useAuth = () => {
   };
 
   const canEdit = !!user?.email && AUTHORIZED_EMAILS.includes(user.email.toLowerCase());
+  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
 
   return {
     user,
@@ -73,6 +79,7 @@ export const useAuth = () => {
     isLoading,
     signOut,
     canEdit,
+    isAdmin,
     isAuthenticated: !!user,
   };
 };

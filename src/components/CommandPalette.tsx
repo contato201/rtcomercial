@@ -13,7 +13,6 @@ import {
 import {
   LayoutDashboard,
   TrendingUp,
-  UserSearch,
   Calendar,
   Download,
   History,
@@ -64,10 +63,6 @@ export const CommandPalette = ({
           <CommandItem onSelect={() => run(() => navigate('/growth'))}>
             <TrendingUp className="mr-2 h-4 w-4" />
             Growth
-          </CommandItem>
-          <CommandItem onSelect={() => run(() => navigate('/analise'))}>
-            <UserSearch className="mr-2 h-4 w-4" />
-            Análise de Perfil
           </CommandItem>
         </CommandGroup>
 

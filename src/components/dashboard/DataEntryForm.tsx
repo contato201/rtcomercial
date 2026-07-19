@@ -21,8 +21,8 @@ interface DataEntryFormProps {
   metaAgendamentos: number;
   filterType?: 'month' | 'quarter' | 'year';
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
-  onAddUnitSale: (monthIndex: number, valor: number, cliente: string, pessoa: string) => Promise<void> | void;
-  onUpdateUnitSale: (id: string, valor: number, cliente: string, pessoa: string) => Promise<void> | void;
+  onAddUnitSale: (monthIndex: number, valor: number, cliente: string, pessoa: string, origem: string) => Promise<void> | void;
+  onUpdateUnitSale: (id: string, valor: number, cliente: string, pessoa: string, origem: string) => Promise<void> | void;
   onDeleteUnitSale: (id: string) => Promise<void> | void;
   onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
@@ -321,7 +321,7 @@ export const DataEntryForm = ({
             monthLabel={MONTHS[selectedMonth]}
             sales={unitSales}
             canEdit={canEdit}
-            onAdd={(valor, cliente, pessoa) => onAddUnitSale(selectedMonth, valor, cliente, pessoa)}
+            onAdd={(valor, cliente, pessoa, origem) => onAddUnitSale(selectedMonth, valor, cliente, pessoa, origem)}
             onUpdate={onUpdateUnitSale}
             onDelete={onDeleteUnitSale}
           />

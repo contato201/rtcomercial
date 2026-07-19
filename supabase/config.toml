@@ -1,7 +1,7 @@
-project_id = "ysjyrqhpnpcmvydrokfl"
+project_id = "qqthjtnphbycondztgwr"
 
 [functions.fetch-sheets-data]
 verify_jwt = false
 
-[functions.analyze-profile]
+[functions.sync-meta]
 verify_jwt = false

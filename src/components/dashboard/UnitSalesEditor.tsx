@@ -10,6 +10,7 @@ import {
   subscribeSdrNames,
   type SdrNames,
 } from "@/lib/sdrNames";
+import { ORIGENS_VENDA, labelDaOrigem, isTrafego } from "@/lib/origens";
 
 export type UnitSale = {
   id: string;
@@ -17,6 +18,7 @@ export type UnitSale = {
   valor: number;
   cliente: string;
   pessoa: string;
+  origem: string;
   created_at: string;
   updated_at: string;
 };
@@ -44,8 +46,8 @@ interface UnitSalesEditorProps {
   monthLabel: string;
   sales: UnitSale[];
   canEdit: boolean;
-  onAdd: (valor: number, cliente: string, pessoa: string) => Promise<void> | void;
-  onUpdate: (id: string, valor: number, cliente: string, pessoa: string) => Promise<void> | void;
+  onAdd: (valor: number, cliente: string, pessoa: string, origem: string) => Promise<void> | void;
+  onUpdate: (id: string, valor: number, cliente: string, pessoa: string, origem: string) => Promise<void> | void;
   onDelete: (id: string) => Promise<void> | void;
 }
 
@@ -61,11 +63,13 @@ export const UnitSalesEditor = ({
   const [newValue, setNewValue] = useState("");
   const [newCliente, setNewCliente] = useState("");
   const [newPessoa, setNewPessoa] = useState("");
+  const [newOrigem, setNewOrigem] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [editingCliente, setEditingCliente] = useState("");
   const [editingPessoa, setEditingPessoa] = useState("");
+  const [editingOrigem, setEditingOrigem] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -106,10 +110,11 @@ export const UnitSalesEditor = ({
     try {
       setIsAdding(true);
       setFormError(null);
-      await onAdd(parsed.data, newCliente.trim(), newPessoa.trim());
+      await onAdd(parsed.data, newCliente.trim(), newPessoa.trim(), newOrigem);
       setNewValue("");
       setNewCliente("");
       setNewPessoa("");
+      setNewOrigem("");
     } catch (error) {
       console.error("Erro ao adicionar venda:", error);
       setFormError("Venda não salva. Faça login novamente com o email autorizado e tente de novo.");
@@ -124,6 +129,7 @@ export const UnitSalesEditor = ({
     setEditingValue(String(sale.valor ?? ""));
     setEditingCliente(sale.cliente ?? "");
     setEditingPessoa(sale.pessoa ?? "");
+    setEditingOrigem(sale.origem ?? "");
     setEditError(null);
   };
 
@@ -132,6 +138,7 @@ export const UnitSalesEditor = ({
     setEditingValue("");
     setEditingCliente("");
     setEditingPessoa("");
+    setEditingOrigem("");
     setEditError(null);
   };
 
@@ -146,7 +153,7 @@ export const UnitSalesEditor = ({
     try {
       setBusyId(id);
       setEditError(null);
-      await onUpdate(id, parsed.data, editingCliente.trim(), editingPessoa.trim());
+      await onUpdate(id, parsed.data, editingCliente.trim(), editingPessoa.trim(), editingOrigem);
       cancelEdit();
     } catch (error) {
       console.error("Erro ao atualizar venda:", error);
@@ -189,7 +196,7 @@ export const UnitSalesEditor = ({
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-2">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-5 gap-2">
         <div>
           <label className="text-xs text-muted-foreground block mb-1 font-medium">
             SDR responsável
@@ -203,6 +210,22 @@ export const UnitSalesEditor = ({
             <option value="">— Sem SDR —</option>
             {sdrNames.map((name) => (
               <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1 font-medium">
+            Origem da venda
+          </label>
+          <select
+            value={newOrigem}
+            onChange={(e) => setNewOrigem(e.target.value)}
+            disabled={!canEdit || isAdding}
+            className={`input-field ${!canEdit ? "cursor-not-allowed opacity-60" : ""}`}
+          >
+            <option value="">— Sem origem —</option>
+            {ORIGENS_VENDA.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         </div>
@@ -282,6 +305,18 @@ export const UnitSalesEditor = ({
                           Sem SDR
                         </Badge>
                       )}
+                      {sale.origem ? (
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${isTrafego(sale.origem) ? "border-primary/50 text-primary" : ""}`}
+                        >
+                          {isTrafego(sale.origem) ? "🚀 " : ""}{labelDaOrigem(sale.origem) || sale.origem}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs opacity-70">
+                          Sem origem
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {sale.created_at ? `Criada em ${formatDate(sale.created_at)}` : ""}
@@ -299,6 +334,17 @@ export const UnitSalesEditor = ({
                         <option value="">— Sem SDR —</option>
                         {sdrNames.map((name) => (
                           <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={editingOrigem}
+                        onChange={(e) => setEditingOrigem(e.target.value)}
+                        disabled={!canEdit || isBusy}
+                        className="input-field h-9 w-40"
+                      >
+                        <option value="">— Sem origem —</option>
+                        {ORIGENS_VENDA.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
                       <input
