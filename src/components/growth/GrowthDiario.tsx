@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { CalendarDays, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
-import type { Periodo } from "@/components/growth/GrowthDateRange";
+import { GrowthDateRange, periodoPadrao, type Periodo } from "@/components/growth/GrowthDateRange";
 import type { TrafegoRow } from "@/hooks/useTrafegoDiario";
 
 interface GrowthDia {
@@ -25,13 +25,13 @@ const custo = (invest: number, qtd: number) => (qtd > 0 ? brl(invest / qtd) : "�
 const pct = (num: number, den: number) => (den > 0 ? `${((num / den) * 100).toFixed(1)}%` : "—");
 
 interface Props {
-  periodo: Periodo;
   canEdit: boolean;
   filtro: string;
   trafegoRows: TrafegoRow[];
 }
 
-export const GrowthDiario = ({ periodo, canEdit, filtro, trafegoRows }: Props) => {
+export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
+  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
   const [rows, setRows] = useState<GrowthDia[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -134,11 +134,14 @@ export const GrowthDiario = ({ periodo, canEdit, filtro, trafegoRows }: Props) =
             </p>
           </div>
         </div>
-        {filtroAtivo && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-primary bg-primary/15 px-3 py-1 text-xs font-bold text-primary sm:ml-auto">
-            Contém: “{filtro.trim().toUpperCase()}”
-          </span>
-        )}
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:ml-auto">
+          {filtroAtivo && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-primary bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+              Contém: “{filtro.trim().toUpperCase()}”
+            </span>
+          )}
+          <GrowthDateRange value={periodo} onChange={setPeriodo} />
+        </div>
       </div>
       {filtroAtivo && (
         <p className="text-xs text-muted-foreground -mt-2 mb-3">

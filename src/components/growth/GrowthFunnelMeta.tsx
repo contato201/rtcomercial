@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { isTrafego } from "@/lib/origens";
-import type { Periodo } from "@/components/growth/GrowthDateRange";
+import { GrowthDateRange, periodoPadrao, type Periodo } from "@/components/growth/GrowthDateRange";
 import type { TrafegoRow } from "@/hooks/useTrafegoDiario";
 import { Filter, Megaphone, MousePointerClick, Users, CalendarCheck, DollarSign, Eye, X } from "lucide-react";
 
@@ -22,14 +22,14 @@ const localYmd = (iso: string) => {
 const noPeriodo = (dataStr: string, p: Periodo) => dataStr >= p.from && dataStr <= p.to;
 
 interface Props {
-  periodo: Periodo;
   filtro: string;
   onFiltroChange: (v: string) => void;
   rows: TrafegoRow[];
   rowsLoading: boolean;
 }
 
-export const GrowthFunnelMeta = ({ periodo, filtro, onFiltroChange, rows, rowsLoading }: Props) => {
+export const GrowthFunnelMeta = ({ filtro, onFiltroChange, rows, rowsLoading }: Props) => {
+  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
   const [com, setCom] = useState({ reunioes: 0, vendas: 0, faturamento: 0 });
 
   // Dados comerciais no período: reuniões (agendamentos por data_lancamento),
@@ -108,14 +108,17 @@ export const GrowthFunnelMeta = ({ periodo, filtro, onFiltroChange, rows, rowsLo
             </p>
           </div>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            value={filtro}
-            onChange={(e) => onFiltroChange(e.target.value)}
-            placeholder="Filtrar campanha (ex: DIAGNOSTICO)"
-            className={`pl-8 ${filtro.trim() ? 'border-primary ring-1 ring-primary/40' : ''}`}
-          />
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <GrowthDateRange value={periodo} onChange={setPeriodo} />
+          <div className="relative w-full sm:w-64">
+            <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={filtro}
+              onChange={(e) => onFiltroChange(e.target.value)}
+              placeholder="Filtrar campanha (ex: DIAGNOSTICO)"
+              className={`pl-8 ${filtro.trim() ? 'border-primary ring-1 ring-primary/40' : ''}`}
+            />
+          </div>
         </div>
       </div>
 

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useTrafegoDiario, NIVEIS, type NivelTrafego } from "@/hooks/useTrafegoDiario";
-import type { Periodo } from "@/components/growth/GrowthDateRange";
+import { GrowthDateRange, periodoPadrao, type Periodo } from "@/components/growth/GrowthDateRange";
 import { LayoutList, Search, ArrowUpDown, ArrowDown, ArrowUp, X } from "lucide-react";
 
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -48,15 +48,12 @@ const COR_CHIP: Record<NivelTrafego, string> = {
   anuncio: "border-sky-400 text-sky-300 bg-sky-400/10",
 };
 
-interface Props {
-  periodo: Periodo;
-}
-
 // "Gerenciador" — lista campanhas/conjuntos/anúncios da conta Meta com status e
 // métricas do período. Seleção estilo Meta com DRILL-DOWN: marcar campanhas
 // filtra as abas Conjuntos/Anúncios só para o que pertence a elas (e conjuntos
 // filtram anúncios). As seleções viram etiquetas removíveis acima da tabela.
-export const GerenciadorMeta = ({ periodo }: Props) => {
+export const GerenciadorMeta = () => {
+  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
   const [tipo, setTipo] = useState<NivelTrafego>("campanha");
   const [buscaTxt, setBuscaTxt] = useState("");
   const [soAtivas, setSoAtivas] = useState(false);
@@ -255,6 +252,7 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center lg:ml-auto flex-wrap">
+          <GrowthDateRange value={periodo} onChange={setPeriodo} />
           <div className="flex rounded-lg border border-border/60 bg-muted/20 p-0.5">
             {NIVEIS.map((n) => (
               <button

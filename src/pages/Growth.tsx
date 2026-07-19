@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { AppNavbar } from '@/components/AppNavbar';
 import { GrowthFunnelMeta } from '@/components/growth/GrowthFunnelMeta';
 import { GrowthDiario } from '@/components/growth/GrowthDiario';
-import { GrowthDateRange, periodoPadrao, type Periodo } from '@/components/growth/GrowthDateRange';
 import { GerenciadorMeta } from '@/components/growth/GerenciadorMeta';
 import { useTrafegoDiario } from '@/hooks/useTrafegoDiario';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,9 +13,9 @@ const FILTRO_STORAGE_KEY = 'growth-filtro-campanha';
 const Growth = () => {
   const { canEdit } = useAuth();
   const { isLoading } = useGrowthData();
-  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
-  // Filtro "contém" + nível (campanha/conjunto/anúncio) compartilhados entre o
-  // funil e o dia a dia. Ficam salvos no navegador até o usuário mudar.
+  // Filtro "contém" compartilhado entre o funil e o dia a dia.
+  // Fica salvo no navegador até o usuário mudar. (O período é individual
+  // de cada bloco — cada um tem seu próprio calendário.)
   const [filtro, setFiltroState] = useState<string>(() => {
     try { return localStorage.getItem(FILTRO_STORAGE_KEY) ?? ''; } catch { return ''; }
   });
@@ -51,19 +50,14 @@ const Growth = () => {
       <AppNavbar />
 
       <div className="max-w-[1600px] mx-auto p-4 sm:p-5 md:p-6 lg:p-8">
-        {/* Título e seletor de período */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 md:mb-6">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard de Growth</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">Tráfego Meta Ads — escolha o período</p>
-          </div>
-
-          <GrowthDateRange value={periodo} onChange={setPeriodo} />
+        {/* Título */}
+        <div className="mb-4 md:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard de Growth</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Tráfego Meta Ads — cada bloco tem seu próprio período</p>
         </div>
 
-        {/* Funil de Growth - Meta Ads (filtro por campanha/conjunto/anúncio) */}
+        {/* Funil de Growth - Meta Ads (filtro por campanha) */}
         <GrowthFunnelMeta
-          periodo={periodo}
           filtro={filtro}
           onFiltroChange={setFiltro}
           rows={trafegoRows}
@@ -71,10 +65,10 @@ const Growth = () => {
         />
 
         {/* Growth Diário - Meta Ads (dia a dia + CPA + conversão) */}
-        <GrowthDiario periodo={periodo} canEdit={canEdit} filtro={filtro} trafegoRows={trafegoRows} />
+        <GrowthDiario canEdit={canEdit} filtro={filtro} trafegoRows={trafegoRows} />
 
         {/* Gerenciador - todas as campanhas/conjuntos/anúncios com status */}
-        <GerenciadorMeta periodo={periodo} />
+        <GerenciadorMeta />
       </div>
     </div>
   );
