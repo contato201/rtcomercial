@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Plus, Trash2, Calendar, User, Pencil, Check, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ORIGENS_LEAD, ORIGEM_TRAFEGO_LEAD } from '@/components/dashboard/ReunioesEditor';
 import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +18,7 @@ export interface AgendamentoRow {
   month: string;
   pessoa: string;
   quantidade: number;
+  origem: string;
   data_lancamento: string;
   created_at: string;
 }
@@ -24,7 +27,7 @@ interface AgendamentosEditorProps {
   selectedMonth: number;
   agendamentos: AgendamentoRow[];
   metaAgendamentos: number;
-  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string) => Promise<void>;
+  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
   canEdit: boolean;
 }
@@ -39,7 +42,7 @@ interface SdrSlotProps {
   entries: AgendamentoRow[];
   selectedMonth: number;
   canEdit: boolean;
-  onAdd: (pessoa: string, qtd: number, dataLancamento: string) => Promise<void>;
+  onAdd: (pessoa: string, qtd: number, dataLancamento: string, origem: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onRename: (newName: string) => Promise<void>;
   iconColor?: string;
@@ -67,6 +70,7 @@ const SdrSlot = ({
 }: SdrSlotProps) => {
   const [quantidade, setQuantidade] = useState('');
   const [dataLancamento, setDataLancamento] = useState(todayISO);
+  const [origem, setOrigem] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -90,12 +94,17 @@ const SdrSlot = ({
       setError('Selecione a data');
       return;
     }
+    if (!origem) {
+      setError('Escolha a origem do agendamento');
+      return;
+    }
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(name, qtd, dataLancamento);
+      await onAdd(name, qtd, dataLancamento, origem);
       setQuantidade('');
       setDataLancamento(todayISO());
+      setOrigem('');
     } catch {
       setError('Erro ao adicionar');
     } finally {
@@ -208,6 +217,16 @@ const SdrSlot = ({
               className="flex-1 text-xs"
             />
           </div>
+          <Select value={origem} onValueChange={setOrigem}>
+            <SelectTrigger className="text-xs h-9">
+              <SelectValue placeholder="Origem do agendamento" />
+            </SelectTrigger>
+            <SelectContent>
+              {ORIGENS_LEAD.map((o) => (
+                <SelectItem key={o} value={o}>{o}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex gap-2">
             <Input
               type="number"
@@ -229,9 +248,21 @@ const SdrSlot = ({
       {entries.length > 0 && (
         <div className="max-h-32 overflow-y-auto space-y-1">
           {entries.map((a) => (
-            <div key={a.id} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1">
-              <span>{formatDate(a.data_lancamento)}</span>
-              <span className="font-medium">+{a.quantidade}</span>
+            <div key={a.id} className="flex items-center justify-between gap-1 text-xs bg-muted/50 rounded px-2 py-1">
+              <span className="shrink-0">{formatDate(a.data_lancamento)}</span>
+              {a.origem && (
+                <span
+                  className={`truncate rounded px-1.5 py-0.5 text-[10px] ${
+                    a.origem === ORIGEM_TRAFEGO_LEAD
+                      ? 'bg-primary/15 text-primary font-semibold'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                  title={a.origem}
+                >
+                  {a.origem === ORIGEM_TRAFEGO_LEAD ? '🚀 ' : ''}{a.origem}
+                </span>
+              )}
+              <span className="font-medium shrink-0">+{a.quantidade}</span>
               {canEdit && (
                 <Button
                   variant="ghost"
@@ -388,7 +419,7 @@ export const AgendamentosEditor = ({
                 entries={slot.entries}
                 selectedMonth={selectedMonth}
                 canEdit={canEdit}
-                onAdd={(pessoa, qtd, dataLancamento) => onAddAgendamento(selectedMonth, pessoa, qtd, dataLancamento)}
+                onAdd={(pessoa, qtd, dataLancamento, origem) => onAddAgendamento(selectedMonth, pessoa, qtd, dataLancamento, origem)}
                 onDelete={onDeleteAgendamento}
                 onRename={(newName) => handleRename(i, newName)}
                 iconColor={iconColors[i]}

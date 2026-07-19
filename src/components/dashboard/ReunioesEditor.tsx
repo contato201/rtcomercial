@@ -34,6 +34,9 @@ export const ORIGENS_LEAD = [
   'Outros',
 ] as const;
 
+// Origem que alimenta o funil de Growth / tráfego pago (usada em agendamentos e reuniões)
+export const ORIGEM_TRAFEGO_LEAD = 'Tráfego Pago';
+
 interface ReunioesEditorProps {
   selectedMonth: number;
   tipo: 'primeira' | 'segunda';

@@ -20,6 +20,7 @@ export type Database = {
           data_lancamento: string
           id: string
           month: string
+          origem: string | null
           pessoa: string
           quantidade: number
           updated_at: string
@@ -29,6 +30,7 @@ export type Database = {
           data_lancamento?: string
           id?: string
           month: string
+          origem?: string | null
           pessoa: string
           quantidade?: number
           updated_at?: string
@@ -38,6 +40,7 @@ export type Database = {
           data_lancamento?: string
           id?: string
           month?: string
+          origem?: string | null
           pessoa?: string
           quantidade?: number
           updated_at?: string

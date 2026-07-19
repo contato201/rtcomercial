@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { isTrafego } from "@/lib/origens";
+import { ORIGEM_TRAFEGO_LEAD } from "@/components/dashboard/ReunioesEditor";
 import { GrowthDateRange, periodoPadrao, type Periodo } from "@/components/growth/GrowthDateRange";
 import type { TrafegoRow } from "@/hooks/useTrafegoDiario";
 import { Filter, Megaphone, MousePointerClick, Users, CalendarCheck, DollarSign, Eye, X } from "lucide-react";
@@ -37,11 +38,12 @@ export const GrowthFunnelMeta = ({ filtro, onFiltroChange, rows, rowsLoading }: 
   useEffect(() => {
     (async () => {
       const [ag, vd] = await Promise.all([
-        (supabase as any).from("agendamentos").select("quantidade,data_lancamento"),
+        (supabase as any).from("agendamentos").select("quantidade,data_lancamento,origem"),
         (supabase as any).from("vendas_unitarias").select("valor,origem,created_at"),
       ]);
+      // Só agendamentos de tráfego pago entram no funil de Growth (senão o número infla e distorce o custo por agendamento).
       const reunioes = (ag.data || [])
-        .filter((r: any) => noPeriodo(String(r.data_lancamento ?? "").slice(0, 10), periodo))
+        .filter((r: any) => r.origem === ORIGEM_TRAFEGO_LEAD && noPeriodo(String(r.data_lancamento ?? "").slice(0, 10), periodo))
         .reduce((s: number, r: any) => s + (r.quantidade || 0), 0);
       const vendasTrafego = (vd.data || []).filter(
         (r: any) => isTrafego(r.origem) && noPeriodo(localYmd(r.created_at), periodo),
@@ -89,7 +91,7 @@ export const GrowthFunnelMeta = ({ filtro, onFiltroChange, rows, rowsLoading }: 
     { label: "Impressões", valor: agg.imp, icon: Eye, conv: null as string | null, meta: true },
     { label: "Cliques", valor: agg.cli, icon: MousePointerClick, conv: pct(agg.cli, agg.imp), meta: true },
     { label: "Leads", valor: agg.leads, icon: Users, conv: pct(agg.leads, agg.cli), meta: true },
-    { label: "Reuniões marcadas", valor: com.reunioes, icon: CalendarCheck, conv: pct(com.reunioes, agg.leads), meta: false },
+    { label: "Agendamentos (tráfego)", valor: com.reunioes, icon: CalendarCheck, conv: pct(com.reunioes, agg.leads), meta: false },
     { label: "Vendas (tráfego)", valor: com.vendas, icon: DollarSign, conv: pct(com.vendas, com.reunioes), meta: false },
   ];
   const maxVal = Math.max(agg.imp, 1);
@@ -200,7 +202,7 @@ export const GrowthFunnelMeta = ({ filtro, onFiltroChange, rows, rowsLoading }: 
           </div>
 
           <p className="text-xs text-muted-foreground mt-4">
-            🔵 <strong>Impressões, Cliques, Leads</strong> vêm da Meta (filtráveis por campanha). 🟡 <strong>Reuniões</strong> são os agendamentos do período. 💰 <strong>Vendas e Faturamento</strong> contam apenas as vendas marcadas como <strong>origem "Tráfego pago"</strong> no período (lançadas no dashboard comercial).
+            🔵 <strong>Impressões, Cliques, Leads</strong> vêm da Meta (filtráveis por campanha). 🟡 <strong>Agendamentos, Vendas e Faturamento</strong> contam apenas o que foi marcado como <strong>origem "Tráfego Pago"</strong> no dashboard comercial (por isso o Custo por Agendamento e o ROAS ficam reais).
           </p>
         </>
       )}
