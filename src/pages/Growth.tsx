@@ -5,6 +5,7 @@ import { AppNavbar } from '@/components/AppNavbar';
 import { GrowthFunnelMeta } from '@/components/growth/GrowthFunnelMeta';
 import { GrowthDiario } from '@/components/growth/GrowthDiario';
 import { GrowthDateRange, periodoPadrao, type Periodo } from '@/components/growth/GrowthDateRange';
+import { GerenciadorMeta } from '@/components/growth/GerenciadorMeta';
 import { useTrafegoDiario, type NivelTrafego } from '@/hooks/useTrafegoDiario';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -83,6 +84,9 @@ const Growth = () => {
 
         {/* Growth Diário - Meta Ads (dia a dia + CPA + conversão) */}
         <GrowthDiario periodo={periodo} canEdit={canEdit} filtro={filtro} trafegoRows={trafegoRows} />
+
+        {/* Gerenciador - todas as campanhas/conjuntos/anúncios com status */}
+        <GerenciadorMeta periodo={periodo} />
       </div>
     </div>
   );

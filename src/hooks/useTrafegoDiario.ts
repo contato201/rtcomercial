@@ -15,7 +15,9 @@ export const NIVEIS: { value: NivelTrafego; label: string; plural: string }[] = 
 // pra o filtro "contém" achar mesmo quando o texto está no nome da campanha.
 export interface TrafegoRow {
   data: string; // YYYY-MM-DD
+  entityId: string; // id da campanha/conjunto/anúncio na Meta
   nome: string;
+  contexto: string; // onde vive: campanha (e conjunto) "pai", para exibição
   busca: string;
   investimento: number;
   leads: number;
@@ -24,17 +26,22 @@ export interface TrafegoRow {
 }
 
 const TABELAS: Record<NivelTrafego, { tabela: string; campos: string }> = {
-  campanha: { tabela: "growth_campanha_diario", campos: "data,campaign_name,investimento,leads,impressoes,cliques" },
-  conjunto: { tabela: "growth_conjunto_diario", campos: "data,adset_name,campaign_name,investimento,leads,impressoes,cliques" },
-  anuncio: { tabela: "growth_anuncio_diario", campos: "data,ad_name,adset_name,campaign_name,investimento,leads,impressoes,cliques" },
+  campanha: { tabela: "growth_campanha_diario", campos: "data,campaign_id,campaign_name,investimento,leads,impressoes,cliques" },
+  conjunto: { tabela: "growth_conjunto_diario", campos: "data,adset_id,adset_name,campaign_name,investimento,leads,impressoes,cliques" },
+  anuncio: { tabela: "growth_anuncio_diario", campos: "data,ad_id,ad_name,adset_name,campaign_name,investimento,leads,impressoes,cliques" },
 };
 
 const normaliza = (nivel: NivelTrafego, r: any): TrafegoRow => {
   const nome = nivel === "campanha" ? r.campaign_name : nivel === "conjunto" ? r.adset_name : r.ad_name;
+  const entityId = nivel === "campanha" ? r.campaign_id : nivel === "conjunto" ? r.adset_id : r.ad_id;
+  const contexto =
+    nivel === "campanha" ? "" : nivel === "conjunto" ? String(r.campaign_name ?? "") : [r.campaign_name, r.adset_name].filter(Boolean).join(" · ");
   const busca = [r.campaign_name, r.adset_name, r.ad_name].filter(Boolean).join(" · ").toUpperCase();
   return {
     data: String(r.data),
+    entityId: String(entityId ?? ""),
     nome: String(nome ?? ""),
+    contexto,
     busca,
     investimento: Number(r.investimento || 0),
     leads: r.leads || 0,

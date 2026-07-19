@@ -107,6 +107,32 @@ Deno.serve(async (req) => {
       if (error) throw error;
     }
 
+    // Entidades (nome + status ativo/pausado) — para o "gerenciador" do dashboard
+    const entBase = `https://graph.facebook.com/${GV}/${META_ACC}`;
+    const [entCamps, entAdsets, entAds] = await Promise.all([
+      fetchAll(`${entBase}/campaigns?fields=id,name,effective_status&limit=500&access_token=${META_TOKEN}`),
+      fetchAll(`${entBase}/adsets?fields=id,name,effective_status,campaign{name}&limit=500&access_token=${META_TOKEN}`),
+      fetchAll(`${entBase}/ads?fields=id,name,effective_status,campaign{name},adset{name}&limit=500&access_token=${META_TOKEN}`),
+    ]);
+    const entData = [
+      ...entCamps.map((c: any) => ({
+        entity_id: c.id, tipo: "campanha", nome: c.name ?? "", status: c.effective_status ?? "",
+        campaign_name: c.name ?? "", adset_name: "", updated_at: new Date().toISOString(),
+      })),
+      ...entAdsets.map((s: any) => ({
+        entity_id: s.id, tipo: "conjunto", nome: s.name ?? "", status: s.effective_status ?? "",
+        campaign_name: s.campaign?.name ?? "", adset_name: s.name ?? "", updated_at: new Date().toISOString(),
+      })),
+      ...entAds.map((a: any) => ({
+        entity_id: a.id, tipo: "anuncio", nome: a.name ?? "", status: a.effective_status ?? "",
+        campaign_name: a.campaign?.name ?? "", adset_name: a.adset?.name ?? "", updated_at: new Date().toISOString(),
+      })),
+    ];
+    if (entData.length) {
+      const { error } = await supabase.from("meta_entidades").upsert(entData, { onConflict: "entity_id" });
+      if (error) throw error;
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
@@ -114,6 +140,7 @@ Deno.serve(async (req) => {
         campanha_dias: campData.length,
         conjunto_dias: adsetData.length,
         anuncio_dias: adData.length,
+        entidades: entData.length,
         ate: fmt(until),
       }),
       { headers: { "Content-Type": "application/json" } },
