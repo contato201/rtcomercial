@@ -6,11 +6,10 @@ import { GrowthFunnelMeta } from '@/components/growth/GrowthFunnelMeta';
 import { GrowthDiario } from '@/components/growth/GrowthDiario';
 import { GrowthDateRange, periodoPadrao, type Periodo } from '@/components/growth/GrowthDateRange';
 import { GerenciadorMeta } from '@/components/growth/GerenciadorMeta';
-import { useTrafegoDiario, type NivelTrafego } from '@/hooks/useTrafegoDiario';
+import { useTrafegoDiario } from '@/hooks/useTrafegoDiario';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const FILTRO_STORAGE_KEY = 'growth-filtro-campanha';
-const NIVEL_STORAGE_KEY = 'growth-filtro-nivel';
 
 const Growth = () => {
   const { canEdit } = useAuth();
@@ -28,17 +27,8 @@ const Growth = () => {
       else localStorage.removeItem(FILTRO_STORAGE_KEY);
     } catch { /* armazenamento indisponível — filtro segue só em memória */ }
   };
-  const [nivel, setNivelState] = useState<NivelTrafego>(() => {
-    try {
-      const s = localStorage.getItem(NIVEL_STORAGE_KEY);
-      return s === 'conjunto' || s === 'anuncio' ? s : 'campanha';
-    } catch { return 'campanha'; }
-  });
-  const setNivel = (n: NivelTrafego) => {
-    setNivelState(n);
-    try { localStorage.setItem(NIVEL_STORAGE_KEY, n); } catch { /* ok */ }
-  };
-  const { rows: trafegoRows, loading: trafegoLoading } = useTrafegoDiario(nivel);
+  // O funil analisa por campanha; a visão por conjunto/anúncio fica no Gerenciador.
+  const { rows: trafegoRows, loading: trafegoLoading } = useTrafegoDiario('campanha');
 
   if (isLoading) {
     return (
@@ -76,8 +66,6 @@ const Growth = () => {
           periodo={periodo}
           filtro={filtro}
           onFiltroChange={setFiltro}
-          nivel={nivel}
-          onNivelChange={setNivel}
           rows={trafegoRows}
           rowsLoading={trafegoLoading}
         />

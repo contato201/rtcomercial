@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useTrafegoDiario, NIVEIS, type NivelTrafego } from "@/hooks/useTrafegoDiario";
 import type { Periodo } from "@/components/growth/GrowthDateRange";
-import { LayoutList, Search, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
+import { LayoutList, Search, ArrowUpDown, ArrowDown, ArrowUp, X } from "lucide-react";
 
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 const num = (v: number) => new Intl.NumberFormat("pt-BR").format(Math.round(v || 0));
@@ -45,11 +46,15 @@ interface Props {
 }
 
 // "Gerenciador" — lista todas as campanhas/conjuntos/anúncios da conta Meta com
-// nome, status (ativa/pausada) e métricas do período. Independente do funil.
+// nome, status (ativa/pausada) e métricas do período. Permite SELECIONAR linhas
+// (como no gerenciador da Meta) e ver os números só do que foi selecionado.
 export const GerenciadorMeta = ({ periodo }: Props) => {
   const [tipo, setTipo] = useState<NivelTrafego>("campanha");
   const [buscaTxt, setBuscaTxt] = useState("");
   const [soAtivas, setSoAtivas] = useState(false);
+  const [comDados, setComDados] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [soSelecionadas, setSoSelecionadas] = useState(false);
   const [sortCol, setSortCol] = useState<Coluna>("investimento");
   const [sortDesc, setSortDesc] = useState(true);
   const [entidades, setEntidades] = useState<Entidade[]>([]);
@@ -64,8 +69,15 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
     })();
   }, []);
 
-  const linhas = useMemo(() => {
-    // métricas do período agregadas por entidade
+  // Troca de aba limpa a seleção (ids são de outro tipo)
+  const trocarTipo = (n: NivelTrafego) => {
+    setTipo(n);
+    setSelecionadas(new Set());
+    setSoSelecionadas(false);
+  };
+
+  // Todas as linhas do tipo (métricas do período + status), antes dos filtros
+  const todasLinhas = useMemo(() => {
     const porEntidade = new Map<string, Linha>();
     for (const r of rows) {
       if (r.data < periodo.from || r.data > periodo.to) continue;
@@ -79,7 +91,6 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
       acc.cliques += r.cliques;
       porEntidade.set(r.entityId, acc);
     }
-    // junta com a lista de entidades (traz status e inclui ativas sem gasto no período)
     for (const e of entidades) {
       if (e.tipo !== tipo) continue;
       const atual = porEntidade.get(e.entity_id);
@@ -94,10 +105,17 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
         });
       }
     }
-    let lista = [...porEntidade.values()];
+    return [...porEntidade.values()];
+  }, [rows, entidades, tipo, periodo]);
+
+  // Linhas exibidas (filtros + ordenação)
+  const linhas = useMemo(() => {
+    let lista = todasLinhas;
     const f = buscaTxt.trim().toUpperCase();
     if (f) lista = lista.filter((l) => (l.nome + " " + l.contexto).toUpperCase().includes(f));
     if (soAtivas) lista = lista.filter((l) => l.status === "ACTIVE");
+    if (comDados) lista = lista.filter((l) => l.impressoes > 0 || l.investimento > 0);
+    if (soSelecionadas) lista = lista.filter((l) => selecionadas.has(l.id));
 
     const valor = (l: Linha): number | string => {
       switch (sortCol) {
@@ -108,13 +126,21 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
         default: return l[sortCol];
       }
     };
-    lista.sort((a, b) => {
+    return [...lista].sort((a, b) => {
       const va = valor(a), vb = valor(b);
       const cmp = typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number);
       return sortDesc ? -cmp : cmp;
     });
-    return lista;
-  }, [rows, entidades, tipo, periodo, buscaTxt, soAtivas, sortCol, sortDesc]);
+  }, [todasLinhas, buscaTxt, soAtivas, comDados, soSelecionadas, selecionadas, sortCol, sortDesc]);
+
+  // Resumo do que está selecionado (independe dos filtros de exibição)
+  const selAgg = useMemo(() => {
+    const sel = todasLinhas.filter((l) => selecionadas.has(l.id));
+    return sel.reduce(
+      (a, l) => ({ n: a.n + 1, inv: a.inv + l.investimento, leads: a.leads + l.leads, imp: a.imp + l.impressoes, cli: a.cli + l.cliques }),
+      { n: 0, inv: 0, leads: 0, imp: 0, cli: 0 },
+    );
+  }, [todasLinhas, selecionadas]);
 
   const tot = useMemo(
     () => linhas.reduce(
@@ -123,6 +149,32 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
     ),
     [linhas],
   );
+
+  const toggleLinha = (id: string) => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      if (next.size === 0) setSoSelecionadas(false);
+      return next;
+    });
+  };
+
+  const todasVisiveisMarcadas = linhas.length > 0 && linhas.every((l) => selecionadas.has(l.id));
+  const toggleTodas = () => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (todasVisiveisMarcadas) linhas.forEach((l) => next.delete(l.id));
+      else linhas.forEach((l) => next.add(l.id));
+      if (next.size === 0) setSoSelecionadas(false);
+      return next;
+    });
+  };
+
+  const limparSelecao = () => {
+    setSelecionadas(new Set());
+    setSoSelecionadas(false);
+  };
 
   const ordenar = (c: Coluna) => {
     if (sortCol === c) setSortDesc(!sortDesc);
@@ -161,13 +213,13 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center lg:ml-auto">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center lg:ml-auto flex-wrap">
           <div className="flex rounded-lg border border-border/60 bg-muted/20 p-0.5">
             {NIVEIS.map((n) => (
               <button
                 key={n.value}
                 type="button"
-                onClick={() => setTipo(n.value)}
+                onClick={() => trocarTipo(n.value)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
                   tipo === n.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -180,12 +232,46 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
             <input type="checkbox" checked={soAtivas} onChange={(e) => setSoAtivas(e.target.checked)} className="accent-[hsl(var(--gold))]" />
             Só ativas
           </label>
-          <div className="relative w-full sm:w-64">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
+            <input type="checkbox" checked={comDados} onChange={(e) => setComDados(e.target.checked)} className="accent-[hsl(var(--gold))]" />
+            Com impressões
+          </label>
+          <div className="relative w-full sm:w-56">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input value={buscaTxt} onChange={(e) => setBuscaTxt(e.target.value)} placeholder="Buscar por nome..." className="pl-8" />
           </div>
         </div>
       </div>
+
+      {/* Barra da seleção — números só do que está marcado */}
+      {selAgg.n > 0 && (
+        <div className="mb-4 rounded-lg border-2 border-primary bg-primary/10 p-3 flex flex-col lg:flex-row lg:items-center gap-2">
+          <span className="text-sm font-bold text-primary whitespace-nowrap">✓ {selAgg.n} selecionada(s)</span>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-foreground lg:ml-3">
+            <span><strong>Investido:</strong> {brl(selAgg.inv)}</span>
+            <span><strong>Leads:</strong> {num(selAgg.leads)}</span>
+            <span><strong>CPL:</strong> {selAgg.leads > 0 ? brl(selAgg.inv / selAgg.leads) : "—"}</span>
+            <span><strong>Cliques:</strong> {num(selAgg.cli)}</span>
+            <span><strong>CPC:</strong> {selAgg.cli > 0 ? brl(selAgg.inv / selAgg.cli) : "—"}</span>
+            <span><strong>CTR:</strong> {selAgg.imp > 0 ? `${((selAgg.cli / selAgg.imp) * 100).toFixed(2)}%` : "—"}</span>
+            <span><strong>Impressões:</strong> {num(selAgg.imp)}</span>
+          </div>
+          <div className="flex gap-2 lg:ml-auto">
+            <Button
+              type="button"
+              size="sm"
+              variant={soSelecionadas ? "default" : "outline"}
+              onClick={() => setSoSelecionadas(!soSelecionadas)}
+            >
+              {soSelecionadas ? "Ver todas" : "Ver só selecionadas"}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={limparSelecao}>
+              <X className="w-3.5 h-3.5 mr-1" />
+              Limpar
+            </Button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground py-6 text-center">Carregando…</p>
@@ -196,6 +282,15 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                <th className="py-2 pl-1 pr-2 w-8">
+                  <input
+                    type="checkbox"
+                    checked={todasVisiveisMarcadas}
+                    onChange={toggleTodas}
+                    className="accent-[hsl(var(--gold))] cursor-pointer"
+                    title="Marcar/desmarcar todas as visíveis"
+                  />
+                </th>
                 <Th col="nome" right={false}>Nome</Th>
                 <th className="py-2 px-2 font-semibold text-left">Status</th>
                 <Th col="investimento">Investido</Th>
@@ -210,8 +305,22 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
             <tbody>
               {linhas.map((l) => {
                 const st = statusInfo(l.status);
+                const marcada = selecionadas.has(l.id);
                 return (
-                  <tr key={l.id} className="border-b border-border/40 hover:bg-accent/30">
+                  <tr
+                    key={l.id}
+                    className={`border-b border-border/40 cursor-pointer ${marcada ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-accent/30"}`}
+                    onClick={() => toggleLinha(l.id)}
+                  >
+                    <td className="py-2 pl-1 pr-2">
+                      <input
+                        type="checkbox"
+                        checked={marcada}
+                        onChange={() => toggleLinha(l.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="accent-[hsl(var(--gold))] cursor-pointer"
+                      />
+                    </td>
                     <td className="py-2 px-2 max-w-[380px]">
                       <p className="font-medium text-foreground truncate" title={l.nome}>{l.nome}</p>
                       {l.contexto && <p className="text-[11px] text-muted-foreground truncate" title={l.contexto}>{l.contexto}</p>}
@@ -233,6 +342,7 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
                 );
               })}
               <tr className="bg-accent/40 font-bold">
+                <td className="py-2 pl-1 pr-2" />
                 <td className="py-2 px-2">Total ({linhas.length})</td>
                 <td className="py-2 px-2" />
                 <td className="text-right py-2 px-2">{brl(tot.inv)}</td>
@@ -249,7 +359,7 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
       )}
 
       <p className="text-xs text-muted-foreground mt-3">
-        🟢 Ativa · ⚪ Pausada — status vem da Meta e atualiza na sincronização diária (01:00). Números respeitam o período escolhido no topo. Campanhas ativas sem gasto no período também aparecem.
+        ✓ Clique numa linha (ou na caixinha) pra selecionar — os números da seleção aparecem na barra dourada. 🟢 Ativa · ⚪ Pausada — status vem da Meta e atualiza na sincronização diária (01:00). Números respeitam o período escolhido no topo.
       </p>
     </div>
   );

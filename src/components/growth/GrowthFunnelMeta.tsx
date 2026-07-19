@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { isTrafego } from "@/lib/origens";
 import type { Periodo } from "@/components/growth/GrowthDateRange";
-import { NIVEIS, type NivelTrafego, type TrafegoRow } from "@/hooks/useTrafegoDiario";
+import type { TrafegoRow } from "@/hooks/useTrafegoDiario";
 import { Filter, Megaphone, MousePointerClick, Users, CalendarCheck, DollarSign, Eye, X } from "lucide-react";
 
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -25,13 +25,11 @@ interface Props {
   periodo: Periodo;
   filtro: string;
   onFiltroChange: (v: string) => void;
-  nivel: NivelTrafego;
-  onNivelChange: (n: NivelTrafego) => void;
   rows: TrafegoRow[];
   rowsLoading: boolean;
 }
 
-export const GrowthFunnelMeta = ({ periodo, filtro, onFiltroChange, nivel, onNivelChange, rows, rowsLoading }: Props) => {
+export const GrowthFunnelMeta = ({ periodo, filtro, onFiltroChange, rows, rowsLoading }: Props) => {
   const [com, setCom] = useState({ reunioes: 0, vendas: 0, faturamento: 0 });
 
   // Dados comerciais no período: reuniões (agendamentos por data_lancamento),
@@ -106,37 +104,18 @@ export const GrowthFunnelMeta = ({ periodo, filtro, onFiltroChange, nivel, onNiv
           <div>
             <h3 className="font-bold text-foreground">🚀 Funil de Growth — Meta Ads</h3>
             <p className="text-xs text-muted-foreground">
-              {agg.campanhas.size} {NIVEIS.find((n) => n.value === nivel)?.plural}{filtro.trim() ? ` com "${filtro.trim()}"` : ' — todos'}
+              {agg.campanhas.size} campanha(s){filtro.trim() ? ` com "${filtro.trim()}"` : ' — todas'}
             </p>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          {/* Nível de análise: campanha, conjunto ou anúncio */}
-          <div className="flex rounded-lg border border-border/60 bg-muted/20 p-0.5">
-            {NIVEIS.map((n) => (
-              <button
-                key={n.value}
-                type="button"
-                onClick={() => onNivelChange(n.value)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-                  nivel === n.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {n.label}
-              </button>
-            ))}
-          </div>
-          <div className="relative w-full sm:w-64">
-            <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={filtro}
-              onChange={(e) => onFiltroChange(e.target.value)}
-              placeholder="Filtrar (ex: DIAGNOSTICO)"
-              className={`pl-8 ${filtro.trim() ? 'border-primary ring-1 ring-primary/40' : ''}`}
-            />
-          </div>
+        <div className="relative w-full sm:w-72">
+          <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={filtro}
+            onChange={(e) => onFiltroChange(e.target.value)}
+            placeholder="Filtrar campanha (ex: DIAGNOSTICO)"
+            className={`pl-8 ${filtro.trim() ? 'border-primary ring-1 ring-primary/40' : ''}`}
+          />
         </div>
       </div>
 
