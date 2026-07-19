@@ -41,20 +41,30 @@ const statusInfo = (s: string): { label: string; cor: string } => {
   return { label: s, cor: "bg-muted-foreground/50" };
 };
 
+const PREFIXO: Record<NivelTrafego, string> = { campanha: "CMP", conjunto: "CNJ", anuncio: "ANC" };
+const COR_CHIP: Record<NivelTrafego, string> = {
+  campanha: "border-[hsl(var(--gold))] text-[hsl(var(--gold))] bg-[hsl(var(--gold)/0.1)]",
+  conjunto: "border-violet-400 text-violet-300 bg-violet-400/10",
+  anuncio: "border-sky-400 text-sky-300 bg-sky-400/10",
+};
+
 interface Props {
   periodo: Periodo;
 }
 
-// "Gerenciador" — lista todas as campanhas/conjuntos/anúncios da conta Meta com
-// nome, status (ativa/pausada) e métricas do período. Permite SELECIONAR linhas
-// (como no gerenciador da Meta) e ver os números só do que foi selecionado.
+// "Gerenciador" — lista campanhas/conjuntos/anúncios da conta Meta com status e
+// métricas do período. Seleção estilo Meta com DRILL-DOWN: marcar campanhas
+// filtra as abas Conjuntos/Anúncios só para o que pertence a elas (e conjuntos
+// filtram anúncios). As seleções viram etiquetas removíveis acima da tabela.
 export const GerenciadorMeta = ({ periodo }: Props) => {
   const [tipo, setTipo] = useState<NivelTrafego>("campanha");
   const [buscaTxt, setBuscaTxt] = useState("");
   const [soAtivas, setSoAtivas] = useState(false);
   const [comDados, setComDados] = useState(false);
-  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [soSelecionadas, setSoSelecionadas] = useState(false);
+  const [sel, setSel] = useState<Record<NivelTrafego, Set<string>>>({
+    campanha: new Set(), conjunto: new Set(), anuncio: new Set(),
+  });
   const [sortCol, setSortCol] = useState<Coluna>("investimento");
   const [sortDesc, setSortDesc] = useState(true);
   const [entidades, setEntidades] = useState<Entidade[]>([]);
@@ -69,14 +79,32 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
     })();
   }, []);
 
-  // Troca de aba limpa a seleção (ids são de outro tipo)
+  const entMap = useMemo(() => new Map(entidades.map((e) => [e.entity_id, e])), [entidades]);
+
+  // Nomes das campanhas/conjuntos selecionados — usados pro drill-down por nome
+  const campSelNomes = useMemo(
+    () => new Set([...sel.campanha].map((id) => entMap.get(id)?.campaign_name ?? "").filter(Boolean)),
+    [sel.campanha, entMap],
+  );
+  const conjSelNomes = useMemo(
+    () => new Set([...sel.conjunto].map((id) => entMap.get(id)?.adset_name ?? "").filter(Boolean)),
+    [sel.conjunto, entMap],
+  );
+
   const trocarTipo = (n: NivelTrafego) => {
     setTipo(n);
-    setSelecionadas(new Set());
     setSoSelecionadas(false);
   };
 
-  // Todas as linhas do tipo (métricas do período + status), antes dos filtros
+  // Campanha/conjunto "pai" de uma linha (pra aplicar o drill-down)
+  const paisDaLinha = (l: Linha): { camp: string; conj: string } => {
+    const e = entMap.get(l.id);
+    if (e) return { camp: e.campaign_name, conj: e.adset_name };
+    const partes = l.contexto.split(" · ");
+    return { camp: partes[0] ?? "", conj: partes[1] ?? "" };
+  };
+
+  // Todas as linhas do tipo (métricas do período + status), antes dos filtros de exibição
   const todasLinhas = useMemo(() => {
     const porEntidade = new Map<string, Linha>();
     for (const r of rows) {
@@ -105,8 +133,17 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
         });
       }
     }
-    return [...porEntidade.values()];
-  }, [rows, entidades, tipo, periodo]);
+    let lista = [...porEntidade.values()];
+    // Drill-down: conjuntos respeitam as campanhas marcadas; anúncios respeitam ambas
+    if (tipo !== "campanha" && campSelNomes.size > 0) {
+      lista = lista.filter((l) => campSelNomes.has(paisDaLinha(l).camp));
+    }
+    if (tipo === "anuncio" && conjSelNomes.size > 0) {
+      lista = lista.filter((l) => conjSelNomes.has(paisDaLinha(l).conj));
+    }
+    return lista;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, entidades, tipo, periodo, campSelNomes, conjSelNomes, entMap]);
 
   // Linhas exibidas (filtros + ordenação)
   const linhas = useMemo(() => {
@@ -115,7 +152,7 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
     if (f) lista = lista.filter((l) => (l.nome + " " + l.contexto).toUpperCase().includes(f));
     if (soAtivas) lista = lista.filter((l) => l.status === "ACTIVE");
     if (comDados) lista = lista.filter((l) => l.impressoes > 0 || l.investimento > 0);
-    if (soSelecionadas) lista = lista.filter((l) => selecionadas.has(l.id));
+    if (soSelecionadas) lista = lista.filter((l) => sel[tipo].has(l.id));
 
     const valor = (l: Linha): number | string => {
       switch (sortCol) {
@@ -131,17 +168,18 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
       const cmp = typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number);
       return sortDesc ? -cmp : cmp;
     });
-  }, [todasLinhas, buscaTxt, soAtivas, comDados, soSelecionadas, selecionadas, sortCol, sortDesc]);
+  }, [todasLinhas, buscaTxt, soAtivas, comDados, soSelecionadas, sel, tipo, sortCol, sortDesc]);
 
-  // Resumo do que está selecionado (independe dos filtros de exibição)
+  // Resumo do que está selecionado NA ABA ATUAL (independe dos filtros de exibição)
   const selAgg = useMemo(() => {
-    const sel = todasLinhas.filter((l) => selecionadas.has(l.id));
-    return sel.reduce(
+    const marcadas = todasLinhas.filter((l) => sel[tipo].has(l.id));
+    return marcadas.reduce(
       (a, l) => ({ n: a.n + 1, inv: a.inv + l.investimento, leads: a.leads + l.leads, imp: a.imp + l.impressoes, cli: a.cli + l.cliques }),
       { n: 0, inv: 0, leads: 0, imp: 0, cli: 0 },
     );
-  }, [todasLinhas, selecionadas]);
+  }, [todasLinhas, sel, tipo]);
 
+  // Subtotal do que está na tela
   const tot = useMemo(
     () => linhas.reduce(
       (a, l) => ({ inv: a.inv + l.investimento, leads: a.leads + l.leads, imp: a.imp + l.impressoes, cli: a.cli + l.cliques }),
@@ -150,31 +188,34 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
     [linhas],
   );
 
-  const toggleLinha = (id: string) => {
-    setSelecionadas((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      if (next.size === 0) setSoSelecionadas(false);
+  const mudarSel = (nivel: NivelTrafego, muda: (s: Set<string>) => void) => {
+    setSel((prev) => {
+      const next = { ...prev, [nivel]: new Set(prev[nivel]) };
+      muda(next[nivel]);
       return next;
     });
   };
 
-  const todasVisiveisMarcadas = linhas.length > 0 && linhas.every((l) => selecionadas.has(l.id));
-  const toggleTodas = () => {
-    setSelecionadas((prev) => {
-      const next = new Set(prev);
-      if (todasVisiveisMarcadas) linhas.forEach((l) => next.delete(l.id));
-      else linhas.forEach((l) => next.add(l.id));
-      if (next.size === 0) setSoSelecionadas(false);
-      return next;
-    });
-  };
+  const toggleLinha = (id: string) => mudarSel(tipo, (s) => (s.has(id) ? s.delete(id) : s.add(id)));
 
-  const limparSelecao = () => {
-    setSelecionadas(new Set());
+  const todasVisiveisMarcadas = linhas.length > 0 && linhas.every((l) => sel[tipo].has(l.id));
+  const toggleTodas = () =>
+    mudarSel(tipo, (s) => (todasVisiveisMarcadas ? linhas.forEach((l) => s.delete(l.id)) : linhas.forEach((l) => s.add(l.id))));
+
+  const limparTudo = () => {
+    setSel({ campanha: new Set(), conjunto: new Set(), anuncio: new Set() });
     setSoSelecionadas(false);
   };
+
+  const chips = useMemo(() => {
+    const out: { nivel: NivelTrafego; id: string; nome: string }[] = [];
+    for (const nivel of ["campanha", "conjunto", "anuncio"] as NivelTrafego[]) {
+      for (const id of sel[nivel]) {
+        out.push({ nivel, id, nome: entMap.get(id)?.nome || id });
+      }
+    }
+    return out;
+  }, [sel, entMap]);
 
   const ordenar = (c: Coluna) => {
     if (sortCol === c) setSortDesc(!sortDesc);
@@ -243,7 +284,34 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
         </div>
       </div>
 
-      {/* Barra da seleção — números só do que está marcado */}
+      {/* Etiquetas do que está selecionado (drill-down) — CMP filtra conjuntos/anúncios, CNJ filtra anúncios */}
+      {chips.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {chips.map((c) => (
+            <span
+              key={c.id}
+              className={`inline-flex max-w-[340px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${COR_CHIP[c.nivel]}`}
+              title={c.nome}
+            >
+              <span className="opacity-70">{PREFIXO[c.nivel]}</span>
+              <span className="truncate">{c.nome}</span>
+              <button
+                type="button"
+                onClick={() => mudarSel(c.nivel, (s) => s.delete(c.id))}
+                className="ml-0.5 rounded-full hover:bg-foreground/20 p-0.5"
+                title="Remover"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+          <button type="button" onClick={limparTudo} className="text-[11px] text-muted-foreground hover:text-foreground underline ml-1">
+            limpar tudo
+          </button>
+        </div>
+      )}
+
+      {/* Barra da seleção — números só do que está marcado nesta aba */}
       {selAgg.n > 0 && (
         <div className="mb-4 rounded-lg border-2 border-primary bg-primary/10 p-3 flex flex-col lg:flex-row lg:items-center gap-2">
           <span className="text-sm font-bold text-primary whitespace-nowrap">✓ {selAgg.n} selecionada(s)</span>
@@ -265,7 +333,7 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
             >
               {soSelecionadas ? "Ver todas" : "Ver só selecionadas"}
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={limparSelecao}>
+            <Button type="button" size="sm" variant="outline" onClick={limparTudo}>
               <X className="w-3.5 h-3.5 mr-1" />
               Limpar
             </Button>
@@ -305,7 +373,7 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
             <tbody>
               {linhas.map((l) => {
                 const st = statusInfo(l.status);
-                const marcada = selecionadas.has(l.id);
+                const marcada = sel[tipo].has(l.id);
                 return (
                   <tr
                     key={l.id}
@@ -343,7 +411,7 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
               })}
               <tr className="bg-accent/40 font-bold">
                 <td className="py-2 pl-1 pr-2" />
-                <td className="py-2 px-2">Total ({linhas.length})</td>
+                <td className="py-2 px-2">Subtotal ({linhas.length})</td>
                 <td className="py-2 px-2" />
                 <td className="text-right py-2 px-2">{brl(tot.inv)}</td>
                 <td className="text-right py-2 px-2">{num(tot.leads)}</td>
@@ -359,7 +427,7 @@ export const GerenciadorMeta = ({ periodo }: Props) => {
       )}
 
       <p className="text-xs text-muted-foreground mt-3">
-        ✓ Clique numa linha (ou na caixinha) pra selecionar — os números da seleção aparecem na barra dourada. 🟢 Ativa · ⚪ Pausada — status vem da Meta e atualiza na sincronização diária (01:00). Números respeitam o período escolhido no topo.
+        ✓ Marque campanhas e troque pra aba <strong>Conjuntos</strong>/<strong>Anúncios</strong>: só aparece o que pertence a elas (as etiquetas em cima mostram o filtro — X remove). No <strong>Subtotal</strong>, CPL, CPC e CTR já são a média ponderada do que está na tela. 🟢 Ativa · ⚪ Pausada — status atualiza na sincronização diária (01:00).
       </p>
     </div>
   );
