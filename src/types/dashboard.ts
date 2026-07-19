@@ -51,7 +51,8 @@ export const createEmptyMonthData = (monthIndex: number): MonthData => {
     monthIndex,
     metaVendas: meta.metaVendas,
     realizadoVendas: 0,
-    metaFaturamento: meta.metaVendas * ticket,
+    // Meta de faturamento: usa a personalizada do Planejamento se existir; senão Vendas × Ticket
+    metaFaturamento: meta.metaFaturamento ?? meta.metaVendas * ticket,
     realizadoFaturamento: 0,
     ticketRealizado: ticket,
     metaPrimeiraReuniao: meta.metaPrimeiraReuniao,

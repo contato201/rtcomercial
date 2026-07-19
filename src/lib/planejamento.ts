@@ -6,6 +6,8 @@ export interface MetaMensal {
   metaVendas: number;
   metaPrimeiraReuniao: number;
   metaSegundaReuniao: number;
+  // Meta de faturamento personalizada. null/undefined = automática (Vendas × Ticket).
+  metaFaturamento?: number | null;
 }
 
 export interface PlanejamentoState {
@@ -83,6 +85,7 @@ export const loadPlanejamento = async (): Promise<void> => {
           metaVendas: Number(row.meta_vendas) || 0,
           metaPrimeiraReuniao: Number(row.meta_primeira_reuniao) || 0,
           metaSegundaReuniao: Number(row.meta_segunda_reuniao) || 0,
+          metaFaturamento: row.meta_faturamento != null && Number(row.meta_faturamento) > 0 ? Number(row.meta_faturamento) : null,
         });
       }
       state.metas = DEFAULT_METAS.map((d) => map.get(d.monthIndex) ?? d);
@@ -169,7 +172,8 @@ export const saveMetaMes = async (
   monthIndex: number,
   metaVendas: number,
   metaPrimeiraReuniao: number,
-  metaSegundaReuniao: number
+  metaSegundaReuniao: number,
+  metaFaturamento?: number | null
 ): Promise<void> => {
   const { error } = await (supabase as any)
     .from('planejamento_mensal')
@@ -179,6 +183,8 @@ export const saveMetaMes = async (
         meta_vendas: Math.max(0, Math.round(metaVendas)),
         meta_primeira_reuniao: Math.max(0, Math.round(metaPrimeiraReuniao)),
         meta_segunda_reuniao: Math.max(0, Math.round(metaSegundaReuniao)),
+        // null = meta de faturamento automática (Vendas × Ticket)
+        meta_faturamento: metaFaturamento != null && metaFaturamento > 0 ? Math.round(metaFaturamento) : null,
       },
       { onConflict: 'month_index' }
     );
@@ -230,7 +236,7 @@ export const recalcularFunilMetas = async (): Promise<void> => {
   for (const m of state.metas) {
     const segunda = Math.round(m.metaVendas / tV2);
     const primeira = Math.round(segunda / t21);
-    await saveMetaMes(m.monthIndex, m.metaVendas, primeira, segunda);
+    await saveMetaMes(m.monthIndex, m.metaVendas, primeira, segunda, m.metaFaturamento ?? null);
   }
   await loadPlanejamento();
 };
