@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Input } from "@/components/ui/input";
-import { CalendarDays, TrendingDown } from "lucide-react";
-import { toast } from "sonner";
+import { CalendarDays } from "lucide-react";
 import { GrowthDateRange, periodoPadrao, type Periodo } from "@/components/growth/GrowthDateRange";
 import type { TrafegoRow } from "@/hooks/useTrafegoDiario";
+import { ORIGEM_TRAFEGO_LEAD } from "@/components/dashboard/ReunioesEditor";
 
 interface GrowthDia {
   id: string;
@@ -16,7 +15,6 @@ interface GrowthDia {
   agendamentos: number;
 }
 
-
 const brl = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 
@@ -25,24 +23,35 @@ const custo = (invest: number, qtd: number) => (qtd > 0 ? brl(invest / qtd) : "�
 const pct = (num: number, den: number) => (den > 0 ? `${((num / den) * 100).toFixed(1)}%` : "—");
 
 interface Props {
-  canEdit: boolean;
   filtro: string;
   trafegoRows: TrafegoRow[];
 }
 
-export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
+export const GrowthDiario = ({ filtro, trafegoRows }: Props) => {
   const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
   const [rows, setRows] = useState<GrowthDia[]>([]);
+  // Agendamentos de "Tráfego Pago" por dia (YYYY-MM-DD), vindos do dashboard Comercial
+  const [agPorDia, setAgPorDia] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await (supabase as any)
-      .from("growth_diario")
-      .select("*")
-      .order("data", { ascending: true });
-    if (!error && Array.isArray(data)) setRows(data as GrowthDia[]);
+    const [diario, agendaRes] = await Promise.all([
+      (supabase as any).from("growth_diario").select("*").order("data", { ascending: true }),
+      (supabase as any).from("agendamentos").select("quantidade,data_lancamento,origem"),
+    ]);
+    if (!diario.error && Array.isArray(diario.data)) setRows(diario.data as GrowthDia[]);
+
+    const mapa = new Map<string, number>();
+    if (!agendaRes.error && Array.isArray(agendaRes.data)) {
+      for (const a of agendaRes.data as any[]) {
+        if (a.origem !== ORIGEM_TRAFEGO_LEAD) continue;
+        const dia = String(a.data_lancamento ?? "").slice(0, 10);
+        if (!dia) continue;
+        mapa.set(dia, (mapa.get(dia) ?? 0) + (Number(a.quantidade) || 0));
+      }
+    }
+    setAgPorDia(mapa);
     setLoading(false);
   };
 
@@ -53,12 +62,16 @@ export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
   const filtroAtivo = filtro.trim().length > 0;
 
   const mesRows = useMemo(() => {
-    const noPeriodo = rows.filter((r) => r.data >= periodo.from && r.data <= periodo.to);
-    if (!filtroAtivo) return noPeriodo;
+    const ag = (dia: string) => agPorDia.get(dia) ?? 0;
 
-    // Filtro ativo: soma os números da Meta (investimento/leads/cliques) só das
-    // linhas do nível selecionado (campanha/conjunto/anúncio) que contêm o
-    // texto, dia a dia. Os agendamentos digitados continuam vindo do dia inteiro.
+    if (!filtroAtivo) {
+      return rows
+        .filter((r) => r.data >= periodo.from && r.data <= periodo.to)
+        .map((r) => ({ ...r, agendamentos: ag(r.data) }));
+    }
+
+    // Filtro ativo: investimento/leads/cliques só das campanhas filtradas (dia a dia).
+    // Agendou continua sendo o total de "Tráfego Pago" do dia (não dá pra separar por campanha).
     const f = filtro.trim().toUpperCase();
     const porDia = new Map<string, { investimento: number; leads: number; impressoes: number; cliques: number }>();
     for (const c of trafegoRows) {
@@ -71,39 +84,19 @@ export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
       acc.cliques += c.cliques || 0;
       porDia.set(c.data, acc);
     }
-    const diarioPorData = new Map(noPeriodo.map((r) => [r.data, r]));
+    const diarioPorData = new Map(rows.map((r) => [r.data, r]));
     return [...porDia.entries()]
       .sort(([a], [b]) => (a < b ? -1 : 1))
-      .map(([data, m]) => {
-        const base = diarioPorData.get(data);
-        return {
-          id: base?.id ?? "",
-          data,
-          investimento: m.investimento,
-          leads: m.leads,
-          impressoes: m.impressoes,
-          cliques: m.cliques,
-          agendamentos: base?.agendamentos ?? 0,
-        } as GrowthDia;
-      });
-  }, [rows, trafegoRows, periodo, filtro, filtroAtivo]);
-
-  const saveAgendamentos = async (r: GrowthDia, valor: string) => {
-    if (!r.id) return; // dia sem registro base — não dá pra salvar
-    const num = Math.max(0, parseInt(valor || "0", 10) || 0);
-    if (num === r.agendamentos) return;
-    setSavingId(r.id);
-    const { error } = await (supabase as any)
-      .from("growth_diario")
-      .update({ agendamentos: num })
-      .eq("id", r.id);
-    setSavingId(null);
-    if (error) {
-      toast.error("Erro ao salvar", { description: error.message });
-      return;
-    }
-    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, agendamentos: num } : x)));
-  };
+      .map(([data, m]) => ({
+        id: diarioPorData.get(data)?.id ?? "",
+        data,
+        investimento: m.investimento,
+        leads: m.leads,
+        impressoes: m.impressoes,
+        cliques: m.cliques,
+        agendamentos: ag(data),
+      } as GrowthDia));
+  }, [rows, trafegoRows, agPorDia, periodo, filtro, filtroAtivo]);
 
   const tot = mesRows.reduce(
     (a, r) => ({
@@ -130,7 +123,7 @@ export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
           <div>
             <h3 className="font-bold text-foreground">📅 Growth Diário — Meta Ads</h3>
             <p className="text-xs text-muted-foreground">
-              Investimento e leads vêm automáticos da Meta. Digite os <strong>agendamentos</strong> do dia e o custo por agendamento sai sozinho.
+              Tudo automático: investimento e leads vêm da Meta; os <strong>agendamentos</strong> vêm do que você lança como <strong>"Tráfego Pago"</strong> no dashboard comercial. O custo por agendamento sai sozinho.
             </p>
           </div>
         </div>
@@ -145,7 +138,7 @@ export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
       </div>
       {filtroAtivo && (
         <p className="text-xs text-muted-foreground -mt-2 mb-3">
-          ⚠️ Com o filtro ativo, <strong>Investido, Leads e Cliques</strong> são só das campanhas filtradas. Já <strong>Agendou</strong> é o total digitado do dia (todas as campanhas) — a conversão e o CPA ficam aproximados.
+          ⚠️ Com o filtro ativo, <strong>Investido, Leads e Cliques</strong> são só das campanhas filtradas. Já <strong>Agendou</strong> é o total de "Tráfego Pago" do dia (todas as campanhas) — a conversão e o CPA ficam aproximados.
         </p>
       )}
 
@@ -165,31 +158,20 @@ export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
                 <th className="text-right py-2 px-2 font-semibold">Leads</th>
                 <th className="text-right py-2 px-2 font-semibold" title="Custo por lead">C/ Lead</th>
                 <th className="text-right py-2 px-2 font-semibold">Cliques</th>
-                <th className="text-right py-2 px-2 font-semibold text-primary" title="Agendamentos (você digita)">Agendou ✍️</th>
+                <th className="text-right py-2 px-2 font-semibold text-primary" title="Agendamentos de Tráfego Pago lançados no dashboard comercial">Agendou 🚀</th>
                 <th className="text-right py-2 px-2 font-semibold" title="Taxa de conversão: Agendamentos ÷ Leads">Conv.</th>
                 <th className="text-right py-2 pl-2 font-semibold text-[hsl(var(--success))]" title="Custo por agendamento = Investido ÷ Agendamentos">CPA</th>
               </tr>
             </thead>
             <tbody>
               {mesRows.map((r) => (
-                <tr key={r.id} className="border-b border-border/40 hover:bg-accent/30">
+                <tr key={r.data} className="border-b border-border/40 hover:bg-accent/30">
                   <td className="py-2 pr-3 font-medium text-foreground whitespace-nowrap">{diaFmt(r.data)}</td>
                   <td className="text-right py-2 px-2">{brl(Number(r.investimento))}</td>
                   <td className="text-right py-2 px-2">{r.leads}</td>
                   <td className="text-right py-2 px-2 text-muted-foreground">{custo(Number(r.investimento), r.leads)}</td>
                   <td className="text-right py-2 px-2 text-muted-foreground">{r.cliques}</td>
-                  <td className="text-right py-2 px-2">
-                    <Input
-                      type="number"
-                      min={0}
-                      defaultValue={r.agendamentos}
-                      disabled={!canEdit || !r.id || savingId === r.id}
-                      onBlur={(e) => saveAgendamentos(r, e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-                      className="h-8 w-20 text-right ml-auto"
-                      title={canEdit ? "Digite quantos agendou neste dia (total do dia)" : "Faça login para editar"}
-                    />
-                  </td>
+                  <td className="text-right py-2 px-2 font-semibold text-primary">{r.agendamentos}</td>
                   <td className="text-right py-2 px-2 font-medium">{pct(r.agendamentos, r.leads)}</td>
                   <td className="text-right py-2 pl-2 font-semibold text-[hsl(var(--success))]">
                     {custo(Number(r.investimento), r.agendamentos)}
@@ -202,7 +184,7 @@ export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
                 <td className="text-right py-2 px-2">{tot.leads}</td>
                 <td className="text-right py-2 px-2">{custo(tot.inv, tot.leads)}</td>
                 <td className="text-right py-2 px-2">{tot.cliques}</td>
-                <td className="text-right py-2 px-2">{tot.agend}</td>
+                <td className="text-right py-2 px-2 text-primary">{tot.agend}</td>
                 <td className="text-right py-2 px-2">{pct(tot.agend, tot.leads)}</td>
                 <td className="text-right py-2 pl-2 text-[hsl(var(--success))]">{custo(tot.inv, tot.agend)}</td>
               </tr>
@@ -211,11 +193,9 @@ export const GrowthDiario = ({ canEdit, filtro, trafegoRows }: Props) => {
         </div>
       )}
 
-      {!canEdit && (
-        <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-          <TrendingDown className="w-3 h-3" /> Faça login para digitar os agendamentos.
-        </p>
-      )}
+      <p className="text-xs text-muted-foreground mt-3">
+        💡 O <strong>Agendou</strong> agora é automático — conforme a equipe lança os agendamentos com origem <strong>"Tráfego Pago"</strong> no dashboard comercial (com a data), eles aparecem aqui no dia certo. Não precisa mais digitar.
+      </p>
     </div>
   );
 };

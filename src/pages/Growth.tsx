@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useGrowthData } from '@/hooks/useGrowthData';
-import { useAuth } from '@/hooks/useAuth';
 import { AppNavbar } from '@/components/AppNavbar';
 import { GrowthFunnelMeta } from '@/components/growth/GrowthFunnelMeta';
 import { GrowthDiario } from '@/components/growth/GrowthDiario';
@@ -11,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 const FILTRO_STORAGE_KEY = 'growth-filtro-campanha';
 
 const Growth = () => {
-  const { canEdit } = useAuth();
   const { isLoading } = useGrowthData();
   // Filtro "contém" compartilhado entre o funil e o dia a dia.
   // Fica salvo no navegador até o usuário mudar. (O período é individual
@@ -65,7 +63,7 @@ const Growth = () => {
         />
 
         {/* Growth Diário - Meta Ads (dia a dia + CPA + conversão) */}
-        <GrowthDiario canEdit={canEdit} filtro={filtro} trafegoRows={trafegoRows} />
+        <GrowthDiario filtro={filtro} trafegoRows={trafegoRows} />
 
         {/* Gerenciador - todas as campanhas/conjuntos/anúncios com status */}
         <GerenciadorMeta />
