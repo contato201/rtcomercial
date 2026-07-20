@@ -24,6 +24,7 @@ export type AgendamentoRow = {
   pessoa: string;
   quantidade: number;
   origem: string;
+  lead_nome: string;
   data_lancamento: string;
   created_at: string;
 };
@@ -149,6 +150,7 @@ export const useDashboardData = () => {
         pessoa: String(row.pessoa ?? ''),
         quantidade: toFiniteNumber(row.quantidade),
         origem: String(row.origem ?? ''),
+        lead_nome: String(row.lead_nome ?? ''),
         data_lancamento: row.data_lancamento,
         created_at: row.created_at,
       }));
@@ -526,7 +528,7 @@ export const useDashboardData = () => {
   }, [handlePersistenceError, loadFromDatabase, requireFreshEditorSession]);
 
   // Agendamentos
-  const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string) => {
+  const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string, leadNome?: string) => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const p = pessoaSchema.safeParse(pessoa);
@@ -536,11 +538,13 @@ export const useDashboardData = () => {
     const payload: any = { month: m.data, pessoa: p.data, quantidade: q.data };
     if (dataLancamento) payload.data_lancamento = dataLancamento;
     if (origem !== undefined) payload.origem = origem || null;
+    if (leadNome !== undefined) payload.lead_nome = leadNome.trim() || null;
     const { data: inserted, error } = await supabase.from('agendamentos' as any).insert(payload).select('*').single();
     if (error) { handlePersistenceError('Erro ao inserir agendamento:', error); throw error; }
     const newRow: AgendamentoRow = {
       id: (inserted as any).id, month: (inserted as any).month, pessoa: (inserted as any).pessoa,
       quantidade: (inserted as any).quantidade, origem: String((inserted as any).origem ?? ''),
+      lead_nome: String((inserted as any).lead_nome ?? ''),
       data_lancamento: (inserted as any).data_lancamento, created_at: (inserted as any).created_at,
     };
     setAgendamentos((prev) => [newRow, ...prev]);

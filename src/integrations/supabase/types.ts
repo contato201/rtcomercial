@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           data_lancamento: string
           id: string
+          lead_nome: string | null
           month: string
           origem: string | null
           pessoa: string
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string
           data_lancamento?: string
           id?: string
+          lead_nome?: string | null
           month: string
           origem?: string | null
           pessoa: string
@@ -39,6 +41,7 @@ export type Database = {
           created_at?: string
           data_lancamento?: string
           id?: string
+          lead_nome?: string | null
           month?: string
           origem?: string | null
           pessoa?: string

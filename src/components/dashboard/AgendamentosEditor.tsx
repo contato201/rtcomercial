@@ -19,6 +19,7 @@ export interface AgendamentoRow {
   pessoa: string;
   quantidade: number;
   origem: string;
+  lead_nome: string;
   data_lancamento: string;
   created_at: string;
 }
@@ -27,7 +28,7 @@ interface AgendamentosEditorProps {
   selectedMonth: number;
   agendamentos: AgendamentoRow[];
   metaAgendamentos: number;
-  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string) => Promise<void>;
+  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string, leadNome?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
   canEdit: boolean;
 }
@@ -42,7 +43,7 @@ interface SdrSlotProps {
   entries: AgendamentoRow[];
   selectedMonth: number;
   canEdit: boolean;
-  onAdd: (pessoa: string, qtd: number, dataLancamento: string, origem: string) => Promise<void>;
+  onAdd: (pessoa: string, qtd: number, dataLancamento: string, origem: string, leadNome: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onRename: (newName: string) => Promise<void>;
   iconColor?: string;
@@ -71,6 +72,7 @@ const SdrSlot = ({
   const [quantidade, setQuantidade] = useState('');
   const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [origem, setOrigem] = useState('');
+  const [leadNome, setLeadNome] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -101,10 +103,11 @@ const SdrSlot = ({
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(name, qtd, dataLancamento, origem);
+      await onAdd(name, qtd, dataLancamento, origem, leadNome);
       setQuantidade('');
       setDataLancamento(todayISO());
       setOrigem('');
+      setLeadNome('');
     } catch {
       setError('Erro ao adicionar');
     } finally {
@@ -217,6 +220,13 @@ const SdrSlot = ({
               className="flex-1 text-xs"
             />
           </div>
+          <Input
+            type="text"
+            placeholder="Nome do agendado (opcional)"
+            value={leadNome}
+            onChange={(e) => setLeadNome(e.target.value)}
+            className="text-xs"
+          />
           <Select value={origem} onValueChange={setOrigem}>
             <SelectTrigger className="text-xs h-9">
               <SelectValue placeholder="Origem do agendamento" />
@@ -250,6 +260,9 @@ const SdrSlot = ({
           {entries.map((a) => (
             <div key={a.id} className="flex items-center justify-between gap-1 text-xs bg-muted/50 rounded px-2 py-1">
               <span className="shrink-0">{formatDate(a.data_lancamento)}</span>
+              {a.lead_nome && (
+                <span className="truncate text-muted-foreground" title={a.lead_nome}>{a.lead_nome}</span>
+              )}
               {a.origem && (
                 <span
                   className={`truncate rounded px-1.5 py-0.5 text-[10px] ${
@@ -419,7 +432,7 @@ export const AgendamentosEditor = ({
                 entries={slot.entries}
                 selectedMonth={selectedMonth}
                 canEdit={canEdit}
-                onAdd={(pessoa, qtd, dataLancamento, origem) => onAddAgendamento(selectedMonth, pessoa, qtd, dataLancamento, origem)}
+                onAdd={(pessoa, qtd, dataLancamento, origem, leadNome) => onAddAgendamento(selectedMonth, pessoa, qtd, dataLancamento, origem, leadNome)}
                 onDelete={onDeleteAgendamento}
                 onRename={(newName) => handleRename(i, newName)}
                 iconColor={iconColors[i]}
