@@ -23,10 +23,13 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const root = document.documentElement;
+    localStorage.setItem(STORAGE_KEY, theme);
+    // As telas públicas de reunião mandam no tema enquanto estão abertas
+    // (useTemaClaro). Aqui a gente sai da frente para não desfazer isso.
+    if (root.dataset.temaForcado) return;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
     root.style.colorScheme = theme;
-    localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
   const value: ThemeContextValue = {

@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.sync-meta]
 verify_jwt = false
+
+[functions.sala-token]
+verify_jwt = false

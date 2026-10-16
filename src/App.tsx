@@ -4,11 +4,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RequireAuth } from "@/components/RequireAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Growth from "./pages/Growth";
 import Planejamento from "./pages/Planejamento";
+import Reunioes from "./pages/Reunioes";
+import Sala from "./pages/Sala";
+import EntrarSala from "./pages/EntrarSala";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "@/hooks/useTheme";
 
@@ -28,6 +32,10 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/growth" element={<Growth />} />
               <Route path="/planejamento" element={<Planejamento />} />
+              <Route path="/reunioes" element={<RequireAuth><Reunioes /></RequireAuth>} />
+              {/* Salas de reunião: públicas de propósito — o lead entra sem conta. */}
+              <Route path="/entrar" element={<EntrarSala />} />
+              <Route path="/sala/:slug" element={<Sala />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
