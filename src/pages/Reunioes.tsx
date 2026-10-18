@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Copy, Link2, Loader2, Plus, Video, X } from 'lucide-react';
+import { CalendarPlus, Check, Copy, Link2, Loader2, Plus, Video, X } from 'lucide-react';
 import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,22 +12,24 @@ import { toast } from '@/hooks/use-toast';
 import { ORIGENS_LEAD } from '@/components/dashboard/ReunioesEditor';
 import { fetchSdrNamesFromDb, loadSdrNames } from '@/lib/sdrNames';
 import {
-  cancelaSala, criaSala, linkDaSala, listaSalas, quando, type Sala,
+  cancelaSala, criaSala, duracaoMin, estaEsquecida, fechaSalaEsquecida, linkDaSala,
+  linkGoogleAgenda, listaSalas, quando, situacao, type Sala, type Situacao,
 } from '@/lib/salas';
 
 /**
- * /reunioes — onde a equipe marca a sala e pega o link para mandar ao lead.
+ * /reunioes — onde a equipe marca a sala, manda o convite e vê o histórico.
  *
- * Fase 1: marcar, copiar o link, entrar (como anfitrião ou invisível) e
- * cancelar. O que a reunião vira em dado (presença, duração, transcrição)
- * entra na Fase 2.
+ * Marcar, copiar o link, mandar o convite pelo Google Agenda, entrar (como
+ * anfitrião ou invisível) e cancelar. A reunião se encerra sozinha quando o
+ * anfitrião sai; as que ficaram abertas por acidente esta tela fecha ao abrir.
  */
 
-const SELOS: Record<Sala['status'], { texto: string; classe: string }> = {
+const SELOS: Record<Situacao, { texto: string; classe: string }> = {
   agendada: { texto: 'Agendada', classe: 'border-border bg-muted text-muted-foreground' },
   ao_vivo: { texto: 'Ao vivo', classe: 'border-success/30 bg-success/10 text-success' },
   encerrada: { texto: 'Encerrada', classe: 'border-border bg-muted text-muted-foreground' },
   cancelada: { texto: 'Cancelada', classe: 'border-destructive/30 bg-destructive/10 text-destructive' },
+  nao_aconteceu: { texto: 'Não aconteceu', classe: 'border-warning/30 bg-warning/10 text-warning' },
 };
 
 /** Datetime-local quer "YYYY-MM-DDTHH:mm" no fuso de quem está digitando. */
@@ -64,7 +66,13 @@ const Reunioes = () => {
   async function recarrega() {
     setCarregando(true);
     try {
-      setSalas(await listaSalas());
+      const lista = await listaSalas();
+      // Reunião que ficou "ao vivo" muito além do previsto: o anfitrião saiu
+      // sem a página conseguir avisar. Fecha aqui, para ir ao histórico.
+      const esquecidas = lista.filter((s) => estaEsquecida(s));
+      await Promise.all(esquecidas.map((s) => fechaSalaEsquecida(s.id).catch(() => undefined)));
+      const fechadas = new Set(esquecidas.map((s) => s.id));
+      setSalas(lista.map((s) => (fechadas.has(s.id) ? { ...s, status: 'encerrada' } : s)));
     } catch {
       toast({ title: 'Não consegui carregar as reuniões', variant: 'destructive' });
     } finally {
@@ -89,8 +97,8 @@ const Reunioes = () => {
       setForm({ ...VAZIO, sdr: form.sdr });
       await copiar(sala.slug);
       toast({
-        title: 'Sala criada',
-        description: 'O link já está copiado — é só colar para o lead.',
+        title: 'Sala criada e link copiado',
+        description: 'Para mandar o convite com confirmação, clique em "Google Agenda" na reunião.',
       });
     } catch (e) {
       toast({
@@ -125,18 +133,23 @@ const Reunioes = () => {
     }
   }
 
+  // Próximas em ordem de horário (a mais perto primeiro); histórico do mais recente.
   const proximas = useMemo(
-    () => salas.filter((s) => s.status === 'agendada' || s.status === 'ao_vivo'),
+    () => salas
+      .filter((s) => ['agendada', 'ao_vivo'].includes(situacao(s)))
+      .sort((a, b) => a.inicio.localeCompare(b.inicio)),
     [salas],
   );
   const passadas = useMemo(
-    () => salas.filter((s) => s.status === 'encerrada' || s.status === 'cancelada'),
+    () => salas.filter((s) => ['encerrada', 'cancelada', 'nao_aconteceu'].includes(situacao(s))),
     [salas],
   );
 
   const Linha = ({ sala }: { sala: Sala }) => {
-    const selo = SELOS[sala.status];
-    const ativa = sala.status === 'agendada' || sala.status === 'ao_vivo';
+    const sit = situacao(sala);
+    const selo = SELOS[sit];
+    const ativa = sit === 'agendada' || sit === 'ao_vivo';
+    const minutos = duracaoMin(sala);
     return (
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-5">
         <div className="min-w-0 flex-1">
@@ -150,6 +163,16 @@ const Reunioes = () => {
                 lead compareceu
               </span>
             )}
+            {sit === 'encerrada' && !sala.lead_entrou && (
+              <span className="rounded-full border border-warning/30 bg-warning/10 px-2.5 py-0.5 text-[11px] text-warning">
+                lead não entrou
+              </span>
+            )}
+            {sit === 'encerrada' && (
+              <span className="text-[11px] text-muted-foreground">
+                {minutos !== null ? `durou ${minutos} min` : 'duração não registrada'}
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {sala.titulo} · {quando(sala.inicio)} · SDR {sala.sdr}
@@ -160,6 +183,14 @@ const Reunioes = () => {
 
         {ativa && (
           <div className="flex flex-wrap items-center gap-2">
+            {sit === 'agendada' && (
+              <Button asChild variant="outline" size="sm" title="Abre o seu Google Agenda com o convite pronto">
+                <a href={linkGoogleAgenda(sala)} target="_blank" rel="noreferrer">
+                  <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
+                  Google Agenda
+                </a>
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => copiar(sala.slug)}>
               {copiado === sala.slug ? (
                 <><Check className="mr-1.5 h-3.5 w-3.5" />Copiado</>

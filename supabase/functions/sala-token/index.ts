@@ -196,7 +196,9 @@ Deno.serve(async (req) => {
       if (limpaEmail(corpo.email) !== limpaEmail(sala.lead_email)) {
         return json({ ok: false, erro: "email_nao_confere" }, 403);
       }
-      if (sala.status === "encerrada") return json({ ok: false, erro: "sala_encerrada" }, 410);
+      // Reunião encerrada não barra o lead: se o anfitrião caiu ou saiu sem
+      // querer e voltou, a reunião reabre (logo abaixo). Quem protege a sala
+      // fora de hora é a janela de horário.
       if (!dentroDaJanela) {
         return json({ ok: false, erro: "fora_do_horario", inicio: sala.inicio }, 403);
       }
@@ -221,9 +223,16 @@ Deno.serve(async (req) => {
     // Marca que a reunião começou (e que o lead apareceu) — isso é o dado do
     // funil nascendo sozinho, sem ninguém digitar.
     const mudancas: Record<string, unknown> = {};
-    if (sala.status === "agendada" && papel !== "observador") {
-      mudancas.status = "ao_vivo";
-      mudancas.entrou_em = new Date().toISOString();
+    if (papel !== "observador") {
+      if (sala.status === "agendada") {
+        mudancas.status = "ao_vivo";
+        mudancas.entrou_em = new Date().toISOString();
+      } else if (sala.status === "encerrada") {
+        // Alguém voltou depois de encerrada (queda de internet, saiu sem
+        // querer): reabre, e o fim passa a ser a próxima saída do anfitrião.
+        mudancas.status = "ao_vivo";
+        mudancas.encerrada_em = null;
+      }
     }
     if (papel === "lead" && !sala.lead_entrou) mudancas.lead_entrou = true;
     if (Object.keys(mudancas).length > 0) {
@@ -248,6 +257,8 @@ Deno.serve(async (req) => {
   }
 
   // ── encerrar: só a equipe fecha a reunião ─────────────────────────────────
+  // Chamada sozinha quando o anfitrião sai da sala. Só fecha reunião que
+  // estava acontecendo — nunca carimba fim em reunião que nem começou.
   if (acao === "encerrar") {
     if (!equipe) return json({ ok: false, erro: "nao_autorizado" }, 401);
     const slug = String(corpo.slug ?? "").trim().toLowerCase();
@@ -255,7 +266,7 @@ Deno.serve(async (req) => {
       .from("reunioes_salas")
       .update({ status: "encerrada", encerrada_em: new Date().toISOString() })
       .eq("slug", slug)
-      .neq("status", "cancelada");
+      .eq("status", "ao_vivo");
     if (error) return json({ ok: false, erro: "falha_ao_encerrar" }, 500);
     return json({ ok: true });
   }

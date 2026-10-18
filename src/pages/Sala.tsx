@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowRight, Eye, Loader2, Video } from 'lucide-react';
 import logo from '@/assets/logo.png';
@@ -11,7 +11,9 @@ import { Label } from '@/components/ui/label';
 const SalaAoVivo = lazy(() =>
   import('@/components/sala/SalaAoVivo').then((m) => ({ default: m.SalaAoVivo })),
 );
-import { pedeCracha, quando, type Cracha } from '@/lib/salas';
+import {
+  encerraSala, encerraSalaAoFechar, pedeCracha, quando, tokenDeLogin, type Cracha,
+} from '@/lib/salas';
 import { useTemaClaro } from '@/hooks/useTemaClaro';
 
 /**
@@ -49,18 +51,43 @@ const Sala = () => {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [erro, setErro] = useState('');
+  // Guardado na entrada: ao fechar a aba não dá tempo de buscar o login.
+  const loginGuardado = useRef<string | null>(null);
+
+  const anfitriaoNaSala = etapa === 'ao_vivo' && cracha?.papel === 'anfitriao';
+
+  // O anfitrião fechou a aba (ou o navegador) sem clicar em sair: avisa o
+  // porteiro mesmo assim, para a reunião não ficar "ao vivo" para sempre.
+  useEffect(() => {
+    if (!anfitriaoNaSala) return;
+    const aoFechar = () => {
+      if (loginGuardado.current) encerraSalaAoFechar(slug, loginGuardado.current);
+    };
+    window.addEventListener('pagehide', aoFechar);
+    return () => window.removeEventListener('pagehide', aoFechar);
+  }, [anfitriaoNaSala, slug]);
 
   async function entrar(papel?: 'anfitriao' | 'observador') {
     setErro('');
     setEtapa('entrando');
     try {
       const c = await pedeCracha({ slug, nome: nome.trim(), email: email.trim(), papel });
+      if (c.papel === 'anfitriao') loginGuardado.current = await tokenDeLogin();
       setCracha(c);
       setEtapa('ao_vivo');
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não consegui abrir a sala.');
       setEtapa('porta');
     }
+  }
+
+  /**
+   * Saiu da sala. Se foi o anfitrião, a reunião acaba aqui — é isso que dá a
+   * duração e leva a reunião para o histórico. Se ele voltar, ela reabre.
+   */
+  function saiu() {
+    if (cracha?.papel === 'anfitriao') void encerraSala(slug).catch(() => undefined);
+    setEtapa('saiu');
   }
 
   if (etapa === 'ao_vivo' && cracha) {
@@ -73,22 +100,36 @@ const Sala = () => {
           </div>
         }
       >
-        <SalaAoVivo cracha={cracha} aoSair={() => setEtapa('saiu')} />
+        <SalaAoVivo cracha={cracha} aoSair={saiu} />
       </Suspense>
     );
   }
 
   if (etapa === 'saiu') {
+    const eraAnfitriao = cracha?.papel === 'anfitriao';
     return (
       <Moldura>
         <div className="w-full max-w-md text-center">
-          <h1 className="mb-3 text-2xl font-semibold text-foreground">Você saiu da reunião</h1>
-          <p className="mb-8 text-sm text-muted-foreground">
-            {cracha ? quando(cracha.sala.inicio) : 'Obrigado pela conversa.'}
+          <h1 className="mb-3 text-2xl font-semibold text-foreground">
+            {eraAnfitriao ? 'Reunião encerrada' : 'Você saiu da reunião'}
+          </h1>
+          <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
+            {eraAnfitriao
+              ? 'Ela já foi para o histórico, com a duração. Saiu sem querer? Entre de novo que ela reabre.'
+              : cracha
+                ? quando(cracha.sala.inicio)
+                : 'Obrigado pela conversa.'}
           </p>
-          <Button onClick={() => setEtapa('porta')} variant="outline">
-            Entrar de novo
-          </Button>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button onClick={() => setEtapa('porta')} variant="outline">
+              Entrar de novo
+            </Button>
+            {eraAnfitriao && (
+              <Button asChild>
+                <Link to="/reunioes">Voltar para Reuniões</Link>
+              </Button>
+            )}
+          </div>
         </div>
       </Moldura>
     );
