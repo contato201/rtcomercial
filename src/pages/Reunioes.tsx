@@ -1,27 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CalendarPlus, Check, Copy, Link2, Loader2, Plus, Video, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  CalendarPlus, Check, Copy, Link2, Loader2, Plus, Settings2, Users, Video, X, Zap,
+} from 'lucide-react';
 import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { ORIGENS_LEAD } from '@/components/dashboard/ReunioesEditor';
 import { fetchSdrNamesFromDb, loadSdrNames } from '@/lib/sdrNames';
+import { buscaClosers, salvaClosers } from '@/lib/closerNames';
 import {
-  cancelaSala, criaSala, duracaoMin, estaEsquecida, fechaSalaEsquecida, linkDaSala,
-  linkGoogleAgenda, listaSalas, quando, situacao, type Sala, type Situacao,
+  cancelaSala, criaReuniaoAgora, criaSala, duracaoMin, estaEsquecida, fechaSalaEsquecida,
+  linkDaSala, linkGoogleAgenda, listaSalas, quando, separaEmails, situacao,
+  type AcessoSala, type Sala, type Situacao,
 } from '@/lib/salas';
 
 /**
  * /reunioes — onde a equipe marca a sala, manda o convite e vê o histórico.
  *
- * Marcar, copiar o link, mandar o convite pelo Google Agenda, entrar (como
- * anfitrião ou invisível) e cancelar. A reunião se encerra sozinha quando o
- * anfitrião sai; as que ficaram abertas por acidente esta tela fecha ao abrir.
+ * O SDR marca a reunião; quem atende é o closer. "Começar agora" abre uma
+ * reunião na hora, sem lead. Cada reunião escolhe quem pode entrar: só a lista
+ * de convidados, ou sala de espera (os outros pedem e o anfitrião aceita).
  */
 
 const SELOS: Record<Situacao, { texto: string; classe: string }> = {
@@ -44,22 +49,29 @@ const VAZIO = {
   titulo: 'Reunião de diagnóstico',
   lead_nome: '',
   lead_email: '',
+  outros: '',
   sdr: '',
+  closer: '',
   origem: ORIGENS_LEAD[0] as string,
   inicio: agoraLocal(),
-  duracao_min: 60,
+  acesso: 'espera' as AcessoSala,
 };
 
 const Reunioes = () => {
+  const navigate = useNavigate();
   const [salas, setSalas] = useState<Sala[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [sdrs, setSdrs] = useState<string[]>(loadSdrNames());
+  const [closers, setClosers] = useState<string[]>([]);
+  const [editandoClosers, setEditandoClosers] = useState(false);
   const [form, setForm] = useState({ ...VAZIO });
   const [salvando, setSalvando] = useState(false);
+  const [comecando, setComecando] = useState(false);
   const [copiado, setCopiado] = useState('');
 
   useEffect(() => {
     void fetchSdrNamesFromDb().then(setSdrs);
+    void buscaClosers().then(setClosers).catch(() => undefined);
     void recarrega();
   }, []);
 
@@ -80,21 +92,57 @@ const Reunioes = () => {
     }
   }
 
+  async function copiar(slug: string) {
+    try {
+      await navigator.clipboard.writeText(linkDaSala(slug));
+      setCopiado(slug);
+      setTimeout(() => setCopiado(''), 2000);
+      return true;
+    } catch {
+      toast({ title: 'Copie o link na mão', description: linkDaSala(slug) });
+      return false;
+    }
+  }
+
+  /** "Começar agora": cria, copia o link e já entra como anfitrião. */
+  async function comecarAgora() {
+    setComecando(true);
+    try {
+      const sala = await criaReuniaoAgora();
+      await copiar(sala.slug);
+      navigate(`/sala/${sala.slug}?entrar=1`);
+    } catch (e) {
+      toast({
+        title: 'Não consegui abrir a reunião',
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      });
+      setComecando(false);
+    }
+  }
+
   async function salvar(ev: React.FormEvent) {
     ev.preventDefault();
     if (!form.sdr) {
-      toast({ title: 'Escolha o SDR que vai atender', variant: 'destructive' });
+      toast({ title: 'Escolha o SDR que agendou', variant: 'destructive' });
       return;
     }
     setSalvando(true);
     try {
       const sala = await criaSala({
-        ...form,
+        titulo: form.titulo.trim() || 'Reunião',
+        lead_nome: form.lead_nome.trim(),
+        lead_email: form.lead_email.trim(),
+        convidados: separaEmails(form.outros),
+        sdr: form.sdr,
+        closer: form.closer || null,
+        origem: form.origem,
+        acesso: form.acesso,
         inicio: new Date(form.inicio).toISOString(),
-        duracao_min: Number(form.duracao_min) || 60,
+        duracao_min: 60,
       });
       setSalas((atuais) => [sala, ...atuais]);
-      setForm({ ...VAZIO, sdr: form.sdr });
+      setForm({ ...VAZIO, sdr: form.sdr, closer: form.closer, acesso: form.acesso });
       await copiar(sala.slug);
       toast({
         title: 'Sala criada e link copiado',
@@ -111,18 +159,9 @@ const Reunioes = () => {
     }
   }
 
-  async function copiar(slug: string) {
-    try {
-      await navigator.clipboard.writeText(linkDaSala(slug));
-      setCopiado(slug);
-      setTimeout(() => setCopiado(''), 2000);
-    } catch {
-      toast({ title: 'Copie o link na mão', description: linkDaSala(slug) });
-    }
-  }
-
   async function cancelar(sala: Sala) {
-    if (!window.confirm(`Cancelar a reunião com ${sala.lead_nome}? O link para de funcionar.`)) return;
+    const quem = sala.lead_nome ?? 'esta reunião';
+    if (!window.confirm(`Cancelar a reunião com ${quem}? O link para de funcionar.`)) return;
     try {
       await cancelaSala(sala.id);
       setSalas((atuais) =>
@@ -150,11 +189,12 @@ const Reunioes = () => {
     const selo = SELOS[sit];
     const ativa = sit === 'agendada' || sit === 'ao_vivo';
     const minutos = duracaoMin(sala);
+    const equipe = [sala.closer && `Closer ${sala.closer}`, sala.sdr && `SDR ${sala.sdr}`].filter(Boolean);
     return (
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-5">
         <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
-            <p className="font-semibold text-foreground">{sala.lead_nome}</p>
+            <p className="font-semibold text-foreground">{sala.lead_nome ?? sala.titulo}</p>
             <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${selo.classe}`}>
               {selo.texto}
             </span>
@@ -163,7 +203,7 @@ const Reunioes = () => {
                 lead compareceu
               </span>
             )}
-            {sit === 'encerrada' && !sala.lead_entrou && (
+            {sit === 'encerrada' && !sala.lead_entrou && !sala.instantanea && (
               <span className="rounded-full border border-warning/30 bg-warning/10 px-2.5 py-0.5 text-[11px] text-warning">
                 lead não entrou
               </span>
@@ -175,15 +215,24 @@ const Reunioes = () => {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {sala.titulo} · {quando(sala.inicio)} · SDR {sala.sdr}
-            {sala.origem ? ` · ${sala.origem}` : ''}
+            {[sala.lead_nome ? sala.titulo : null, quando(sala.inicio), ...equipe, sala.origem]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
-          <p className="mt-1 truncate text-xs text-muted-foreground/80">{sala.lead_email}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground/80">
+            {sala.lead_email && <span className="truncate">{sala.lead_email}</span>}
+            {sala.convidados.length > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <Users className="h-3 w-3" />+{sala.convidados.length} convidado{sala.convidados.length > 1 ? 's' : ''}
+              </span>
+            )}
+            <span>{sala.acesso === 'espera' ? 'sala de espera' : 'só convidados'}</span>
+          </p>
         </div>
 
         {ativa && (
           <div className="flex flex-wrap items-center gap-2">
-            {sit === 'agendada' && (
+            {sit === 'agendada' && sala.lead_email && (
               <Button asChild variant="outline" size="sm" title="Abre o seu Google Agenda com o convite pronto">
                 <a href={linkGoogleAgenda(sala)} target="_blank" rel="noreferrer">
                   <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
@@ -195,7 +244,7 @@ const Reunioes = () => {
               {copiado === sala.slug ? (
                 <><Check className="mr-1.5 h-3.5 w-3.5" />Copiado</>
               ) : (
-                <><Copy className="mr-1.5 h-3.5 w-3.5" />Link do lead</>
+                <><Copy className="mr-1.5 h-3.5 w-3.5" />Copiar link</>
               )}
             </Button>
             <Button asChild size="sm">
@@ -208,6 +257,7 @@ const Reunioes = () => {
               variant="ghost"
               size="sm"
               onClick={() => cancelar(sala)}
+              aria-label="Cancelar reunião"
               className="text-muted-foreground hover:text-destructive"
             >
               <X className="h-3.5 w-3.5" />
@@ -223,24 +273,27 @@ const Reunioes = () => {
       <AppNavbar />
 
       <main className="mx-auto max-w-[1100px] px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground">Reuniões</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Marque a sala, mande o link e atenda aqui dentro — sem Meet, sem Zoom.
-          </p>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Reuniões</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Marque a sala, mande o convite e atenda aqui dentro — sem Meet, sem Zoom.
+            </p>
+          </div>
+          <Button onClick={comecarAgora} disabled={comecando} className="h-11 px-5">
+            {comecando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
+            Começar agora
+          </Button>
         </div>
 
-        <form
-          onSubmit={salvar}
-          className="mb-10 rounded-2xl border border-border bg-card p-6"
-        >
+        <form onSubmit={salvar} className="mb-6 rounded-2xl border border-border bg-card p-6">
           <h2 className="mb-5 flex items-center gap-2 font-semibold text-foreground">
             <Plus className="h-4 w-4 text-primary" />
-            Nova reunião
+            Agendar reunião
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="lg:col-span-1">
+            <div>
               <Label htmlFor="lead_nome" className="mb-1.5 block text-xs font-semibold">Nome do lead *</Label>
               <Input
                 id="lead_nome" required value={form.lead_nome}
@@ -257,10 +310,11 @@ const Reunioes = () => {
               />
             </div>
             <div>
-              <Label htmlFor="titulo" className="mb-1.5 block text-xs font-semibold">Título</Label>
+              <Label htmlFor="outros" className="mb-1.5 block text-xs font-semibold">Outros convidados</Label>
               <Input
-                id="titulo" value={form.titulo}
-                onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+                id="outros" value={form.outros}
+                onChange={(e) => setForm({ ...form, outros: e.target.value })}
+                placeholder="socio@empresa.com.br, outro@email.com"
               />
             </div>
 
@@ -272,13 +326,46 @@ const Reunioes = () => {
               />
             </div>
             <div>
-              <Label className="mb-1.5 block text-xs font-semibold">SDR *</Label>
+              <Label className="mb-1.5 block text-xs font-semibold">SDR que agendou *</Label>
               <Select value={form.sdr} onValueChange={(v) => setForm({ ...form, sdr: v })}>
-                <SelectTrigger><SelectValue placeholder="Quem vai atender" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Quem marcou" /></SelectTrigger>
                 <SelectContent>
                   {sdrs.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <Label className="text-xs font-semibold">Closer que vai atender</Label>
+                <button
+                  type="button"
+                  onClick={() => setEditandoClosers((v) => !v)}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                >
+                  <Settings2 className="h-3 w-3" />
+                  {closers.length === 0 ? 'Cadastrar closers' : 'Editar lista'}
+                </button>
+              </div>
+              <Select
+                value={form.closer}
+                onValueChange={(v) => setForm({ ...form, closer: v })}
+                disabled={closers.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={closers.length === 0 ? 'Nenhum closer cadastrado' : 'Quem atende'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {closers.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="titulo" className="mb-1.5 block text-xs font-semibold">Título</Label>
+              <Input
+                id="titulo" value={form.titulo}
+                onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+              />
             </div>
             <div>
               <Label className="mb-1.5 block text-xs font-semibold">Origem do lead</Label>
@@ -288,8 +375,43 @@ const Reunioes = () => {
                   {ORIGENS_LEAD.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <p className="mt-1 text-[11px] text-muted-foreground">Só a equipe vê. Não vai no convite.</p>
             </div>
           </div>
+
+          <fieldset className="mt-5">
+            <legend className="mb-2 text-xs font-semibold text-foreground">Quem pode entrar</legend>
+            <RadioGroup
+              value={form.acesso}
+              onValueChange={(v) => setForm({ ...form, acesso: v as AcessoSala })}
+              className="grid gap-3 sm:grid-cols-2"
+            >
+              <Label
+                htmlFor="acesso-espera"
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4 font-normal has-[[data-state=checked]]:border-primary"
+              >
+                <RadioGroupItem id="acesso-espera" value="espera" className="mt-0.5" />
+                <span>
+                  <span className="block text-sm font-semibold text-foreground">Com sala de espera</span>
+                  <span className="block text-xs leading-relaxed text-muted-foreground">
+                    Os convidados entram direto. Quem não foi convidado pede para entrar e você aceita ou recusa.
+                  </span>
+                </span>
+              </Label>
+              <Label
+                htmlFor="acesso-convidados"
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4 font-normal has-[[data-state=checked]]:border-primary"
+              >
+                <RadioGroupItem id="acesso-convidados" value="convidados" className="mt-0.5" />
+                <span>
+                  <span className="block text-sm font-semibold text-foreground">Só convidados</span>
+                  <span className="block text-xs leading-relaxed text-muted-foreground">
+                    Ninguém além do lead e dos outros convidados consegue entrar.
+                  </span>
+                </span>
+              </Label>
+            </RadioGroup>
+          </fieldset>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={salvando}>
@@ -297,16 +419,27 @@ const Reunioes = () => {
               Criar sala e copiar link
             </Button>
             <p className="text-xs text-muted-foreground">
-              A sala abre 30 min antes e o lead confirma com o e-mail acima.
+              A sala abre 30 min antes do horário.
             </p>
           </div>
         </form>
+
+        {editandoClosers && (
+          <EditorDeClosers
+            closers={closers}
+            aoSalvar={(lista) => {
+              setClosers(lista);
+              if (form.closer && !lista.includes(form.closer)) setForm({ ...form, closer: '' });
+            }}
+            fechar={() => setEditandoClosers(false)}
+          />
+        )}
 
         {carregando ? (
           <p className="py-10 text-center text-sm text-muted-foreground">Carregando…</p>
         ) : (
           <>
-            <section className="mb-10">
+            <section className="mb-10 mt-10">
               <h2 className="mb-4 text-xs font-semibold uppercase tracking-[1.6px] text-muted-foreground">
                 Próximas e ao vivo · {proximas.length}
               </h2>
@@ -337,5 +470,92 @@ const Reunioes = () => {
     </div>
   );
 };
+
+/** Lista de closers: adicionar e tirar nomes. Fica guardada para toda a equipe. */
+function EditorDeClosers({
+  closers, aoSalvar, fechar,
+}: {
+  closers: string[];
+  aoSalvar: (lista: string[]) => void;
+  fechar: () => void;
+}) {
+  const [lista, setLista] = useState(closers);
+  const [novo, setNovo] = useState('');
+  const [salvando, setSalvando] = useState(false);
+
+  function adicionar() {
+    const n = novo.trim();
+    if (!n || lista.includes(n)) return;
+    setLista([...lista, n]);
+    setNovo('');
+  }
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      const salva = await salvaClosers(lista);
+      aoSalvar(salva);
+      toast({ title: 'Lista de closers salva' });
+      fechar();
+    } catch {
+      toast({ title: 'Não consegui salvar a lista', variant: 'destructive' });
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-primary/30 bg-card p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-semibold text-foreground">Closers</h2>
+        <button type="button" onClick={fechar} aria-label="Fechar" className="text-muted-foreground hover:text-foreground">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Quem atende as reuniões. Aparece na sala e no convite ("Reunião com Fulano").
+      </p>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {lista.length === 0 && <p className="text-sm text-muted-foreground">Nenhum closer ainda.</p>}
+        {lista.map((c) => (
+          <span key={c} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-sm text-foreground">
+            {c}
+            <button
+              type="button"
+              onClick={() => setLista(lista.filter((x) => x !== c))}
+              aria-label={`Tirar ${c}`}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Label htmlFor="novo-closer" className="sr-only">Nome do closer</Label>
+        <Input
+          id="novo-closer"
+          value={novo}
+          onChange={(e) => setNovo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              adicionar();
+            }
+          }}
+          placeholder="Nome do closer"
+          className="max-w-xs"
+        />
+        <Button type="button" variant="outline" onClick={adicionar}>Adicionar</Button>
+        <Button type="button" onClick={salvar} disabled={salvando}>
+          {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Salvar lista
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default Reunioes;

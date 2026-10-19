@@ -1,22 +1,27 @@
 // RT Meet — porteiro das salas de reunião.
 //
-// É a ÚNICA porta entre quem está de fora e a tabela `reunioes_salas`. O lead
-// nunca fala com o banco: ele fala com esta função, que roda com a chave de
-// serviço e devolve só o mínimo.
+// É a ÚNICA porta entre quem está de fora e as tabelas `reunioes_salas` e
+// `reunioes_pedidos`. O lead nunca fala com o banco: ele fala com esta função,
+// que roda com a chave de serviço e devolve só o mínimo.
 //
-// Três ações (POST, corpo JSON):
-//   { acao: "buscar", email }                → reuniões daquele e-mail (sem dados sensíveis)
-//   { acao: "entrar", slug, nome?, email? }  → crachá (token) para entrar na sala
-//   { acao: "encerrar", slug }               → marca a reunião como encerrada (só equipe)
+// Ações (POST, corpo JSON):
+//   Visitante (sem login):
+//     { acao: "buscar", email }                         → reuniões daquele e-mail
+//     { acao: "entrar", slug, nome, email, consentiu }  → crachá, ou pedido na sala de espera
+//     { acao: "pedido", pedido_id, chave }              → como está meu pedido (e o crachá, se aceito)
+//   Equipe (JWT do Supabase + e-mail na lista de editores):
+//     { acao: "entrar", slug, papel? }                  → anfitrião, ou observador (invisível)
+//     { acao: "pedidos", slug }                         → quem está esperando para entrar
+//     { acao: "decidir", pedido_id, aceitar }           → aceita ou recusa um pedido
+//     { acao: "encerrar", slug }                        → fecha a reunião (chamado quando o anfitrião sai)
 //
-// Quem é quem:
-//   • equipe logada (JWT do Supabase + e-mail na lista de editores) → anfitrião,
-//     ou observador se pedir `papel: "observador"` (entra invisível e mudo);
-//   • qualquer outra pessoa → lead, e só se o e-mail bater com o da reunião.
+// Quem entra direto: o e-mail do lead e os da lista de convidados. Os outros:
+//   • reunião "só convidados" → barrados;
+//   • reunião com sala de espera → pedem para entrar e o anfitrião decide.
 //
 // Segredos no cofre do Supabase (Edge Functions → secrets):
 //   LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_URL (wss://…livekit.cloud)
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const LK_KEY = Deno.env.get("LIVEKIT_API_KEY") ?? "";
 const LK_SECRET = Deno.env.get("LIVEKIT_API_SECRET") ?? "";
@@ -112,12 +117,108 @@ async function equipeLogada(req: Request) {
   }
 }
 
+// ── Utilidades ──────────────────────────────────────────────────────────────
 const limpaEmail = (v: unknown) => String(v ?? "").trim().toLowerCase();
-const primeiroNome = (v: string) => (v || "").trim().split(/\s+/)[0] ?? "";
+const primeiroNome = (v: unknown) => String(v ?? "").trim().split(/\s+/)[0] ?? "";
+const limpaNome = (v: unknown) => String(v ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
+// Formato simples e sem caracteres que quebrariam o filtro do banco (vírgula,
+// parênteses, chaves, aspas). Basta para e-mail de verdade.
+const EMAIL_OK = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 
-// Janela em que a sala aceita gente: 30 min antes do horário até 4 h depois.
+// Janela em que a sala aceita gente de fora: 30 min antes até 4 h depois.
 const ANTES_MS = 30 * 60 * 1000;
 const DEPOIS_MS = 4 * 60 * 60 * 1000;
+// Teto de pedidos esperando numa sala, para ninguém lotar a fila de propósito.
+const MAX_PEDIDOS_PENDENTES = 30;
+
+type Sala = Record<string, any>;
+type Papel = "anfitriao" | "observador" | "lead" | "convidado";
+
+const dentroDaJanela = (sala: Sala) => {
+  const inicio = new Date(sala.inicio).getTime();
+  const agora = Date.now();
+  return agora >= inicio - ANTES_MS && agora <= inicio + DEPOIS_MS;
+};
+
+/** E-mails que entram direto: o do lead e os da lista de convidados. */
+const listaDeConvidados = (sala: Sala): string[] =>
+  [sala.lead_email, ...(sala.convidados ?? [])].map(limpaEmail).filter(Boolean);
+
+/** Com quem é a reunião, do jeito que o lead vê: o closer, ou o SDR. */
+const comQuem = (sala: Sala) => primeiroNome(sala.closer) || primeiroNome(sala.sdr) || null;
+
+/**
+ * Marca no banco que a reunião começou, que alguém de fora apareceu e o
+ * consentimento — é o dado do funil nascendo sozinho, sem ninguém digitar.
+ */
+async function registraEntrada(db: SupabaseClient, sala: Sala, papel: Papel, consentiu: boolean) {
+  const mudancas: Record<string, unknown> = {};
+  if (papel !== "observador") {
+    if (sala.status === "agendada") {
+      mudancas.status = "ao_vivo";
+      mudancas.entrou_em = new Date().toISOString();
+    } else if (sala.status === "encerrada") {
+      // Alguém voltou depois de encerrada (queda de internet, saiu sem
+      // querer): reabre, e o fim passa a ser a próxima saída do anfitrião.
+      mudancas.status = "ao_vivo";
+      mudancas.encerrada_em = null;
+    }
+  }
+  const deFora = papel === "lead" || papel === "convidado";
+  if (deFora && !sala.lead_entrou) mudancas.lead_entrou = true;
+  if (deFora && consentiu && !sala.consentimento_em) {
+    mudancas.consentimento_em = new Date().toISOString();
+  }
+  if (Object.keys(mudancas).length > 0) {
+    await db.from("reunioes_salas").update(mudancas).eq("id", sala.id);
+  }
+}
+
+/** Monta a resposta com o crachá. Quem é de fora recebe menos informação. */
+async function respostaComCracha(sala: Sala, papel: Papel, nome: string, consentiu: boolean) {
+  const equipe = papel === "anfitriao" || papel === "observador";
+  const token = await criaCracha({
+    identidade: `${papel}-${crypto.randomUUID().slice(0, 8)}`,
+    nome,
+    sala: `rt-${sala.slug}`,
+    podePublicar: papel !== "observador",
+    invisivel: papel === "observador",
+    admin: papel === "anfitriao",
+    // `consentiu` diz às próximas fases (transcrição, análise do rosto) se
+    // podem processar essa pessoa. Equipe é sempre sim; quem é de fora, só
+    // se marcou "Concordo".
+    metadata: { papel, sala_id: sala.id, consentiu: equipe ? true : consentiu },
+  });
+
+  return json({
+    ok: true,
+    token,
+    url: LK_URL,
+    papel,
+    sala: {
+      slug: sala.slug,
+      titulo: sala.titulo,
+      inicio: sala.inicio,
+      com: comQuem(sala),
+      // Daqui pra baixo, só a equipe vê. O lead nunca recebe origem, SDR,
+      // closer completo nem o nome cadastrado de outras pessoas.
+      lead_nome: equipe ? sala.lead_nome : null,
+      sdr: equipe ? sala.sdr : null,
+      closer: equipe ? sala.closer : null,
+      origem: equipe ? sala.origem : null,
+      acesso: equipe ? sala.acesso : null,
+    },
+  });
+}
+
+async function buscaSala(db: SupabaseClient, slug: unknown) {
+  const s = String(slug ?? "").trim().toLowerCase();
+  if (!s) return { erro: json({ ok: false, erro: "sala_invalida" }, 400) };
+  const { data, error } = await db.from("reunioes_salas").select("*").eq("slug", s).maybeSingle();
+  if (error) return { erro: json({ ok: false, erro: "falha_na_busca" }, 500) };
+  if (!data) return { erro: json({ ok: false, erro: "sala_nao_encontrada" }, 404) };
+  return { sala: data as Sala };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -141,13 +242,13 @@ Deno.serve(async (req) => {
   // ── buscar: o lead digita o e-mail e descobre a reunião dele ──────────────
   if (acao === "buscar") {
     const email = limpaEmail(corpo.email);
-    if (!email.includes("@")) return json({ ok: false, erro: "email_invalido" }, 400);
+    if (!EMAIL_OK.test(email)) return json({ ok: false, erro: "email_invalido" }, 400);
 
     const agora = Date.now();
     const { data, error } = await db
       .from("reunioes_salas")
-      .select("slug, titulo, inicio, duracao_min, sdr, status")
-      .eq("lead_email", email)
+      .select("slug, titulo, inicio, duracao_min, sdr, closer, status")
+      .or(`lead_email.eq."${email}",convidados.cs.{"${email}"}`)
       .in("status", ["agendada", "ao_vivo"])
       .gte("inicio", new Date(agora - DEPOIS_MS).toISOString())
       .order("inicio", { ascending: true })
@@ -160,100 +261,131 @@ Deno.serve(async (req) => {
       titulo: s.titulo,
       inicio: s.inicio,
       duracao_min: s.duracao_min,
-      // só o primeiro nome do SDR — ninguém precisa da lista da equipe
-      com: primeiroNome(s.sdr),
+      com: comQuem(s),
       aberta: new Date(s.inicio).getTime() - ANTES_MS <= agora,
     }));
 
     return json({ ok: true, salas });
   }
 
-  // ── entrar: devolve o crachá para entrar na sala ──────────────────────────
+  // ── entrar ────────────────────────────────────────────────────────────────
   if (acao === "entrar") {
-    const slug = String(corpo.slug ?? "").trim().toLowerCase();
-    if (!slug) return json({ ok: false, erro: "sala_invalida" }, 400);
-
-    const { data: sala, error } = await db
-      .from("reunioes_salas")
-      .select("*")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (error) return json({ ok: false, erro: "falha_na_busca" }, 500);
-    if (!sala) return json({ ok: false, erro: "sala_nao_encontrada" }, 404);
+    const { sala, erro } = await buscaSala(db, corpo.slug);
+    if (erro) return erro;
     if (sala.status === "cancelada") return json({ ok: false, erro: "sala_cancelada" }, 410);
 
-    const inicio = new Date(sala.inicio).getTime();
-    const agora = Date.now();
-    const dentroDaJanela = agora >= inicio - ANTES_MS && agora <= inicio + DEPOIS_MS;
-
-    let papel: "anfitriao" | "observador" | "lead";
-
+    // Equipe logada: entra sempre, a qualquer hora.
     if (equipe) {
-      papel = corpo.papel === "observador" ? "observador" : "anfitriao";
-    } else {
-      // Visitante: só entra se for o lead da reunião e dentro do horário.
-      if (limpaEmail(corpo.email) !== limpaEmail(sala.lead_email)) {
-        return json({ ok: false, erro: "email_nao_confere" }, 403);
-      }
-      // Reunião encerrada não barra o lead: se o anfitrião caiu ou saiu sem
-      // querer e voltou, a reunião reabre (logo abaixo). Quem protege a sala
-      // fora de hora é a janela de horário.
-      if (!dentroDaJanela) {
-        return json({ ok: false, erro: "fora_do_horario", inicio: sala.inicio }, 403);
-      }
-      papel = "lead";
+      const papel: Papel = corpo.papel === "observador" ? "observador" : "anfitriao";
+      const nome = limpaNome(corpo.nome) || equipe.email.split("@")[0] || "Equipe RT";
+      await registraEntrada(db, sala, papel, true);
+      return respostaComCracha(sala, papel, nome, true);
     }
 
-    const nomeInformado = String(corpo.nome ?? "").trim().slice(0, 60);
-    const nome = papel === "lead"
-      ? (nomeInformado || sala.lead_nome)
-      : (nomeInformado || equipe?.email?.split("@")[0] || "Equipe RT");
-
-    const token = await criaCracha({
-      identidade: `${papel}-${crypto.randomUUID().slice(0, 8)}`,
-      nome,
-      sala: `rt-${sala.slug}`,
-      podePublicar: papel !== "observador",
-      invisivel: papel === "observador",
-      admin: papel === "anfitriao",
-      metadata: { papel, sala_id: sala.id },
-    });
-
-    // Marca que a reunião começou (e que o lead apareceu) — isso é o dado do
-    // funil nascendo sozinho, sem ninguém digitar.
-    const mudancas: Record<string, unknown> = {};
-    if (papel !== "observador") {
-      if (sala.status === "agendada") {
-        mudancas.status = "ao_vivo";
-        mudancas.entrou_em = new Date().toISOString();
-      } else if (sala.status === "encerrada") {
-        // Alguém voltou depois de encerrada (queda de internet, saiu sem
-        // querer): reabre, e o fim passa a ser a próxima saída do anfitrião.
-        mudancas.status = "ao_vivo";
-        mudancas.encerrada_em = null;
-      }
-    }
-    if (papel === "lead" && !sala.lead_entrou) mudancas.lead_entrou = true;
-    if (Object.keys(mudancas).length > 0) {
-      await db.from("reunioes_salas").update(mudancas).eq("id", sala.id);
+    // Visitante. Reunião encerrada não barra: se o anfitrião caiu e voltou,
+    // ela reabre. Quem protege a sala fora de hora é a janela de horário.
+    if (!dentroDaJanela(sala)) {
+      return json({ ok: false, erro: "fora_do_horario", inicio: sala.inicio }, 403);
     }
 
-    return json({
-      ok: true,
-      token,
-      url: LK_URL,
-      papel,
-      sala: {
-        slug: sala.slug,
-        titulo: sala.titulo,
-        inicio: sala.inicio,
-        lead_nome: sala.lead_nome,
-        sdr: sala.sdr,
-        origem: papel === "lead" ? null : sala.origem,
-        gravar: sala.gravar,
-      },
-    });
+    const email = limpaEmail(corpo.email);
+    const consentiu = corpo.consentiu === true;
+    const convidado = listaDeConvidados(sala).includes(email);
+
+    if (convidado) {
+      const papel: Papel = email === limpaEmail(sala.lead_email) ? "lead" : "convidado";
+      const nome = limpaNome(corpo.nome) || (papel === "lead" ? sala.lead_nome : "") || "Convidado";
+      await registraEntrada(db, sala, papel, consentiu);
+      return respostaComCracha(sala, papel, nome, consentiu);
+    }
+
+    // Não está na lista.
+    if (sala.acesso !== "espera") return json({ ok: false, erro: "email_nao_confere" }, 403);
+
+    // Sala de espera: registra o pedido e devolve a chave para acompanhar.
+    const nome = limpaNome(corpo.nome);
+    if (!nome || !EMAIL_OK.test(email)) return json({ ok: false, erro: "dados_incompletos" }, 400);
+
+    // Pediu de novo (recarregou a página)? Reaproveita o pedido pendente.
+    const { data: jaPediu } = await db
+      .from("reunioes_pedidos")
+      .select("id, chave")
+      .eq("sala_id", sala.id)
+      .eq("email", email)
+      .eq("status", "pendente")
+      .maybeSingle();
+    if (jaPediu) return json({ ok: true, aguardando: true, pedido: jaPediu });
+
+    const { count } = await db
+      .from("reunioes_pedidos")
+      .select("id", { count: "exact", head: true })
+      .eq("sala_id", sala.id)
+      .eq("status", "pendente");
+    if ((count ?? 0) >= MAX_PEDIDOS_PENDENTES) {
+      return json({ ok: false, erro: "fila_cheia" }, 429);
+    }
+
+    const { data: pedido, error: erroPedido } = await db
+      .from("reunioes_pedidos")
+      .insert({ sala_id: sala.id, nome, email, consentiu })
+      .select("id, chave")
+      .single();
+    if (erroPedido || !pedido) return json({ ok: false, erro: "falha_no_pedido" }, 500);
+
+    return json({ ok: true, aguardando: true, pedido });
+  }
+
+  // ── pedido: quem está na sala de espera pergunta se já foi aceito ─────────
+  if (acao === "pedido") {
+    const id = String(corpo.pedido_id ?? "");
+    const chave = String(corpo.chave ?? "");
+    if (!id || !chave) return json({ ok: false, erro: "pedido_invalido" }, 400);
+
+    const { data: pedido } = await db
+      .from("reunioes_pedidos")
+      .select("*, sala:reunioes_salas(*)")
+      .eq("id", id)
+      .eq("chave", chave)
+      .maybeSingle();
+    if (!pedido) return json({ ok: false, erro: "pedido_invalido" }, 404);
+
+    if (pedido.status === "pendente") return json({ ok: true, aguardando: true });
+    if (pedido.status === "recusado") return json({ ok: false, erro: "pedido_recusado" }, 403);
+
+    const sala = pedido.sala as Sala;
+    if (sala.status === "cancelada") return json({ ok: false, erro: "sala_cancelada" }, 410);
+    await registraEntrada(db, sala, "convidado", pedido.consentiu);
+    return respostaComCracha(sala, "convidado", pedido.nome, pedido.consentiu);
+  }
+
+  // ── pedidos: o anfitrião vê quem está esperando ───────────────────────────
+  if (acao === "pedidos") {
+    if (!equipe) return json({ ok: false, erro: "nao_autorizado" }, 401);
+    const { sala, erro } = await buscaSala(db, corpo.slug);
+    if (erro) return erro;
+    const { data } = await db
+      .from("reunioes_pedidos")
+      .select("id, nome, email, created_at")
+      .eq("sala_id", sala.id)
+      .eq("status", "pendente")
+      .order("created_at", { ascending: true });
+    return json({ ok: true, pedidos: data ?? [] });
+  }
+
+  // ── decidir: o anfitrião aceita ou recusa ─────────────────────────────────
+  if (acao === "decidir") {
+    if (!equipe) return json({ ok: false, erro: "nao_autorizado" }, 401);
+    const id = String(corpo.pedido_id ?? "");
+    const { error } = await db
+      .from("reunioes_pedidos")
+      .update({
+        status: corpo.aceitar === true ? "aceito" : "recusado",
+        decidido_em: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("status", "pendente");
+    if (error) return json({ ok: false, erro: "falha_ao_decidir" }, 500);
+    return json({ ok: true });
   }
 
   // ── encerrar: só a equipe fecha a reunião ─────────────────────────────────

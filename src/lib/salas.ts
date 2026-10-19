@@ -9,16 +9,27 @@ import { supabase } from '@/integrations/supabase/client';
  */
 
 export type StatusSala = 'agendada' | 'ao_vivo' | 'encerrada' | 'cancelada';
-export type PapelSala = 'anfitriao' | 'observador' | 'lead';
+export type PapelSala = 'anfitriao' | 'observador' | 'lead' | 'convidado';
+/** 'convidados': só a lista entra. 'espera': os outros pedem e o anfitrião aceita. */
+export type AcessoSala = 'convidados' | 'espera';
 
 /** Uma reunião como a equipe vê (tabela completa). */
 export interface Sala {
   id: string;
   slug: string;
   titulo: string;
-  lead_nome: string;
-  lead_email: string;
-  sdr: string;
+  /** Vazios numa reunião instantânea, aberta pelo "Começar agora". */
+  lead_nome: string | null;
+  lead_email: string | null;
+  /** Quem agendou. */
+  sdr: string | null;
+  /** Quem atende. */
+  closer: string | null;
+  /** E-mails que entram direto, além do lead. */
+  convidados: string[];
+  acesso: AcessoSala;
+  instantanea: boolean;
+  consentimento_em: string | null;
   origem: string | null;
   inicio: string;
   duracao_min: number;
@@ -37,7 +48,7 @@ export interface SalaDoLead {
   titulo: string;
   inicio: string;
   duracao_min: number;
-  com: string;
+  com: string | null;
   aberta: boolean;
 }
 
@@ -50,12 +61,29 @@ export interface Cracha {
     slug: string;
     titulo: string;
     inicio: string;
-    lead_nome: string;
-    sdr: string;
+    /** Primeiro nome de quem atende — o que o lead vê. */
+    com: string | null;
+    // Os campos abaixo só chegam para a equipe; para quem é de fora vêm vazios.
+    lead_nome: string | null;
+    sdr: string | null;
+    closer: string | null;
     origem: string | null;
-    gravar: boolean;
+    acesso: AcessoSala | null;
   };
 }
+
+/** Quem está na sala de espera, como o anfitrião vê. */
+export interface PedidoDeEntrada {
+  id: string;
+  nome: string;
+  email: string;
+  created_at: string;
+}
+
+/** O que acontece ao tentar entrar: ou entra, ou vai para a sala de espera. */
+export type ResultadoEntrada =
+  | { tipo: 'entrou'; cracha: Cracha }
+  | { tipo: 'esperando'; pedido: { id: string; chave: string } };
 
 /**
  * A tabela é nova e o arquivo de tipos do Supabase é gerado automaticamente
@@ -69,32 +97,57 @@ const tabela = () => (supabase as unknown as {
 /** Mensagens de erro do porteiro, em português de gente. */
 const RECADOS: Record<string, string> = {
   email_invalido: 'Esse e-mail não parece certo. Confira e tente de novo.',
-  email_nao_confere: 'Não encontramos reunião marcada para esse e-mail.',
+  email_nao_confere:
+    'Esse e-mail não é o do convite desta reunião. Use o mesmo e-mail em que você recebeu o convite.',
   sala_nao_encontrada: 'Esse link de reunião não existe mais.',
   sala_cancelada: 'Essa reunião foi cancelada.',
   sala_encerrada: 'Essa reunião já foi encerrada.',
   fora_do_horario: 'A sala abre 30 minutos antes do horário marcado.',
   livekit_nao_configurado: 'A sala de vídeo ainda não foi configurada. Avise a equipe.',
   nao_autorizado: 'Você precisa estar logado para fazer isso.',
+  dados_incompletos: 'Preencha seu nome e um e-mail válido para pedir para entrar.',
+  pedido_recusado: 'O anfitrião não aceitou sua entrada nesta reunião.',
+  pedido_invalido: 'Esse pedido de entrada não vale mais. Peça para entrar de novo.',
+  fila_cheia: 'Tem gente demais esperando para entrar agora. Tente de novo em instantes.',
 };
 
-export const recado = (erro?: string) =>
-  (erro && RECADOS[erro]) || 'Não consegui agora. Tente de novo em instantes.';
+/** Monta o recado. Fora do horário, diz a hora em que a sala abre. */
+export const recado = (erro?: string, inicio?: string) => {
+  if (erro === 'fora_do_horario' && inicio) {
+    const abre = new Date(new Date(inicio).getTime() - 30 * 60 * 1000);
+    const hora = abre.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return `A sala ainda não abriu. Ela abre às ${hora}, 30 minutos antes do horário marcado.`;
+  }
+  return (erro && RECADOS[erro]) || 'Não consegui agora. Tente de novo em instantes.';
+};
+
+/**
+ * Lê o motivo que o porteiro mandou quando recusou (status 403, 404…).
+ *
+ * O Supabase entrega esse caso como erro, com a resposta original guardada em
+ * `context` — um Response, que precisa ser lido com `.json()`. Antes a tela
+ * tentava ler como texto pronto, não achava nada e mostrava sempre o recado
+ * genérico: o lead via "tente de novo" quando o problema era o e-mail.
+ */
+async function motivoDaRecusa(error: unknown): Promise<{ erro?: string; inicio?: string }> {
+  const resposta = (error as { context?: unknown })?.context;
+  if (resposta instanceof Response) {
+    try {
+      return (await resposta.clone().json()) ?? {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
 
 async function chamaPorteiro<T>(corpo: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('sala-token', { body: corpo });
   if (error) {
-    // A função devolve o motivo no corpo mesmo quando o status não é 200.
-    const detalhe = (error as { context?: { body?: unknown } }).context?.body;
-    let erro: string | undefined;
-    try {
-      erro = typeof detalhe === 'string' ? JSON.parse(detalhe)?.erro : (detalhe as { erro?: string })?.erro;
-    } catch {
-      erro = undefined;
-    }
-    throw new Error(recado(erro));
+    const { erro, inicio } = await motivoDaRecusa(error);
+    throw new Error(recado(erro, inicio));
   }
-  if (!data?.ok) throw new Error(recado(data?.erro));
+  if (!data?.ok) throw new Error(recado(data?.erro, data?.inicio));
   return data as T;
 }
 
@@ -104,14 +157,51 @@ export async function buscaReunioesPorEmail(email: string): Promise<SalaDoLead[]
   return r.salas ?? [];
 }
 
-/** Pede o crachá para entrar numa sala. */
-export async function pedeCracha(opts: {
+type RespostaEntrada = Cracha & { aguardando?: boolean; pedido?: { id: string; chave: string } };
+
+const resultado = (r: RespostaEntrada): ResultadoEntrada =>
+  r.aguardando && r.pedido ? { tipo: 'esperando', pedido: r.pedido } : { tipo: 'entrou', cracha: r };
+
+/**
+ * Tenta entrar na sala. A equipe logada entra sempre. Quem é de fora entra
+ * direto se estiver na lista de convidados; se não estiver e a reunião tiver
+ * sala de espera, vira um pedido que o anfitrião aceita ou recusa.
+ */
+export async function entraNaSala(opts: {
   slug: string;
   email?: string;
   nome?: string;
   papel?: 'anfitriao' | 'observador';
-}): Promise<Cracha> {
-  return chamaPorteiro<Cracha>({ acao: 'entrar', ...opts });
+  /** Marcou "Concordo" com transcrição e análise por IA (LGPD). */
+  consentiu?: boolean;
+}): Promise<ResultadoEntrada> {
+  return resultado(await chamaPorteiro<RespostaEntrada>({ acao: 'entrar', ...opts }));
+}
+
+/** Pede o crachá e falha se cair na sala de espera — para quem sempre entra direto. */
+export async function pedeCracha(opts: Parameters<typeof entraNaSala>[0]): Promise<Cracha> {
+  const r = await entraNaSala(opts);
+  if (r.tipo === 'esperando') throw new Error('Você está na sala de espera.');
+  return r.cracha;
+}
+
+/** Quem está na sala de espera pergunta se já foi aceito. */
+export async function consultaPedido(pedido: { id: string; chave: string }): Promise<ResultadoEntrada> {
+  const r = await chamaPorteiro<RespostaEntrada>({
+    acao: 'pedido', pedido_id: pedido.id, chave: pedido.chave,
+  });
+  return r.aguardando ? { tipo: 'esperando', pedido } : { tipo: 'entrou', cracha: r };
+}
+
+/** O anfitrião vê quem está esperando para entrar. */
+export async function listaPedidos(slug: string): Promise<PedidoDeEntrada[]> {
+  const r = await chamaPorteiro<{ pedidos: PedidoDeEntrada[] }>({ acao: 'pedidos', slug });
+  return r.pedidos ?? [];
+}
+
+/** O anfitrião aceita ou recusa um pedido de entrada. */
+export async function decidePedido(pedidoId: string, aceitar: boolean): Promise<void> {
+  await chamaPorteiro({ acao: 'decidir', pedido_id: pedidoId, aceitar });
 }
 
 /** Encerra a reunião (só equipe logada). */
@@ -162,8 +252,10 @@ export async function listaSalas(): Promise<Sala[]> {
   return (data ?? []) as unknown as Sala[];
 }
 
-export type NovaSala = Pick<Sala, 'titulo' | 'lead_nome' | 'lead_email' | 'sdr' | 'inicio'> &
-  Partial<Pick<Sala, 'origem' | 'duracao_min' | 'gravar' | 'observacoes'>>;
+export type NovaSala = Pick<Sala, 'titulo' | 'inicio'> &
+  Partial<Pick<Sala,
+    | 'lead_nome' | 'lead_email' | 'sdr' | 'closer' | 'convidados' | 'acesso'
+    | 'instantanea' | 'origem' | 'duracao_min' | 'gravar' | 'observacoes'>>;
 
 export async function criaSala(nova: NovaSala): Promise<Sala> {
   const { data: sessao } = await supabase.auth.getUser();
@@ -173,6 +265,31 @@ export async function criaSala(nova: NovaSala): Promise<Sala> {
     .single();
   if (error) throw error;
   return data as unknown as Sala;
+}
+
+/**
+ * "Começar agora": abre uma reunião na hora, sem lead cadastrado. Ela já nasce
+ * com sala de espera — quem chegar pelo link pede para entrar e o anfitrião
+ * aceita, como no Meet.
+ */
+export async function criaReuniaoAgora(closer?: string | null): Promise<Sala> {
+  return criaSala({
+    titulo: 'Reunião instantânea',
+    inicio: new Date().toISOString(),
+    acesso: 'espera',
+    instantanea: true,
+    closer: closer || null,
+  });
+}
+
+/** "a@b.com, c@d.com; e@f.com" → ['a@b.com', 'c@d.com', 'e@f.com'] (só os que parecem e-mail). */
+export function separaEmails(texto: string): string[] {
+  return Array.from(new Set(
+    texto
+      .split(/[\s,;]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)),
+  ));
 }
 
 export async function cancelaSala(id: string): Promise<void> {
@@ -242,15 +359,23 @@ const dataGoogle = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.
  * faz o resto: manda o convite por e-mail, o lead confirma na agenda dele e
  * recebe lembrete. Sem servidor de e-mail, sem integração para manter.
  */
-export function linkGoogleAgenda(sala: Pick<Sala, 'slug' | 'titulo' | 'inicio' | 'duracao_min' | 'lead_email'>): string {
+export function linkGoogleAgenda(
+  sala: Pick<Sala, 'slug' | 'titulo' | 'inicio' | 'duracao_min' | 'lead_email'> &
+    Partial<Pick<Sala, 'convidados' | 'closer'>>,
+): string {
   const inicio = new Date(sala.inicio);
   const fim = new Date(inicio.getTime() + sala.duracao_min * 60 * 1000);
   const link = linkDaSala(sala.slug);
+  const convidados = [sala.lead_email, ...(sala.convidados ?? [])].filter(Boolean) as string[];
+  // Tudo que vai aqui o lead também vê — por isso nada de origem, SDR ou
+  // anotação interna. Só o que ajuda ele a entrar.
   const detalhes = [
-    'Reunião com a Reproduzindo Talentos.',
+    sala.closer
+      ? `Reunião com ${sala.closer}, da Reproduzindo Talentos.`
+      : 'Reunião com a Reproduzindo Talentos.',
     '',
     `Para entrar, acesse: ${link}`,
-    `Na entrada, confirme com este e-mail: ${sala.lead_email}`,
+    'Na entrada, confirme com o e-mail em que você recebeu este convite.',
     '',
     'Não precisa instalar nada. A sala abre 30 minutos antes do horário.',
   ].join('\n');
@@ -261,7 +386,7 @@ export function linkGoogleAgenda(sala: Pick<Sala, 'slug' | 'titulo' | 'inicio' |
     dates: `${dataGoogle(inicio)}/${dataGoogle(fim)}`,
     details: detalhes,
     location: link,
-    add: sala.lead_email,
+    add: convidados.join(','),
   });
   return `https://calendar.google.com/calendar/render?${p.toString()}`;
 }

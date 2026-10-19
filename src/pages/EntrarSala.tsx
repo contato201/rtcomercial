@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Loader2, Mail, Search } from 'lucide-react';
-import logo from '@/assets/logo.png';
+// Versão pequena (20 KB): o lead entra mais rápido, principalmente no celular.
+import logo from '@/assets/logo-pequena.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { buscaReunioesPorEmail, quando, type SalaDoLead } from '@/lib/salas';
 import { useTemaClaro } from '@/hooks/useTemaClaro';
+import { useTituloAba } from '@/hooks/useTituloAba';
 
 /**
  * /entrar — a porta da frente para quem perdeu o link.
@@ -17,6 +19,7 @@ import { useTemaClaro } from '@/hooks/useTemaClaro';
  */
 const EntrarSala = () => {
   useTemaClaro();
+  useTituloAba('Reunião — Reproduzindo Talentos');
   const [email, setEmail] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [buscou, setBuscou] = useState(false);
