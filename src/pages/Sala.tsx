@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { ArrowRight, Clock, Eye, Loader2, Video } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock, Eye, Loader2, Video } from 'lucide-react';
 // Versão pequena (20 KB): o lead entra mais rápido, principalmente no celular.
 import logo from '@/assets/logo-pequena.png';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,6 +18,7 @@ import {
 } from '@/lib/salas';
 import { useTemaClaro } from '@/hooks/useTemaClaro';
 import { useTituloAba } from '@/hooks/useTituloAba';
+import { geraRelatorio } from '@/lib/coach';
 
 /**
  * A sala pública: /sala/<slug>. É o link que o closer manda para o lead.
@@ -69,6 +70,7 @@ const Sala = () => {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [erro, setErro] = useState('');
+  const [relatorio, setRelatorio] = useState<'nada' | 'gerando' | 'pronto' | 'sem'>('nada');
   // Guardado na entrada: ao fechar a aba não dá tempo de buscar o login.
   const loginGuardado = useRef<string | null>(null);
 
@@ -143,7 +145,20 @@ const Sala = () => {
    * duração e leva a reunião para o histórico. Se ele voltar, ela reabre.
    */
   function saiu() {
-    if (cracha?.papel === 'anfitriao') void encerraSala(slug).catch(() => undefined);
+    if (cracha?.papel === 'anfitriao') {
+      void encerraSala(slug).catch(() => undefined);
+      // O relatório do Coach. Espera uns segundos para as últimas falas
+      // chegarem ao banco (o painel guarda o que sobrou ao fechar).
+      const salaId = cracha.sala.id;
+      if (salaId) {
+        setRelatorio('gerando');
+        setTimeout(() => {
+          geraRelatorio(salaId)
+            .then(() => setRelatorio('pronto'))
+            .catch(() => setRelatorio('sem')); // sem transcrição: não há o que relatar
+        }, 6000);
+      }
+    }
     setEtapa('saiu');
   }
 
@@ -192,6 +207,18 @@ const Sala = () => {
           <h1 className="mb-3 text-2xl font-semibold text-foreground">
             {eraAnfitriao ? 'Reunião encerrada' : 'Você saiu da reunião'}
           </h1>
+          {eraAnfitriao && relatorio === 'gerando' && (
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              O Coach está escrevendo o relatório da reunião…
+            </p>
+          )}
+          {eraAnfitriao && relatorio === 'pronto' && (
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-4 py-2 text-xs font-semibold text-success">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Relatório pronto — está na reunião, em Reuniões.
+            </p>
+          )}
           <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
             {eraAnfitriao
               ? 'Ela já foi para o histórico, com a duração. Saiu sem querer? Entre de novo que ela reabre.'

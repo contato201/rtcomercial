@@ -81,6 +81,11 @@ async function criaCracha(opts: {
     },
   };
 
+  return assinaJwt(payload);
+}
+
+/** Assina um JWT HS256 com o API secret do LiveKit. */
+async function assinaJwt(payload: Record<string, unknown>) {
   const cabecalho = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const corpo = b64url(JSON.stringify(payload));
   const chave = await crypto.subtle.importKey(
@@ -96,6 +101,95 @@ async function criaCracha(opts: {
     new TextEncoder().encode(`${cabecalho}.${corpo}`),
   );
   return `${cabecalho}.${corpo}.${b64url(new Uint8Array(assinatura))}`;
+}
+
+// ── Gravação (Egress do LiveKit) ────────────────────────────────────────────
+// O LiveKit "assiste" a sala como uma pessoa invisível, junta todo mundo numa
+// tela só e manda o MP4 direto para o armazém `gravacoes` do Supabase (que
+// fala a mesma língua do S3 da Amazon).
+const S3_KEY = Deno.env.get("SUPABASE_S3_ACCESS_KEY_ID") ?? "";
+const S3_SECRET = Deno.env.get("SUPABASE_S3_SECRET_ACCESS_KEY") ?? "";
+const PROJETO = new URL(SUPABASE_URL || "https://x.supabase.co").hostname.split(".")[0];
+
+async function chamaEgress(metodo: "StartRoomCompositeEgress" | "StopEgress", corpo: unknown) {
+  const agora = Math.floor(Date.now() / 1000);
+  const token = await assinaJwt({
+    iss: LK_KEY,
+    sub: "rt-porteiro",
+    nbf: agora - 10,
+    exp: agora + 600,
+    video: { roomRecord: true },
+  });
+  const base = LK_URL.replace(/^wss:/, "https:").replace(/^ws:/, "http:").replace(/\/$/, "");
+  const r = await fetch(`${base}/twirp/livekit.Egress/${metodo}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(corpo),
+  });
+  const texto = await r.text();
+  if (!r.ok) {
+    console.error("Egress respondeu erro", metodo, r.status, texto.slice(0, 300));
+    return { ok: false as const, status: r.status, texto };
+  }
+  return { ok: true as const, dados: JSON.parse(texto || "{}") };
+}
+
+async function comecaGravacao(db: SupabaseClient, sala: Sala) {
+  if (!S3_KEY || !S3_SECRET) return json({ ok: false, erro: "gravacao_nao_configurada" }, 500);
+
+  // Já está gravando? Não abre uma segunda gravação igual.
+  const { data: ativa } = await db
+    .from("reunioes_gravacoes")
+    .select("id")
+    .eq("sala_id", sala.id)
+    .eq("status", "gravando")
+    .limit(1)
+    .maybeSingle();
+  if (ativa) return json({ ok: true, gravando: true });
+
+  const quando = new Date().toISOString().replace(/[:.]/g, "-");
+  const arquivo = `${sala.id}/${quando}.mp4`;
+  const r = await chamaEgress("StartRoomCompositeEgress", {
+    room_name: `rt-${sala.slug}`,
+    layout: "speaker",
+    // 720p a ~1 Mbps: uns 450 MB por hora. Bom para rever a call sem lotar o armazém.
+    advanced: { width: 1280, height: 720, framerate: 24, video_bitrate: 1000, audio_bitrate: 64 },
+    file_outputs: [{
+      file_type: "MP4",
+      filepath: arquivo,
+      s3: {
+        access_key: S3_KEY,
+        secret: S3_SECRET,
+        region: "ca-central-1",
+        endpoint: `https://${PROJETO}.storage.supabase.co/storage/v1/s3`,
+        bucket: "gravacoes",
+        force_path_style: true,
+      },
+    }],
+  });
+  if (!r.ok) return json({ ok: false, erro: "gravacao_falhou" }, 502);
+
+  const egressId = r.dados.egress_id ?? r.dados.egressId;
+  if (!egressId) return json({ ok: false, erro: "gravacao_falhou" }, 502);
+  await db.from("reunioes_gravacoes").insert({ sala_id: sala.id, egress_id: egressId, arquivo });
+  return json({ ok: true, gravando: true });
+}
+
+/** Para toda gravação aberta da sala. Se o LiveKit já tinha parado sozinho
+ *  (a sala esvaziou), só marca como concluída. */
+async function paraGravacao(db: SupabaseClient, salaId: string) {
+  const { data: abertas } = await db
+    .from("reunioes_gravacoes")
+    .select("id, egress_id")
+    .eq("sala_id", salaId)
+    .eq("status", "gravando");
+  for (const g of abertas ?? []) {
+    await chamaEgress("StopEgress", { egress_id: g.egress_id });
+    await db
+      .from("reunioes_gravacoes")
+      .update({ status: "concluida", fim: new Date().toISOString() })
+      .eq("id", g.id);
+  }
 }
 
 // ── Quem está chamando ──────────────────────────────────────────────────────
@@ -202,11 +296,17 @@ async function respostaComCracha(sala: Sala, papel: Papel, nome: string, consent
       com: comQuem(sala),
       // Daqui pra baixo, só a equipe vê. O lead nunca recebe origem, SDR,
       // closer completo nem o nome cadastrado de outras pessoas.
+      // `id` e `tipo_reuniao`: a tela do closer guarda a transcrição e pede
+      // as dicas do Coach com eles.
+      id: equipe ? sala.id : null,
+      tipo_reuniao: equipe ? (sala.tipo_reuniao ?? 1) : null,
       lead_nome: equipe ? sala.lead_nome : null,
       sdr: equipe ? sala.sdr : null,
       closer: equipe ? sala.closer : null,
       origem: equipe ? sala.origem : null,
       acesso: equipe ? sala.acesso : null,
+      // Gravar sozinho quando o anfitrião entrar.
+      gravar: equipe ? sala.gravar === true : false,
     },
   });
 }
@@ -394,13 +494,25 @@ Deno.serve(async (req) => {
   if (acao === "encerrar") {
     if (!equipe) return json({ ok: false, erro: "nao_autorizado" }, 401);
     const slug = String(corpo.slug ?? "").trim().toLowerCase();
-    const { error } = await db
+    const { data: fechadas, error } = await db
       .from("reunioes_salas")
       .update({ status: "encerrada", encerrada_em: new Date().toISOString() })
       .eq("slug", slug)
-      .eq("status", "ao_vivo");
+      .eq("status", "ao_vivo")
+      .select("id");
     if (error) return json({ ok: false, erro: "falha_ao_encerrar" }, 500);
+    for (const f of fechadas ?? []) await paraGravacao(db, f.id);
     return json({ ok: true });
+  }
+
+  // ── gravar: a equipe liga ou desliga a gravação ───────────────────────────
+  if (acao === "gravar") {
+    if (!equipe) return json({ ok: false, erro: "nao_autorizado" }, 401);
+    const { sala, erro } = await buscaSala(db, corpo.slug);
+    if (erro) return erro;
+    if (corpo.ligar === true) return comecaGravacao(db, sala);
+    await paraGravacao(db, sala.id);
+    return json({ ok: true, gravando: false });
   }
 
   return json({ ok: false, erro: "acao_desconhecida" }, 400);

@@ -30,6 +30,10 @@ export interface Sala {
   acesso: AcessoSala;
   instantanea: boolean;
   consentimento_em: string | null;
+  /** 1 = Consultoria/Diagnóstico, 2 = Plano de Ação/Proposta. O Coach segue o roteiro de cada uma. */
+  tipo_reuniao: 1 | 2;
+  /** O que o SDR já descobriu — o Coach lê antes de começar. */
+  notas_sdr: string | null;
   origem: string | null;
   inicio: string;
   duracao_min: number;
@@ -64,11 +68,15 @@ export interface Cracha {
     /** Primeiro nome de quem atende — o que o lead vê. */
     com: string | null;
     // Os campos abaixo só chegam para a equipe; para quem é de fora vêm vazios.
+    id: string | null;
+    tipo_reuniao: 1 | 2 | null;
     lead_nome: string | null;
     sdr: string | null;
     closer: string | null;
     origem: string | null;
     acesso: AcessoSala | null;
+    /** Começa a gravar sozinho quando o anfitrião entra. */
+    gravar: boolean;
   };
 }
 
@@ -109,6 +117,8 @@ const RECADOS: Record<string, string> = {
   pedido_recusado: 'O anfitrião não aceitou sua entrada nesta reunião.',
   pedido_invalido: 'Esse pedido de entrada não vale mais. Peça para entrar de novo.',
   fila_cheia: 'Tem gente demais esperando para entrar agora. Tente de novo em instantes.',
+  gravacao_nao_configurada: 'A gravação ainda não foi ligada: faltam as chaves do armazém no Supabase.',
+  gravacao_falhou: 'Não consegui começar a gravação agora. Tente de novo em instantes.',
 };
 
 /** Monta o recado. Fora do horário, diz a hora em que a sala abre. */
@@ -204,6 +214,11 @@ export async function decidePedido(pedidoId: string, aceitar: boolean): Promise<
   await chamaPorteiro({ acao: 'decidir', pedido_id: pedidoId, aceitar });
 }
 
+/** Liga ou desliga a gravação da reunião (só equipe logada). */
+export async function gravaSala(slug: string, ligar: boolean): Promise<void> {
+  await chamaPorteiro({ acao: 'gravar', slug, ligar });
+}
+
 /** Encerra a reunião (só equipe logada). */
 export async function encerraSala(slug: string): Promise<void> {
   await chamaPorteiro({ acao: 'encerrar', slug });
@@ -255,7 +270,8 @@ export async function listaSalas(): Promise<Sala[]> {
 export type NovaSala = Pick<Sala, 'titulo' | 'inicio'> &
   Partial<Pick<Sala,
     | 'lead_nome' | 'lead_email' | 'sdr' | 'closer' | 'convidados' | 'acesso'
-    | 'instantanea' | 'origem' | 'duracao_min' | 'gravar' | 'observacoes'>>;
+    | 'instantanea' | 'origem' | 'duracao_min' | 'gravar' | 'observacoes'
+    | 'tipo_reuniao' | 'notas_sdr'>>;
 
 export async function criaSala(nova: NovaSala): Promise<Sala> {
   const { data: sessao } = await supabase.auth.getUser();
@@ -272,14 +288,47 @@ export async function criaSala(nova: NovaSala): Promise<Sala> {
  * com sala de espera — quem chegar pelo link pede para entrar e o anfitrião
  * aceita, como no Meet.
  */
-export async function criaReuniaoAgora(closer?: string | null): Promise<Sala> {
+export async function criaReuniaoAgora(
+  opcoes: { closer?: string | null; gravar?: boolean } = {},
+): Promise<Sala> {
   return criaSala({
     titulo: 'Reunião instantânea',
     inicio: new Date().toISOString(),
     acesso: 'espera',
     instantanea: true,
-    closer: closer || null,
+    closer: opcoes.closer || null,
+    gravar: opcoes.gravar === true,
   });
+}
+
+/** Uma gravação guardada no armazém `gravacoes`. */
+export interface Gravacao {
+  id: string;
+  sala_id: string;
+  arquivo: string;
+  status: 'gravando' | 'concluida' | 'falhou';
+  inicio: string;
+  fim: string | null;
+}
+
+/** As gravações de uma reunião — ou de todas, se não disser qual. */
+export async function listaGravacoes(salaId?: string): Promise<Gravacao[]> {
+  const consulta = (supabase as unknown as {
+    from: (nome: string) => ReturnType<typeof supabase.from>;
+  }).from('reunioes_gravacoes')
+    .select('id, sala_id, arquivo, status, inicio, fim')
+    .order('inicio', { ascending: true })
+    .limit(500);
+  const { data, error } = await (salaId ? consulta.eq('sala_id', salaId) : consulta);
+  if (error) throw error;
+  return (data ?? []) as unknown as Gravacao[];
+}
+
+/** Link de 1 hora para assistir: o armazém é fechado, ninguém acha o vídeo por fora. */
+export async function linkDaGravacao(arquivo: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('gravacoes').createSignedUrl(arquivo, 3600);
+  if (error || !data?.signedUrl) throw new Error('A gravação ainda está sendo salva. Tente de novo em alguns minutos.');
+  return data.signedUrl;
 }
 
 /** "a@b.com, c@d.com; e@f.com" → ['a@b.com', 'c@d.com', 'e@f.com'] (só os que parecem e-mail). */

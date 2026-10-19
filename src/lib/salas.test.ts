@@ -58,6 +58,8 @@ const base: Sala = {
   acesso: 'espera',
   instantanea: false,
   consentimento_em: null,
+  tipo_reuniao: 1,
+  notas_sdr: null,
   origem: 'Tráfego Pago',
   inicio: new Date(agora).toISOString(),
   duracao_min: 60,

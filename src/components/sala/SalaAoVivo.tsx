@@ -2,15 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CarouselLayout, DisconnectButton, FocusLayout, FocusLayoutContainer, GridLayout,
   LayoutContextProvider, LiveKitRoom, MediaDeviceMenu, ParticipantTile, RoomAudioRenderer,
-  TrackToggle, isTrackReference, useChat, useCreateLayoutContext, useLocalParticipant,
-  useParticipants, usePinnedTracks, useSpeakingParticipants, useTracks,
+  TrackToggle, isTrackReference, useChat, useConnectionState, useCreateLayoutContext,
+  useIsRecording, useLocalParticipant, useParticipants, usePinnedTracks,
+  useSpeakingParticipants, useTracks,
 } from '@livekit/components-react';
-import { RoomEvent, Track, type Participant } from 'livekit-client';
-import { Check, Eye, Link2, MessageSquare, Send, Sparkles, UserPlus, X } from 'lucide-react';
+import { ConnectionState, RoomEvent, Track, type Participant } from 'livekit-client';
+import { Check, Circle, Eye, Link2, MessageSquare, Send, Square, UserPlus, X } from 'lucide-react';
 import '@livekit/components-styles';
 import logo from '@/assets/logo-pequena.png';
+import { PainelCoach } from './PainelCoach';
 import {
-  decidePedido, linkDaSala, listaPedidos, type Cracha, type PedidoDeEntrada,
+  decidePedido, gravaSala, linkDaSala, listaPedidos, type Cracha, type PedidoDeEntrada,
 } from '@/lib/salas';
 
 /**
@@ -165,15 +167,34 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
     if (chatAberto) setLidas(chatMessages.length);
   }, [chatAberto, chatMessages.length]);
   const naoLidas = chatAberto ? 0 : Math.max(0, chatMessages.length - lidas);
+  const gravacao = useGravacao(cracha);
 
   return (
     <LayoutContextProvider value={layout}>
       <div className="flex h-full flex-col">
         <div className="flex min-h-0 flex-1 gap-3 p-3">
-          {equipe && <PainelEquipe ocultarEu={observador} />}
+          {equipe && (
+            <PainelEquipe
+              ocultarEu={observador}
+              salaId={cracha.sala.id}
+              tipo={cracha.sala.tipo_reuniao ?? 1}
+            />
+          )}
 
           <div className="relative min-h-0 min-w-0 flex-1">
             <Palco ocultarEu={observador} />
+            {/* Todo mundo vê quando está gravando — o lead inclusive. */}
+            {gravacao.gravando && (
+              <div className="pointer-events-none absolute left-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-[#E5484D] px-3 py-1 text-xs font-semibold text-white shadow-lg">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                Gravando
+              </div>
+            )}
+            {gravacao.erro && (
+              <div className="absolute bottom-3 left-3 z-20 max-w-[320px] rounded-xl border border-[#5A2A2A] bg-[#1F1414] px-3 py-2 text-xs text-[#F2B8B8]">
+                {gravacao.erro}
+              </div>
+            )}
             {/* Fica por cima do vídeo, e não no painel, para aparecer em qualquer
                 tamanho de tela — o painel some em janela estreita. */}
             {anfitriao && (
@@ -196,6 +217,7 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
 
         <BarraDeBotoes
           observador={observador}
+          gravacao={anfitriao ? gravacao : null}
           naoLidas={naoLidas}
           chatAberto={chatAberto}
           alternarChat={() => setChatAberto((v) => !v)}
@@ -255,9 +277,10 @@ function Palco({ ocultarEu }: { ocultarEu: boolean }) {
 
 /** Barra de baixo, em português. O observador só tem chat e sair. */
 function BarraDeBotoes({
-  observador, naoLidas, chatAberto, alternarChat,
+  observador, gravacao, naoLidas, chatAberto, alternarChat,
 }: {
   observador: boolean;
+  gravacao: ReturnType<typeof useGravacao> | null;
   naoLidas: number;
   chatAberto: boolean;
   alternarChat: () => void;
@@ -299,9 +322,63 @@ function BarraDeBotoes({
         )}
       </button>
 
+      {gravacao && (
+        <button
+          type="button"
+          className="lk-button"
+          disabled={gravacao.mudando}
+          onClick={gravacao.alternar}
+          style={gravacao.gravando ? { color: '#FF8A8E' } : undefined}
+        >
+          {gravacao.gravando
+            ? <Square className="h-4 w-4 fill-current" />
+            : <Circle className="h-4 w-4 fill-[#E5484D] text-[#E5484D]" />}
+          {gravacao.mudando ? 'Aguarde…' : gravacao.gravando ? 'Parar gravação' : 'Gravar'}
+        </button>
+      )}
+
       <DisconnectButton>Sair</DisconnectButton>
     </div>
   );
+}
+
+/**
+ * A gravação da sala. Quem diz se está gravando é o próprio LiveKit
+ * (`useIsRecording`), então o selo aparece igual para todo mundo. Se a reunião
+ * foi marcada com "Gravar automaticamente", o anfitrião liga sozinho assim que
+ * conecta — uma vez só, para não religar depois que alguém parou de propósito.
+ */
+function useGravacao(cracha: Cracha) {
+  const gravando = useIsRecording();
+  const conexao = useConnectionState();
+  const [mudando, setMudando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const jaLigouSozinho = useRef(false);
+  const anfitriao = cracha.papel === 'anfitriao';
+
+  async function muda(ligar: boolean) {
+    setMudando(true);
+    setErro(null);
+    try {
+      await gravaSala(cracha.sala.slug, ligar);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não consegui mudar a gravação.');
+      setTimeout(() => setErro(null), 8000);
+    } finally {
+      // O selo só muda quando o LiveKit confirma; segura o botão uns segundos.
+      setTimeout(() => setMudando(false), 3000);
+    }
+  }
+
+  useEffect(() => {
+    if (!anfitriao || !cracha.sala.gravar || jaLigouSozinho.current) return;
+    if (conexao !== ConnectionState.Connected || gravando) return;
+    jaLigouSozinho.current = true;
+    void muda(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anfitriao, cracha.sala.gravar, conexao, gravando]);
+
+  return { gravando, mudando, erro: anfitriao ? erro : null, alternar: () => muda(!gravando) };
 }
 
 /** Chat da reunião. Some quando fecha; as mensagens continuam guardadas. */
@@ -385,19 +462,12 @@ function PainelChat({
 }
 
 /** O painel da equipe, à esquerda. O lead nunca vê. */
-function PainelEquipe({ ocultarEu }: { ocultarEu: boolean }) {
+function PainelEquipe({ ocultarEu, salaId, tipo }: { ocultarEu: boolean; salaId: string | null; tipo: 1 | 2 }) {
   return (
-    <aside className="hidden w-[300px] shrink-0 flex-col gap-3 overflow-y-auto lg:flex">
+    <aside className="hidden w-[320px] shrink-0 flex-col gap-3 overflow-y-auto pr-1 lg:flex">
+      {/* Coach primeiro: é o que o closer olha durante a conversa. */}
+      {salaId && <PainelCoach salaId={salaId} tipo={tipo} />}
       <TempoDeFala ocultarEu={ocultarEu} />
-      <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-[#C0B072]" />
-          <span className="text-[11px] font-bold uppercase tracking-[1.6px] text-[#C0B072]">Coach IA</span>
-        </div>
-        <p className="text-xs leading-relaxed text-[#8F8A80]">
-          Roteiro da call e dicas ao vivo aparecem aqui assim que a transcrição for ligada.
-        </p>
-      </div>
     </aside>
   );
 }

@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  CalendarPlus, Check, Copy, Link2, Loader2, Plus, Settings2, Users, Video, X, Zap,
+  CalendarClock, CalendarPlus, Check, Circle, Copy, FileText, Link2, Loader2, Play, Plus,
+  Settings2, Users, Video, X, Zap,
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { buscaCoach, geraRelatorio } from '@/lib/coach';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -17,8 +25,8 @@ import { fetchSdrNamesFromDb, loadSdrNames } from '@/lib/sdrNames';
 import { buscaClosers, salvaClosers } from '@/lib/closerNames';
 import {
   cancelaSala, criaReuniaoAgora, criaSala, duracaoMin, estaEsquecida, fechaSalaEsquecida,
-  linkDaSala, linkGoogleAgenda, listaSalas, quando, separaEmails, situacao,
-  type AcessoSala, type Sala, type Situacao,
+  linkDaGravacao, linkDaSala, linkGoogleAgenda, listaGravacoes, listaSalas, quando,
+  separaEmails, situacao, type AcessoSala, type Gravacao, type Sala, type Situacao,
 } from '@/lib/salas';
 
 /**
@@ -55,7 +63,13 @@ const VAZIO = {
   origem: ORIGENS_LEAD[0] as string,
   inicio: agoraLocal(),
   acesso: 'espera' as AcessoSala,
+  tipo_reuniao: 1 as 1 | 2,
+  notas_sdr: '',
+  gravar: false,
 };
+
+/** Aviso de espaço: no plano grátis do Supabase cabe pouco vídeo. */
+const DICA_GRAVAR = 'Cada hora gravada ocupa uns 450 MB no armazém.';
 
 const Reunioes = () => {
   const navigate = useNavigate();
@@ -68,6 +82,10 @@ const Reunioes = () => {
   const [salvando, setSalvando] = useState(false);
   const [comecando, setComecando] = useState(false);
   const [copiado, setCopiado] = useState('');
+  const [relatorioDe, setRelatorioDe] = useState<Sala | null>(null);
+  const [gravarAgora, setGravarAgora] = useState(false);
+  const [gravacoes, setGravacoes] = useState<Record<string, Gravacao[]>>({});
+  const [assistindo, setAssistindo] = useState<Sala | null>(null);
 
   useEffect(() => {
     void fetchSdrNamesFromDb().then(setSdrs);
@@ -85,6 +103,14 @@ const Reunioes = () => {
       await Promise.all(esquecidas.map((s) => fechaSalaEsquecida(s.id).catch(() => undefined)));
       const fechadas = new Set(esquecidas.map((s) => s.id));
       setSalas(lista.map((s) => (fechadas.has(s.id) ? { ...s, status: 'encerrada' } : s)));
+      // As gravações vêm à parte: se a tabela ainda não existir, o resto funciona.
+      listaGravacoes()
+        .then((todas) => {
+          const porSala: Record<string, Gravacao[]> = {};
+          for (const g of todas) (porSala[g.sala_id] ??= []).push(g);
+          setGravacoes(porSala);
+        })
+        .catch(() => undefined);
     } catch {
       toast({ title: 'Não consegui carregar as reuniões', variant: 'destructive' });
     } finally {
@@ -108,7 +134,7 @@ const Reunioes = () => {
   async function comecarAgora() {
     setComecando(true);
     try {
-      const sala = await criaReuniaoAgora();
+      const sala = await criaReuniaoAgora({ gravar: gravarAgora });
       await copiar(sala.slug);
       navigate(`/sala/${sala.slug}?entrar=1`);
     } catch (e) {
@@ -140,9 +166,15 @@ const Reunioes = () => {
         acesso: form.acesso,
         inicio: new Date(form.inicio).toISOString(),
         duracao_min: 60,
+        tipo_reuniao: form.tipo_reuniao,
+        notas_sdr: form.notas_sdr.trim() || null,
+        gravar: form.gravar,
       });
       setSalas((atuais) => [sala, ...atuais]);
-      setForm({ ...VAZIO, sdr: form.sdr, closer: form.closer, acesso: form.acesso });
+      setForm({
+        ...VAZIO, sdr: form.sdr, closer: form.closer, acesso: form.acesso,
+        tipo_reuniao: form.tipo_reuniao, gravar: form.gravar,
+      });
       await copiar(sala.slug);
       toast({
         title: 'Sala criada e link copiado',
@@ -227,8 +259,27 @@ const Reunioes = () => {
               </span>
             )}
             <span>{sala.acesso === 'espera' ? 'sala de espera' : 'só convidados'}</span>
+            {ativa && sala.gravar && (
+              <span className="inline-flex items-center gap-1 text-destructive">
+                <Circle className="h-2.5 w-2.5 fill-current" />grava sozinha
+              </span>
+            )}
           </p>
         </div>
+
+        {(gravacoes[sala.id]?.length ?? 0) > 0 && (
+          <Button variant="outline" size="sm" onClick={() => setAssistindo(sala)}>
+            <Play className="mr-1.5 h-3.5 w-3.5" />
+            Assistir
+          </Button>
+        )}
+
+        {sit === 'encerrada' && (
+          <Button variant="outline" size="sm" onClick={() => setRelatorioDe(sala)}>
+            <FileText className="mr-1.5 h-3.5 w-3.5" />
+            Relatório
+          </Button>
+        )}
 
         {ativa && (
           <div className="flex flex-wrap items-center gap-2">
@@ -273,20 +324,58 @@ const Reunioes = () => {
       <AppNavbar />
 
       <main className="mx-auto max-w-[1100px] px-6 py-8">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Reuniões</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Marque a sala, mande o convite e atenda aqui dentro — sem Meet, sem Zoom.
-            </p>
-          </div>
-          <Button onClick={comecarAgora} disabled={comecando} className="h-11 px-5">
-            {comecando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
-            Começar agora
-          </Button>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Reuniões</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Marque a sala, mande o convite e atenda aqui dentro — sem Meet, sem Zoom.
+          </p>
         </div>
 
-        <form onSubmit={salvar} className="mb-6 rounded-2xl border border-border bg-card p-6">
+        {/* Os dois jeitos de começar, lado a lado, como no Meet. */}
+        <div className="mb-8 grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col rounded-2xl border border-primary/40 bg-primary/5 p-6">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <Zap className="h-5 w-5" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">Reunião agora</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Abre a sala na hora, sem marcar nada. O link já vai copiado para você mandar no WhatsApp —
+              quem chegar pede para entrar e você aceita.
+            </p>
+            <div className="mt-4 flex items-center gap-2.5">
+              <Switch id="gravar-agora" checked={gravarAgora} onCheckedChange={setGravarAgora} />
+              <Label htmlFor="gravar-agora" className="cursor-pointer text-sm font-medium">
+                Gravar esta reunião
+              </Label>
+            </div>
+            {gravarAgora && <p className="mt-1 text-[11px] text-muted-foreground">{DICA_GRAVAR}</p>}
+            <Button onClick={comecarAgora} disabled={comecando} className="mt-5 h-11 w-full sm:w-auto sm:self-start sm:px-6">
+              {comecando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Video className="mr-2 h-4 w-4" />}
+              Começar agora
+            </Button>
+          </div>
+
+          <div className="flex flex-col rounded-2xl border border-border bg-card p-6">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-foreground">
+              <CalendarClock className="h-5 w-5" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">Agendar para depois</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Para reunião com lead: escolha o dia, o SDR e o closer. Você recebe o link e o convite do
+              Google Agenda pronto.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-auto h-11 w-full sm:w-auto sm:self-start sm:px-6"
+              onClick={() => document.getElementById('agendar')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Agendar reunião
+            </Button>
+          </div>
+        </div>
+
+        <form id="agendar" onSubmit={salvar} className="mb-6 scroll-mt-6 rounded-2xl border border-border bg-card p-6">
           <h2 className="mb-5 flex items-center gap-2 font-semibold text-foreground">
             <Plus className="h-4 w-4 text-primary" />
             Agendar reunião
@@ -379,6 +468,34 @@ const Reunioes = () => {
             </div>
           </div>
 
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <div>
+              <Label className="mb-1.5 block text-xs font-semibold">Tipo de reunião</Label>
+              <Select
+                value={String(form.tipo_reuniao)}
+                onValueChange={(v) => setForm({ ...form, tipo_reuniao: v === '2' ? 2 : 1 })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 · Consultoria / Diagnóstico</SelectItem>
+                  <SelectItem value="2">2 · Plano de Ação / Proposta</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-[11px] text-muted-foreground">O Coach segue o roteiro de cada uma.</p>
+            </div>
+            <div className="sm:col-span-2">
+              <Label htmlFor="notas_sdr" className="mb-1.5 block text-xs font-semibold">Notas do SDR</Label>
+              <Textarea
+                id="notas_sdr"
+                value={form.notas_sdr}
+                onChange={(e) => setForm({ ...form, notas_sdr: e.target.value })}
+                placeholder="O que você já descobriu: alunos, mensalidade, quem decide, por que agendou…"
+                className="min-h-[72px]"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">O Coach lê antes da reunião, pra o closer não perguntar de novo.</p>
+            </div>
+          </div>
+
           <fieldset className="mt-5">
             <legend className="mb-2 text-xs font-semibold text-foreground">Quem pode entrar</legend>
             <RadioGroup
@@ -412,6 +529,22 @@ const Reunioes = () => {
               </Label>
             </RadioGroup>
           </fieldset>
+
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-border p-4">
+            <Switch
+              id="gravar-auto"
+              checked={form.gravar}
+              onCheckedChange={(v) => setForm({ ...form, gravar: v })}
+              className="mt-0.5"
+            />
+            <Label htmlFor="gravar-auto" className="cursor-pointer font-normal">
+              <span className="block text-sm font-semibold text-foreground">Gravar automaticamente</span>
+              <span className="block text-xs leading-relaxed text-muted-foreground">
+                A gravação começa sozinha quando você entra. Desligado, você grava na hora pelo botão
+                "Gravar" da sala, se quiser. {DICA_GRAVAR}
+              </span>
+            </Label>
+          </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={salvando}>
@@ -467,9 +600,168 @@ const Reunioes = () => {
           </>
         )}
       </main>
+
+      <RelatorioDaReuniao sala={relatorioDe} fechar={() => setRelatorioDe(null)} />
+      <GravacoesDaReuniao
+        sala={assistindo}
+        gravacoes={assistindo ? gravacoes[assistindo.id] ?? [] : []}
+        fechar={() => setAssistindo(null)}
+      />
     </div>
   );
 };
+
+/**
+ * O relatório do Coach (PARTE A + PARTE B). Se ainda não existe — reunião de
+ * antes do Coach, ou o anfitrião fechou a aba sem esperar —, dá pra gerar aqui.
+ */
+function RelatorioDaReuniao({ sala, fechar }: { sala: Sala | null; fechar: () => void }) {
+  const [carregando, setCarregando] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  const [texto, setTexto] = useState<string | null>(null);
+  const [nota, setNota] = useState<number | null>(null);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    if (!sala) return;
+    setTexto(null);
+    setNota(null);
+    setErro('');
+    setCarregando(true);
+    buscaCoach(sala.id)
+      .then((r) => {
+        setTexto(r?.relatorio ?? null);
+        setNota(r?.nota ?? null);
+      })
+      .catch(() => setErro('Não consegui abrir o relatório.'))
+      .finally(() => setCarregando(false));
+  }, [sala]);
+
+  async function gerar() {
+    if (!sala) return;
+    setErro('');
+    setGerando(true);
+    try {
+      const r = await geraRelatorio(sala.id);
+      setTexto(r.relatorio);
+      setNota(r.nota);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não consegui gerar o relatório.');
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!sala} onOpenChange={(aberto) => !aberto && fechar()}>
+      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Relatório · {sala?.lead_nome ?? sala?.titulo}
+            {nota !== null && <span className="ml-2 text-primary">{nota}/10</span>}
+          </DialogTitle>
+          <DialogDescription>
+            {sala ? quando(sala.inicio) : ''} · escrito pelo Coach IA a partir da transcrição
+          </DialogDescription>
+        </DialogHeader>
+
+        {carregando ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Carregando…</p>
+        ) : texto ? (
+          <div className="prose prose-sm max-w-none text-foreground dark:prose-invert">
+            <ReactMarkdown>{texto}</ReactMarkdown>
+          </div>
+        ) : (
+          <div className="py-6 text-center">
+            <p className="mb-4 text-sm text-muted-foreground">Esta reunião ainda não tem relatório.</p>
+            <Button onClick={gerar} disabled={gerando}>
+              {gerando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {gerando ? 'Escrevendo… (leva até 1 minuto)' : 'Gerar relatório'}
+            </Button>
+          </div>
+        )}
+        {erro && <p className="text-center text-sm text-destructive">{erro}</p>}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * As gravações de uma reunião. O vídeo toca aqui mesmo, por um link que vale
+ * 1 hora — o armazém é fechado, então ninguém de fora acha o arquivo.
+ */
+function GravacoesDaReuniao({
+  sala, gravacoes, fechar,
+}: {
+  sala: Sala | null;
+  gravacoes: Gravacao[];
+  fechar: () => void;
+}) {
+  const [escolhida, setEscolhida] = useState<Gravacao | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    setEscolhida(sala ? gravacoes[gravacoes.length - 1] ?? null : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sala]);
+
+  useEffect(() => {
+    setUrl(null);
+    setErro('');
+    if (!escolhida) return;
+    if (escolhida.status === 'gravando') {
+      setErro('Ainda está gravando. O vídeo aparece aqui uns minutos depois que a reunião termina.');
+      return;
+    }
+    linkDaGravacao(escolhida.arquivo)
+      .then(setUrl)
+      .catch((e) => setErro(e instanceof Error ? e.message : 'Não consegui abrir a gravação.'));
+  }, [escolhida]);
+
+  const hora = (iso: string) =>
+    new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <Dialog open={!!sala} onOpenChange={(aberto) => !aberto && fechar()}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Gravação · {sala?.lead_nome ?? sala?.titulo}</DialogTitle>
+          <DialogDescription>{sala ? quando(sala.inicio) : ''}</DialogDescription>
+        </DialogHeader>
+
+        {gravacoes.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {gravacoes.map((g, i) => (
+              <Button
+                key={g.id}
+                size="sm"
+                variant={escolhida?.id === g.id ? 'default' : 'outline'}
+                onClick={() => setEscolhida(g)}
+              >
+                Parte {i + 1} · {hora(g.inicio)}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {url ? (
+          <video src={url} controls autoPlay className="aspect-video w-full rounded-xl bg-black" />
+        ) : erro ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">{erro}</p>
+        ) : (
+          <p className="py-10 text-center text-sm text-muted-foreground">Carregando…</p>
+        )}
+
+        {url && (
+          <a href={url} download className="text-center text-xs font-semibold text-primary hover:underline">
+            Baixar o vídeo
+          </a>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /** Lista de closers: adicionar e tirar nomes. Fica guardada para toda a equipe. */
 function EditorDeClosers({
