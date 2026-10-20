@@ -1,20 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CalendarClock, CalendarPlus, Check, Circle, Copy, FileText, Link2, Loader2, Play, Plus,
   Settings2, Users, Video, X, Zap,
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
 import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
-import { buscaCoach, geraRelatorio } from '@/lib/coach';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArquivoDeReunioes } from '@/components/reunioes/ArquivoDeReunioes';
+import { DetalheDaReuniao, type AbaDetalhe } from '@/components/reunioes/DetalheDaReuniao';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -25,7 +23,7 @@ import { fetchSdrNamesFromDb, loadSdrNames } from '@/lib/sdrNames';
 import { buscaClosers, salvaClosers } from '@/lib/closerNames';
 import {
   cancelaSala, criaReuniaoAgora, criaSala, duracaoMin, estaEsquecida, fechaSalaEsquecida,
-  linkDaGravacao, linkDaSala, linkGoogleAgenda, listaGravacoes, listaSalas, quando,
+  linkDaSala, linkGoogleAgenda, listaGravacoes, listaSalas, quando,
   separaEmails, situacao, type AcessoSala, type Gravacao, type Sala, type Situacao,
 } from '@/lib/salas';
 
@@ -82,10 +80,18 @@ const Reunioes = () => {
   const [salvando, setSalvando] = useState(false);
   const [comecando, setComecando] = useState(false);
   const [copiado, setCopiado] = useState('');
-  const [relatorioDe, setRelatorioDe] = useState<Sala | null>(null);
+  // Aba e reunião aberta ficam no endereço (?aba=arquivo&reuniao=…): dá para
+  // recarregar a página ou mandar o link sem perder onde estava.
+  const [params, setParams] = useSearchParams();
+  const aba = params.get('aba') === 'arquivo' ? 'arquivo' : 'agenda';
+  const abaDetalhe = (params.get('ver') as AbaDetalhe | null) ?? 'resumo';
+  const detalhe = useMemo(
+    () => salas.find((s) => s.id === params.get('reuniao')) ?? null,
+    [salas, params],
+  );
+  const [versao, setVersao] = useState(0);
   const [gravarAgora, setGravarAgora] = useState(false);
   const [gravacoes, setGravacoes] = useState<Record<string, Gravacao[]>>({});
-  const [assistindo, setAssistindo] = useState<Sala | null>(null);
 
   useEffect(() => {
     void fetchSdrNamesFromDb().then(setSdrs);
@@ -93,8 +99,19 @@ const Reunioes = () => {
     void recarrega();
   }, []);
 
+  function mudaParams(muda: Record<string, string | null>) {
+    const novo = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(muda)) {
+      if (v === null) novo.delete(k);
+      else novo.set(k, v);
+    }
+    setParams(novo, { replace: true });
+  }
+  const abreDetalhe = (sala: Sala, ver: string = 'resumo') => mudaParams({ reuniao: sala.id, ver });
+
   async function recarrega() {
     setCarregando(true);
+    setVersao((v) => v + 1);
     try {
       const lista = await listaSalas();
       // Reunião que ficou "ao vivo" muito além do previsto: o anfitrião saiu
@@ -268,14 +285,14 @@ const Reunioes = () => {
         </div>
 
         {(gravacoes[sala.id]?.length ?? 0) > 0 && (
-          <Button variant="outline" size="sm" onClick={() => setAssistindo(sala)}>
+          <Button variant="outline" size="sm" onClick={() => abreDetalhe(sala, 'video')}>
             <Play className="mr-1.5 h-3.5 w-3.5" />
             Assistir
           </Button>
         )}
 
         {sit === 'encerrada' && (
-          <Button variant="outline" size="sm" onClick={() => setRelatorioDe(sala)}>
+          <Button variant="outline" size="sm" onClick={() => abreDetalhe(sala, 'relatorio')}>
             <FileText className="mr-1.5 h-3.5 w-3.5" />
             Relatório
           </Button>
@@ -331,6 +348,21 @@ const Reunioes = () => {
           </p>
         </div>
 
+        <Tabs value={aba} onValueChange={(v) => mudaParams({ aba: v === 'arquivo' ? 'arquivo' : null })}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="agenda">Agenda</TabsTrigger>
+            <TabsTrigger value="arquivo">Arquivo · gravações e transcrições</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="arquivo" className="mt-0">
+            {carregando && salas.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">Carregando…</p>
+            ) : (
+              <ArquivoDeReunioes salas={salas} versao={versao} abrir={abreDetalhe} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="agenda" className="mt-0">
         {/* Os dois jeitos de começar, lado a lado, como no Meet. */}
         <div className="mb-8 grid gap-4 md:grid-cols-2">
           <div className="flex flex-col rounded-2xl border border-primary/40 bg-primary/5 p-6">
@@ -589,179 +621,38 @@ const Reunioes = () => {
 
             {passadas.length > 0 && (
               <section>
-                <h2 className="mb-4 text-xs font-semibold uppercase tracking-[1.6px] text-muted-foreground">
-                  Já aconteceram · {passadas.length}
-                </h2>
+                <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-[1.6px] text-muted-foreground">
+                    Últimas que aconteceram
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => mudaParams({ aba: 'arquivo' })}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    Ver todas no Arquivo ({passadas.length}) →
+                  </button>
+                </div>
                 <div className="space-y-3">
-                  {passadas.slice(0, 20).map((s) => <Linha key={s.id} sala={s} />)}
+                  {passadas.slice(0, 5).map((s) => <Linha key={s.id} sala={s} />)}
                 </div>
               </section>
             )}
           </>
         )}
+          </TabsContent>
+        </Tabs>
       </main>
 
-      <RelatorioDaReuniao sala={relatorioDe} fechar={() => setRelatorioDe(null)} />
-      <GravacoesDaReuniao
-        sala={assistindo}
-        gravacoes={assistindo ? gravacoes[assistindo.id] ?? [] : []}
-        fechar={() => setAssistindo(null)}
+      <DetalheDaReuniao
+        sala={detalhe}
+        aba={abaDetalhe}
+        mudaAba={(ver) => mudaParams({ ver })}
+        fechar={() => mudaParams({ reuniao: null, ver: null })}
       />
     </div>
   );
 };
-
-/**
- * O relatório do Coach (PARTE A + PARTE B). Se ainda não existe — reunião de
- * antes do Coach, ou o anfitrião fechou a aba sem esperar —, dá pra gerar aqui.
- */
-function RelatorioDaReuniao({ sala, fechar }: { sala: Sala | null; fechar: () => void }) {
-  const [carregando, setCarregando] = useState(false);
-  const [gerando, setGerando] = useState(false);
-  const [texto, setTexto] = useState<string | null>(null);
-  const [nota, setNota] = useState<number | null>(null);
-  const [erro, setErro] = useState('');
-
-  useEffect(() => {
-    if (!sala) return;
-    setTexto(null);
-    setNota(null);
-    setErro('');
-    setCarregando(true);
-    buscaCoach(sala.id)
-      .then((r) => {
-        setTexto(r?.relatorio ?? null);
-        setNota(r?.nota ?? null);
-      })
-      .catch(() => setErro('Não consegui abrir o relatório.'))
-      .finally(() => setCarregando(false));
-  }, [sala]);
-
-  async function gerar() {
-    if (!sala) return;
-    setErro('');
-    setGerando(true);
-    try {
-      const r = await geraRelatorio(sala.id);
-      setTexto(r.relatorio);
-      setNota(r.nota);
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Não consegui gerar o relatório.');
-    } finally {
-      setGerando(false);
-    }
-  }
-
-  return (
-    <Dialog open={!!sala} onOpenChange={(aberto) => !aberto && fechar()}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            Relatório · {sala?.lead_nome ?? sala?.titulo}
-            {nota !== null && <span className="ml-2 text-primary">{nota}/10</span>}
-          </DialogTitle>
-          <DialogDescription>
-            {sala ? quando(sala.inicio) : ''} · escrito pelo Coach IA a partir da transcrição
-          </DialogDescription>
-        </DialogHeader>
-
-        {carregando ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Carregando…</p>
-        ) : texto ? (
-          <div className="prose prose-sm max-w-none text-foreground dark:prose-invert">
-            <ReactMarkdown>{texto}</ReactMarkdown>
-          </div>
-        ) : (
-          <div className="py-6 text-center">
-            <p className="mb-4 text-sm text-muted-foreground">Esta reunião ainda não tem relatório.</p>
-            <Button onClick={gerar} disabled={gerando}>
-              {gerando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {gerando ? 'Escrevendo… (leva até 1 minuto)' : 'Gerar relatório'}
-            </Button>
-          </div>
-        )}
-        {erro && <p className="text-center text-sm text-destructive">{erro}</p>}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/**
- * As gravações de uma reunião. O vídeo toca aqui mesmo, por um link que vale
- * 1 hora — o armazém é fechado, então ninguém de fora acha o arquivo.
- */
-function GravacoesDaReuniao({
-  sala, gravacoes, fechar,
-}: {
-  sala: Sala | null;
-  gravacoes: Gravacao[];
-  fechar: () => void;
-}) {
-  const [escolhida, setEscolhida] = useState<Gravacao | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [erro, setErro] = useState('');
-
-  useEffect(() => {
-    setEscolhida(sala ? gravacoes[gravacoes.length - 1] ?? null : null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sala]);
-
-  useEffect(() => {
-    setUrl(null);
-    setErro('');
-    if (!escolhida) return;
-    if (escolhida.status === 'gravando') {
-      setErro('Ainda está gravando. O vídeo aparece aqui uns minutos depois que a reunião termina.');
-      return;
-    }
-    linkDaGravacao(escolhida.arquivo)
-      .then(setUrl)
-      .catch((e) => setErro(e instanceof Error ? e.message : 'Não consegui abrir a gravação.'));
-  }, [escolhida]);
-
-  const hora = (iso: string) =>
-    new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-  return (
-    <Dialog open={!!sala} onOpenChange={(aberto) => !aberto && fechar()}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Gravação · {sala?.lead_nome ?? sala?.titulo}</DialogTitle>
-          <DialogDescription>{sala ? quando(sala.inicio) : ''}</DialogDescription>
-        </DialogHeader>
-
-        {gravacoes.length > 1 && (
-          <div className="flex flex-wrap gap-2">
-            {gravacoes.map((g, i) => (
-              <Button
-                key={g.id}
-                size="sm"
-                variant={escolhida?.id === g.id ? 'default' : 'outline'}
-                onClick={() => setEscolhida(g)}
-              >
-                Parte {i + 1} · {hora(g.inicio)}
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {url ? (
-          <video src={url} controls autoPlay className="aspect-video w-full rounded-xl bg-black" />
-        ) : erro ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">{erro}</p>
-        ) : (
-          <p className="py-10 text-center text-sm text-muted-foreground">Carregando…</p>
-        )}
-
-        {url && (
-          <a href={url} download className="text-center text-xs font-semibold text-primary hover:underline">
-            Baixar o vídeo
-          </a>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /** Lista de closers: adicionar e tirar nomes. Fica guardada para toda a equipe. */
 function EditorDeClosers({
