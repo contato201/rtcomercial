@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalParticipant, useParticipants, useRoomContext } from '@livekit/components-react';
 import type { Participant } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, Circle, Lightbulb, Sparkles } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import {
   CAMPOS_FICHA, ROTEIRO, aplicaResposta, buscaCoach, estadoInicial, falaDoCloserPct, pedeDica,
   quemGrava, salvaEstado, salvaTrechos,
@@ -15,6 +16,11 @@ import {
  * assistente invisível, guarda no banco a cada 10 s e pede uma dica ao Coach
  * a cada 45 s, se houve fala nova. Os outros da equipe (observador, segundo
  * anfitrião) só leem o estado do banco a cada 5 s — mesma tela, sem custo extra.
+ *
+ * "Coach ao vivo" começa ligado em toda reunião; quem grava pode desligar na
+ * chave do cartão (pedido do Allan). Desligado, as dicas param, mas a fala
+ * continua sendo guardada — o relatório do fim sai igual. Ao religar, o que
+ * foi dito no meio vai junto na próxima pergunta, para a ficha não perder nada.
  */
 
 const TOPICO = 'rt-transcricao';
@@ -57,6 +63,9 @@ export function PainelCoach({
   estadoAtual.current = estado;
   const engajamentoAtual = useRef(engajamento);
   engajamentoAtual.current = engajamento;
+  const [aoVivo, setAoVivo] = useState(true);
+  const aoVivoAtual = useRef(aoVivo);
+  aoVivoAtual.current = aoVivo;
 
   useEffect(() => {
     // Todo anfitrião recebe o texto (o transcritor manda para todos eles),
@@ -89,6 +98,7 @@ export function PainelCoach({
     };
 
     const pergunta = async () => {
+      if (!aoVivoAtual.current) return; // pausado: guarda a fala, não pergunta
       const novos = trechos.current.slice(jaPerguntados.current);
       if (novos.length === 0) return;
       jaPerguntados.current = trechos.current.length;
@@ -132,7 +142,12 @@ export function PainelCoach({
     };
   }, [gravo, salaId]);
 
-  return <TelaDoCoach estado={estado} tipo={tipo} falas={falas} gravo={gravo} />;
+  return (
+    <TelaDoCoach
+      estado={estado} tipo={tipo} falas={falas} gravo={gravo}
+      aoVivo={aoVivo} mudaAoVivo={setAoVivo}
+    />
+  );
 }
 
 // ── A tela ─────────────────────────────────────────────────────────────────
@@ -143,7 +158,16 @@ const COR_DICA: Record<Dica['nivel'], { caixa: string; texto: string; rotulo: st
   sugestao: { caixa: 'border-[#1F3A2A] bg-[#0F1A14]', texto: 'text-[#9FD8B5]', rotulo: 'Sugestão' },
 };
 
-function TelaDoCoach({ estado, tipo, falas, gravo }: { estado: EstadoCoach; tipo: TipoReuniao; falas: number; gravo: boolean }) {
+function TelaDoCoach({
+  estado, tipo, falas, gravo, aoVivo, mudaAoVivo,
+}: {
+  estado: EstadoCoach;
+  tipo: TipoReuniao;
+  falas: number;
+  gravo: boolean;
+  aoVivo: boolean;
+  mudaAoVivo: (ligado: boolean) => void;
+}) {
   const roteiro = ROTEIRO[tipo];
   const atual = estado.bloco ? roteiro.indexOf(estado.bloco) : -1;
   const [ultima, ...anteriores] = estado.dicas;
@@ -168,7 +192,18 @@ function TelaDoCoach({ estado, tipo, falas, gravo }: { estado: EstadoCoach; tipo
           </span>
         </div>
 
-        {ultima ? (
+        {gravo && (
+          <label className="mb-3 flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-[#242424] bg-[#171717] px-3 py-2">
+            <span className="text-xs font-medium text-[#D7D2C6]">Dicas ao vivo</span>
+            <Switch checked={aoVivo} onCheckedChange={mudaAoVivo} aria-label="Ligar ou desligar as dicas ao vivo" />
+          </label>
+        )}
+
+        {gravo && !aoVivo ? (
+          <p className="text-xs leading-relaxed text-[#78736B]">
+            Dicas pausadas. A conversa continua sendo guardada e o relatório chega no fim da reunião.
+          </p>
+        ) : ultima ? (
           <div className={`rounded-xl border p-3 ${COR_DICA[ultima.nivel].caixa}`}>
             <p className={`mb-1 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[1.4px] ${COR_DICA[ultima.nivel].texto}`}>
               {ultima.nivel === 'critico' ? <AlertTriangle className="h-3 w-3" /> : <Lightbulb className="h-3 w-3" />}
