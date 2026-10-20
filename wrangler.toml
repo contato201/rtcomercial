@@ -1,0 +1,6 @@
+# Configuração do Cloudflare Pages para o projeto rtcomercial.
+# A Pages Function functions/api/leadscore.js lê a planilha pública de leads (Google Sheets)
+# ao vivo, então não precisa de binding de banco nem de token.
+name = "rtcomercial"
+compatibility_date = "2024-09-25"
+pages_build_output_dir = "dist"

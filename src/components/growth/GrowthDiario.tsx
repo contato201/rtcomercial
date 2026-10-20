@@ -32,26 +32,31 @@ export const GrowthDiario = ({ filtro, trafegoRows }: Props) => {
   const [rows, setRows] = useState<GrowthDia[]>([]);
   // Agendamentos de "Tráfego Pago" por dia (YYYY-MM-DD), vindos do dashboard Comercial
   const [agPorDia, setAgPorDia] = useState<Map<string, number>>(new Map());
+  // Agendamentos de tráfego crus (com month + mes_lead) pra separar a coorte.
+  const [agsRaw, setAgsRaw] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     const [diario, agendaRes] = await Promise.all([
       (supabase as any).from("growth_diario").select("*").order("data", { ascending: true }),
-      (supabase as any).from("agendamentos").select("quantidade,data_lancamento,origem"),
+      (supabase as any).from("agendamentos").select("quantidade,data_lancamento,origem,month,mes_lead"),
     ]);
     if (!diario.error && Array.isArray(diario.data)) setRows(diario.data as GrowthDia[]);
 
     const mapa = new Map<string, number>();
+    const crus: any[] = [];
     if (!agendaRes.error && Array.isArray(agendaRes.data)) {
       for (const a of agendaRes.data as any[]) {
         if (a.origem !== ORIGEM_TRAFEGO_LEAD) continue;
         const dia = String(a.data_lancamento ?? "").slice(0, 10);
         if (!dia) continue;
         mapa.set(dia, (mapa.get(dia) ?? 0) + (Number(a.quantidade) || 0));
+        crus.push(a);
       }
     }
     setAgPorDia(mapa);
+    setAgsRaw(crus);
     setLoading(false);
   };
 
@@ -108,6 +113,21 @@ export const GrowthDiario = ({ filtro, trafegoRows }: Props) => {
     { inv: 0, leads: 0, cliques: 0, agend: 0 },
   );
 
+  // Coorte dos agendamentos no período (pelo mês do lead: deste mês vs antigos vs sem marcar).
+  const coorte = useMemo(() => {
+    const soma = (arr: any[]) => arr.reduce((s, a) => s + (Number(a.quantidade) || 0), 0);
+    const noPer = agsRaw.filter((a) => {
+      const dia = String(a.data_lancamento ?? "").slice(0, 10);
+      return dia >= periodo.from && dia <= periodo.to;
+    });
+    return {
+      total: soma(noPer),
+      desteMes: soma(noPer.filter((a) => a.mes_lead && a.mes_lead === a.month)),
+      antigos: soma(noPer.filter((a) => a.mes_lead && a.mes_lead !== a.month)),
+      semMarcar: soma(noPer.filter((a) => !a.mes_lead)),
+    };
+  }, [agsRaw, periodo]);
+
   const diaFmt = (d: string) => {
     const dt = new Date(d + "T12:00:00");
     return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", weekday: "short" });
@@ -140,6 +160,31 @@ export const GrowthDiario = ({ filtro, trafegoRows }: Props) => {
         <p className="text-xs text-muted-foreground -mt-2 mb-3">
           ⚠️ Com o filtro ativo, <strong>Investido, Leads e Cliques</strong> são só das campanhas filtradas. Já <strong>Agendou</strong> é o total de "Tráfego Pago" do dia (todas as campanhas) — a conversão e o CPA ficam aproximados.
         </p>
+      )}
+
+      {coorte.total > 0 && (
+        <div className="rounded-xl border border-primary/25 bg-card/70 p-3 mb-4">
+          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <span className="text-sm font-bold text-foreground">🚀 Agendamentos do período · de onde vieram os leads</span>
+            <span className="text-[11px] font-semibold text-muted-foreground bg-muted/50 rounded-full px-2 py-0.5">{coorte.total} no total · custo/ag. {custo(tot.inv, coorte.total)}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg border border-[hsl(var(--success)/0.45)] bg-[hsl(var(--success)/0.15)] px-2 py-2">
+              <div className="text-xl font-bold text-[hsl(var(--success))] leading-none">{coorte.desteMes}</div>
+              <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--success))]">🟢 Deste mês</div>
+              <div className="text-[10px] text-muted-foreground">{coorte.desteMes > 0 ? `${custo(tot.inv, coorte.desteMes)}/ag.` : "—"}</div>
+            </div>
+            <div className="rounded-lg border border-amber-500/45 bg-amber-500/15 px-2 py-2">
+              <div className="text-xl font-bold text-amber-500 leading-none">{coorte.antigos}</div>
+              <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-amber-500">🟡 Antigos</div>
+              <div className="text-[10px] text-muted-foreground">de meses anteriores</div>
+            </div>
+            <div className={`rounded-lg border px-2 py-2 ${coorte.semMarcar > 0 ? "border-dashed border-muted-foreground/50 bg-muted/40" : "border-border/60 bg-muted/20"}`}>
+              <div className="text-xl font-bold text-foreground leading-none">{coorte.semMarcar}</div>
+              <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">⚪ Sem marcar</div>
+            </div>
+          </div>
+        </div>
       )}
 
       {loading ? (

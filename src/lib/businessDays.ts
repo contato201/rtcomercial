@@ -38,3 +38,37 @@ export const businessDaysRemainingInMonth = (
 };
 
 export const DASHBOARD_YEAR = 2026;
+
+export const businessDaysElapsedInMonth = (
+  year: number,
+  monthIndex: number,
+  fromDate: Date = new Date(),
+): number => {
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+  const today = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  const limit = today > monthEnd ? monthEnd : today;
+
+  if (limit < new Date(year, monthIndex, 1)) return 0;
+
+  let count = 0;
+  const cursor = new Date(year, monthIndex, 1);
+  while (cursor <= limit) {
+    if (isBusinessDay(cursor)) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+};
+
+export const businessDaysBetween = (start: Date, end: Date): number => {
+  const from = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const to = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  if (to < from) return 0;
+
+  let count = 0;
+  const cursor = new Date(from);
+  while (cursor <= to) {
+    if (isBusinessDay(cursor)) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+};

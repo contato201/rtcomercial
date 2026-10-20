@@ -1,16 +1,44 @@
 import { useState } from 'react';
 import { useGrowthData } from '@/hooks/useGrowthData';
+import { useAuth } from '@/hooks/useAuth';
 import { AppNavbar } from '@/components/AppNavbar';
 import { GrowthFunnelMeta } from '@/components/growth/GrowthFunnelMeta';
+import { GrowthOrcamento } from '@/components/growth/GrowthOrcamento';
+import { GrowthMQL } from '@/components/growth/GrowthMQL';
 import { GrowthDiario } from '@/components/growth/GrowthDiario';
 import { GerenciadorMeta } from '@/components/growth/GerenciadorMeta';
 import { useTrafegoDiario } from '@/hooks/useTrafegoDiario';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 const FILTRO_STORAGE_KEY = 'growth-filtro-campanha';
 
 const Growth = () => {
   const { isLoading } = useGrowthData();
+  const { canEdit } = useAuth();
+  const [syncing, setSyncing] = useState(false);
+
+  // Puxa os dados da Meta na hora (mesma função do cron das 01:00), via portinha
+  // do servidor que guarda o segredo. Ao terminar, recarrega pra tudo refletir.
+  const sincronizarAgora = async () => {
+    setSyncing(true);
+    try {
+      const r = await fetch('/api/sync-meta', { method: 'POST' });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) {
+        toast.success('Meta sincronizada!', { description: `Dados atualizados até ${j.ate ?? 'hoje'}. Recarregando…` });
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        toast.error('Não consegui sincronizar agora', { description: j.error || 'Tente de novo em instantes.' });
+        setSyncing(false);
+      }
+    } catch {
+      toast.error('Não consegui sincronizar agora', { description: 'Verifique a conexão e tente de novo.' });
+      setSyncing(false);
+    }
+  };
   // Filtro "contém" compartilhado entre o funil e o dia a dia.
   // Fica salvo no navegador até o usuário mudar. (O período é individual
   // de cada bloco — cada um tem seu próprio calendário.)
@@ -49,10 +77,22 @@ const Growth = () => {
 
       <div className="max-w-[1600px] mx-auto p-4 sm:p-5 md:p-6 lg:p-8">
         {/* Título */}
-        <div className="mb-4 md:mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard de Growth</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">Tráfego Meta Ads — cada bloco tem seu próprio período</p>
+        <div className="mb-4 md:mb-6 flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard de Growth</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Tráfego Meta Ads — cada bloco tem seu próprio período</p>
+          </div>
+          <Button onClick={sincronizarAgora} disabled={syncing} variant="outline" size="sm" className="shrink-0" title="Puxa o gasto e as métricas mais recentes da Meta agora (normalmente atualiza sozinho às 01:00)">
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Sincronizando…' : 'Sincronizar agora'}
+          </Button>
         </div>
+
+        {/* Orçamento por Funil - planejado vs gasto real */}
+        <GrowthOrcamento canEdit={canEdit} />
+
+        {/* Qualidade dos leads - MQL por score (A/B/C) + custo de cada */}
+        <GrowthMQL canEdit={canEdit} />
 
         {/* Funil de Growth - Meta Ads (filtro por campanha) */}
         <GrowthFunnelMeta

@@ -20,6 +20,7 @@ import {
   Moon,
   LogIn,
   LogOut,
+  Target,
 } from 'lucide-react';
 import { MONTHS } from '@/types/dashboard';
 import { useTheme } from '@/hooks/useTheme';
@@ -63,6 +64,10 @@ export const CommandPalette = ({
           <CommandItem onSelect={() => run(() => navigate('/growth'))}>
             <TrendingUp className="mr-2 h-4 w-4" />
             Growth
+          </CommandItem>
+          <CommandItem onSelect={() => run(() => navigate('/prospeccao'))}>
+            <Target className="mr-2 h-4 w-4" />
+            Prospecção
           </CommandItem>
         </CommandGroup>
 

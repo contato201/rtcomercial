@@ -22,6 +22,18 @@ const localYmd = (iso: string) => {
 
 const noPeriodo = (dataStr: string, p: Periodo) => dataStr >= p.from && dataStr <= p.to;
 
+const MESES_NOME = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+// true se o mês (do tráfego) sobrepõe o período selecionado — usado para atribuir a venda ao mês do INVESTIMENTO, não ao do pagamento
+const mesOverlapaPeriodo = (mesNome: string, ano: number, p: Periodo) => {
+  const idx = MESES_NOME.indexOf(mesNome);
+  if (idx < 0) return false;
+  const mm = String(idx + 1).padStart(2, "0");
+  const primeiro = `${ano}-${mm}-01`;
+  const ultimoDia = new Date(ano, idx + 1, 0).getDate();
+  const ultimo = `${ano}-${mm}-${String(ultimoDia).padStart(2, "0")}`;
+  return primeiro <= p.to && ultimo >= p.from;
+};
+
 interface Props {
   filtro: string;
   onFiltroChange: (v: string) => void;
@@ -31,26 +43,44 @@ interface Props {
 
 export const GrowthFunnelMeta = ({ filtro, onFiltroChange, rows, rowsLoading }: Props) => {
   const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
-  const [com, setCom] = useState({ reunioes: 0, vendas: 0, faturamento: 0 });
+  const [com, setCom] = useState({ reunioes: 0, agendDesteMes: 0, reuniao1: 0, reuniao2: 0, vendas: 0, faturamento: 0 });
 
   // Dados comerciais no período: reuniões (agendamentos por data_lancamento),
   // vendas + faturamento (vendas_unitarias de ORIGEM TRÁFEGO, por created_at).
   useEffect(() => {
     (async () => {
-      const [ag, vd] = await Promise.all([
-        (supabase as any).from("agendamentos").select("quantidade,data_lancamento,origem"),
-        (supabase as any).from("vendas_unitarias").select("valor,origem,created_at"),
+      const [ag, vd, re] = await Promise.all([
+        (supabase as any).from("agendamentos").select("quantidade,data_lancamento,origem,month,mes_lead"),
+        (supabase as any).from("vendas_unitarias").select("valor,origem,created_at,mes_trafego"),
+        (supabase as any).from("reunioes_entries").select("quantidade,tipo,data_lancamento,origem"),
       ]);
       // Só agendamentos de tráfego pago entram no funil de Growth (senão o número infla e distorce o custo por agendamento).
-      const reunioes = (ag.data || [])
-        .filter((r: any) => r.origem === ORIGEM_TRAFEGO_LEAD && noPeriodo(String(r.data_lancamento ?? "").slice(0, 10), periodo))
+      const agsTrafego = (ag.data || [])
+        .filter((r: any) => r.origem === ORIGEM_TRAFEGO_LEAD && noPeriodo(String(r.data_lancamento ?? "").slice(0, 10), periodo));
+      const reunioes = agsTrafego.reduce((s: number, r: any) => s + (r.quantidade || 0), 0);
+      // Coorte: agendamentos cujo lead entrou no MESMO mês do lançamento (mes_lead == month).
+      const agendDesteMes = agsTrafego
+        .filter((r: any) => r.mes_lead && r.mes_lead === r.month)
         .reduce((s: number, r: any) => s + (r.quantidade || 0), 0);
-      const vendasTrafego = (vd.data || []).filter(
-        (r: any) => isTrafego(r.origem) && noPeriodo(localYmd(r.created_at), periodo),
-      );
+      // 1ª e 2ª reuniões realizadas (tráfego pago), por data_lancamento
+      const reuniaoTipo = (tipo: string) =>
+        (re.data || [])
+          .filter((r: any) => r.tipo === tipo && r.origem === ORIGEM_TRAFEGO_LEAD && noPeriodo(String(r.data_lancamento ?? "").slice(0, 10), periodo))
+          .reduce((s: number, r: any) => s + (r.quantidade || 0), 0);
+      const reuniao1 = reuniaoTipo("primeira");
+      const reuniao2 = reuniaoTipo("segunda");
+      const anoPer = parseInt(periodo.from.slice(0, 4), 10) || new Date().getFullYear();
+      const vendasTrafego = (vd.data || []).filter((r: any) => {
+        if (!isTrafego(r.origem)) return false;
+        const mt = String(r.mes_trafego ?? "").trim();
+        // Se marcou o mês do tráfego, atribui a venda ao mês do INVESTIMENTO (ex: fechou/pagou em setembro, mas tráfego foi julho → conta em julho).
+        if (mt) return mesOverlapaPeriodo(mt, anoPer, periodo);
+        // Sem mês do tráfego → cai no comportamento antigo (data do lançamento).
+        return noPeriodo(localYmd(r.created_at), periodo);
+      });
       const vendas = vendasTrafego.length;
       const faturamento = vendasTrafego.reduce((s: number, r: any) => s + Number(r.valor || 0), 0);
-      setCom({ reunioes, vendas, faturamento });
+      setCom({ reunioes, agendDesteMes, reuniao1, reuniao2, vendas, faturamento });
     })();
   }, [periodo]);
 
@@ -82,9 +112,18 @@ export const GrowthFunnelMeta = ({ filtro, onFiltroChange, rows, rowsLoading }: 
     { label: "CPC (custo/clique)", valor: custo(agg.inv, agg.cli), cor: "text-foreground", destaque: false },
     { label: "CPM (custo/mil)", valor: agg.imp > 0 ? brl(cpm) : "—", cor: "text-foreground", destaque: false },
     { label: "CTR (cliques/impr.)", valor: agg.imp > 0 ? `${ctr.toFixed(2)}%` : "—", cor: "text-foreground", destaque: false },
+    { label: "Agendamentos", valor: num(com.reunioes), cor: "text-foreground", destaque: true },
     { label: "C/ Agendamento", valor: custo(agg.inv, com.reunioes), cor: "text-foreground", destaque: true },
+    { label: "Agend. deste mês", valor: num(com.agendDesteMes), cor: "text-[hsl(var(--success))]", destaque: true },
+    { label: "C/ Agend. deste mês", valor: custo(agg.inv, com.agendDesteMes), cor: "text-foreground", destaque: true },
+    { label: "C/ 1ª Reunião", valor: custo(agg.inv, com.reuniao1), cor: "text-foreground", destaque: true },
+    { label: "C/ 2ª Reunião", valor: custo(agg.inv, com.reuniao2), cor: "text-foreground", destaque: true },
     { label: "CAC (custo/venda)", valor: custo(agg.inv, com.vendas), cor: "text-foreground", destaque: true },
     { label: "ROAS (retorno)", valor: agg.inv > 0 && com.faturamento > 0 ? `${roas.toFixed(2)}x` : "—", cor: roas >= 1 ? "text-[hsl(var(--success))]" : "text-foreground", destaque: true },
+    { label: "Tx Lead→Agend", valor: pct(com.reunioes, agg.leads), cor: "text-primary", destaque: false },
+    { label: "Tx Agend→1ª", valor: pct(com.reuniao1, com.reunioes), cor: "text-primary", destaque: false },
+    { label: "Tx 1ª→2ª", valor: pct(com.reuniao2, com.reuniao1), cor: "text-primary", destaque: false },
+    { label: "Tx 2ª→Venda", valor: pct(com.vendas, com.reuniao2), cor: "text-primary", destaque: false },
   ];
 
   const funil = [
@@ -92,7 +131,9 @@ export const GrowthFunnelMeta = ({ filtro, onFiltroChange, rows, rowsLoading }: 
     { label: "Cliques", valor: agg.cli, icon: MousePointerClick, conv: pct(agg.cli, agg.imp), meta: true },
     { label: "Leads", valor: agg.leads, icon: Users, conv: pct(agg.leads, agg.cli), meta: true },
     { label: "Agendamentos (tráfego)", valor: com.reunioes, icon: CalendarCheck, conv: pct(com.reunioes, agg.leads), meta: false },
-    { label: "Vendas (tráfego)", valor: com.vendas, icon: DollarSign, conv: pct(com.vendas, com.reunioes), meta: false },
+    { label: "1ª Reunião (tráfego)", valor: com.reuniao1, icon: Users, conv: pct(com.reuniao1, com.reunioes), meta: false },
+    { label: "2ª Reunião (tráfego)", valor: com.reuniao2, icon: Users, conv: pct(com.reuniao2, com.reuniao1), meta: false },
+    { label: "Vendas (tráfego)", valor: com.vendas, icon: DollarSign, conv: pct(com.vendas, com.reuniao2), meta: false },
   ];
   const maxVal = Math.max(agg.imp, 1);
 
@@ -202,7 +243,7 @@ export const GrowthFunnelMeta = ({ filtro, onFiltroChange, rows, rowsLoading }: 
           </div>
 
           <p className="text-xs text-muted-foreground mt-4">
-            🔵 <strong>Impressões, Cliques, Leads</strong> vêm da Meta (filtráveis por campanha). 🟡 <strong>Agendamentos, Vendas e Faturamento</strong> contam apenas o que foi marcado como <strong>origem "Tráfego Pago"</strong> no dashboard comercial (por isso o Custo por Agendamento e o ROAS ficam reais).
+            🔵 <strong>Impressões, Cliques, Leads</strong> vêm da Meta (filtráveis por campanha). 🟡 <strong>Agendamentos, 1ª e 2ª Reunião, Vendas e Faturamento</strong> contam apenas o que foi marcado como <strong>origem "Tráfego Pago"</strong> no dashboard comercial (por isso os custos por etapa e o ROAS ficam reais).
           </p>
         </>
       )}

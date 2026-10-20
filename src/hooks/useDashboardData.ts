@@ -14,6 +14,7 @@ type UnitSaleRow = {
   cliente: string;
   pessoa: string;
   origem: string;
+  mes_trafego?: string;
   created_at: string;
   updated_at: string;
 };
@@ -25,6 +26,7 @@ export type AgendamentoRow = {
   quantidade: number;
   origem: string;
   lead_nome: string;
+  mes_lead: string;
   data_lancamento: string;
   created_at: string;
 };
@@ -37,6 +39,9 @@ export type ReuniaoEntryRow = {
   pessoa: string;
   lead_nome: string;
   origem: string;
+  funil: string;
+  comentario: string;
+  qualificacao: string;
   data_lancamento: string;
   created_at: string;
 };
@@ -151,6 +156,7 @@ export const useDashboardData = () => {
         quantidade: toFiniteNumber(row.quantidade),
         origem: String(row.origem ?? ''),
         lead_nome: String(row.lead_nome ?? ''),
+        mes_lead: String(row.mes_lead ?? ''),
         data_lancamento: row.data_lancamento,
         created_at: row.created_at,
       }));
@@ -165,6 +171,9 @@ export const useDashboardData = () => {
         pessoa: String(row.pessoa ?? ''),
         lead_nome: String(row.lead_nome ?? ''),
         origem: String(row.origem ?? ''),
+        funil: String(row.funil ?? ''),
+        comentario: String(row.comentario ?? ''),
+        qualificacao: String(row.qualificacao ?? ''),
         data_lancamento: row.data_lancamento,
         created_at: row.created_at,
       }));
@@ -189,6 +198,7 @@ export const useDashboardData = () => {
           cliente: (row as any).cliente ?? '',
           pessoa: String((row as any).pessoa ?? ''),
           origem: String((row as any).origem ?? ''),
+          mes_trafego: String((row as any).mes_trafego ?? ''),
           created_at: row.created_at, updated_at: row.updated_at,
         });
         return acc;
@@ -355,7 +365,7 @@ export const useDashboardData = () => {
     }
   }, [data, saveToHistory, handlePersistenceError, loadFromDatabase, requireFreshEditorSession]);
 
-  const addUnitSale = useCallback(async (monthIndex: number, valor: number, cliente: string = '', pessoa: string = '', origem: string = '') => {
+  const addUnitSale = useCallback(async (monthIndex: number, valor: number, cliente: string = '', pessoa: string = '', origem: string = '', mesTrafego: string = '') => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const v = valorSchema.safeParse(valor);
@@ -365,7 +375,7 @@ export const useDashboardData = () => {
 
     const { data: inserted, error } = await supabase
       .from('vendas_unitarias')
-      .insert({ month: m.data, valor: v.data, cliente, pessoa: (pessoa ?? '').trim(), origem: (origem ?? '').trim() || null } as any)
+      .insert({ month: m.data, valor: v.data, cliente, pessoa: (pessoa ?? '').trim(), origem: (origem ?? '').trim() || null, mes_trafego: (mesTrafego ?? '').trim() || null } as any)
       .select('*')
       .single();
     if (error) { handlePersistenceError('Erro ao inserir venda unitária:', error); throw error; }
@@ -378,6 +388,7 @@ export const useDashboardData = () => {
         cliente: (inserted as any).cliente ?? '',
         pessoa: String((inserted as any).pessoa ?? ''),
         origem: String((inserted as any).origem ?? ''),
+        mes_trafego: String((inserted as any).mes_trafego ?? ''),
         created_at: inserted.created_at, updated_at: inserted.updated_at,
       };
       list.push(newRow);
@@ -387,7 +398,7 @@ export const useDashboardData = () => {
     });
   }, [applyUnitSalesAggregateToMonth, handlePersistenceError, requireFreshEditorSession]);
 
-  const updateUnitSale = useCallback(async (id: string, valor: number, cliente: string = '', pessoa: string = '', origem: string = '') => {
+  const updateUnitSale = useCallback(async (id: string, valor: number, cliente: string = '', pessoa: string = '', origem: string = '', mesTrafego: string = '') => {
     const v = valorSchema.safeParse(valor);
     if (!v.success) return;
 
@@ -395,7 +406,7 @@ export const useDashboardData = () => {
 
     const { data: updated, error } = await supabase
       .from('vendas_unitarias')
-      .update({ valor: v.data, cliente, pessoa: (pessoa ?? '').trim(), origem: (origem ?? '').trim() || null } as any)
+      .update({ valor: v.data, cliente, pessoa: (pessoa ?? '').trim(), origem: (origem ?? '').trim() || null, mes_trafego: (mesTrafego ?? '').trim() || null } as any)
       .eq('id', id)
       .select('*')
       .single();
@@ -413,6 +424,7 @@ export const useDashboardData = () => {
           cliente: (updated as any).cliente ?? '',
           pessoa: String((updated as any).pessoa ?? ''),
           origem: String((updated as any).origem ?? ''),
+          mes_trafego: String((updated as any).mes_trafego ?? ''),
           updated_at: updated.updated_at,
         };
       }
@@ -528,7 +540,7 @@ export const useDashboardData = () => {
   }, [handlePersistenceError, loadFromDatabase, requireFreshEditorSession]);
 
   // Agendamentos
-  const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string, leadNome?: string) => {
+  const addAgendamento = useCallback(async (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string, leadNome?: string, mesLead?: string) => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const p = pessoaSchema.safeParse(pessoa);
@@ -539,12 +551,14 @@ export const useDashboardData = () => {
     if (dataLancamento) payload.data_lancamento = dataLancamento;
     if (origem !== undefined) payload.origem = origem || null;
     if (leadNome !== undefined) payload.lead_nome = leadNome.trim() || null;
+    if (mesLead !== undefined) payload.mes_lead = (mesLead ?? '').trim() || null;
     const { data: inserted, error } = await supabase.from('agendamentos' as any).insert(payload).select('*').single();
     if (error) { handlePersistenceError('Erro ao inserir agendamento:', error); throw error; }
     const newRow: AgendamentoRow = {
       id: (inserted as any).id, month: (inserted as any).month, pessoa: (inserted as any).pessoa,
       quantidade: (inserted as any).quantidade, origem: String((inserted as any).origem ?? ''),
       lead_nome: String((inserted as any).lead_nome ?? ''),
+      mes_lead: String((inserted as any).mes_lead ?? ''),
       data_lancamento: (inserted as any).data_lancamento, created_at: (inserted as any).created_at,
     };
     setAgendamentos((prev) => [newRow, ...prev]);
@@ -557,8 +571,17 @@ export const useDashboardData = () => {
     setAgendamentos((prev) => prev.filter((a) => a.id !== id));
   }, [handlePersistenceError, requireFreshEditorSession]);
 
+  // Marca/atualiza "de qual mês veio o lead" num agendamento já lançado.
+  const updateAgendamentoMesLead = useCallback(async (id: string, mesLead: string) => {
+    await requireFreshEditorSession();
+    const value = (mesLead ?? '').trim() || null;
+    const { error } = await supabase.from('agendamentos' as any).update({ mes_lead: value }).eq('id', id);
+    if (error) { handlePersistenceError('Erro ao marcar mês do lead:', error); throw error; }
+    setAgendamentos((prev) => prev.map((a) => (a.id === id ? { ...a, mes_lead: value ?? '' } : a)));
+  }, [handlePersistenceError, requireFreshEditorSession]);
+
   // Reuniões entries
-  const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string) => {
+  const addReuniaoEntry = useCallback(async (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string, funil?: string, comentario?: string, qualificacao?: string) => {
     const monthName = MONTHS[monthIndex];
     const m = monthSchema.safeParse(monthName);
     const t = tipoReuniaoSchema.safeParse(tipo);
@@ -571,6 +594,9 @@ export const useDashboardData = () => {
     if (dataLancamento) payload.data_lancamento = dataLancamento;
     if (leadNome !== undefined) payload.lead_nome = leadNome.trim() || null;
     if (origem !== undefined) payload.origem = origem || null;
+    if (funil !== undefined) payload.funil = funil.trim().toUpperCase() || null;
+    if (comentario !== undefined) payload.comentario = comentario.trim() || null;
+    if (qualificacao !== undefined) payload.qualificacao = qualificacao || null;
 
     const { data: inserted, error } = await supabase
       .from('reunioes_entries' as any)
@@ -584,6 +610,9 @@ export const useDashboardData = () => {
       quantidade: (inserted as any).quantidade, pessoa: String((inserted as any).pessoa ?? ''),
       lead_nome: String((inserted as any).lead_nome ?? ''),
       origem: String((inserted as any).origem ?? ''),
+      funil: String((inserted as any).funil ?? ''),
+      comentario: String((inserted as any).comentario ?? ''),
+      qualificacao: String((inserted as any).qualificacao ?? ''),
       data_lancamento: (inserted as any).data_lancamento,
       created_at: (inserted as any).created_at,
     };
@@ -611,6 +640,34 @@ export const useDashboardData = () => {
 
       return updated;
     });
+  }, [handlePersistenceError, requireFreshEditorSession]);
+
+  /** Só o comentário muda depois do lançamento — números e datas seguem imutáveis. */
+  const updateReuniaoComentario = useCallback(async (id: string, comentario: string) => {
+    await requireFreshEditorSession();
+    const valor = comentario.trim() || null;
+
+    const { error } = await supabase
+      .from('reunioes_entries' as any)
+      .update({ comentario: valor })
+      .eq('id', id);
+    if (error) { handlePersistenceError('Erro ao salvar comentário:', error); throw error; }
+
+    setReunioesEntries((prev) => prev.map((e) => (e.id === id ? { ...e, comentario: valor ?? '' } : e)));
+  }, [handlePersistenceError, requireFreshEditorSession]);
+
+  /** Qualificação pode mudar depois: lead qualificado na call cai depois, e vice-versa. */
+  const updateReuniaoQualificacao = useCallback(async (id: string, qualificacao: string) => {
+    await requireFreshEditorSession();
+    const valor = qualificacao || null;
+
+    const { error } = await supabase
+      .from('reunioes_entries' as any)
+      .update({ qualificacao: valor })
+      .eq('id', id);
+    if (error) { handlePersistenceError('Erro ao salvar qualificação:', error); throw error; }
+
+    setReunioesEntries((prev) => prev.map((e) => (e.id === id ? { ...e, qualificacao: valor ?? '' } : e)));
   }, [handlePersistenceError, requireFreshEditorSession]);
 
   const deleteReuniaoEntry = useCallback(async (id: string) => {
@@ -677,7 +734,10 @@ export const useDashboardData = () => {
     deleteUnitSale,
     addAgendamento,
     deleteAgendamento,
+    updateAgendamentoMesLead,
     addReuniaoEntry,
+    updateReuniaoComentario,
+    updateReuniaoQualificacao,
     deleteReuniaoEntry,
     getMetaAgendamentos,
     calculateVariation,

@@ -94,12 +94,20 @@ const Auth = () => {
           email: normalizedEmail,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
+            // Sem isto o Supabase CRIA a conta de qualquer e-mail que peça o link,
+            // e o cadastro fica aberto para qualquer pessoa com o endereço do site.
+            shouldCreateUser: false,
           },
         });
 
         if (error) {
-          toast.error('Link mágico indisponível no momento. Use senha.');
-          setLoginMethod('password');
+          const semCadastro = /signup|not found|disabled|invalid/i.test(error.message ?? '');
+          toast.error(
+            semCadastro
+              ? 'Este e-mail não tem acesso ao dashboard. Fale com o responsável.'
+              : 'Link mágico indisponível no momento. Use senha.',
+          );
+          if (!semCadastro) setLoginMethod('password');
           return;
         }
 

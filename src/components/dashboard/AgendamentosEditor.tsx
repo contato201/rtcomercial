@@ -20,6 +20,7 @@ export interface AgendamentoRow {
   quantidade: number;
   origem: string;
   lead_nome: string;
+  mes_lead: string;
   data_lancamento: string;
   created_at: string;
 }
@@ -28,8 +29,9 @@ interface AgendamentosEditorProps {
   selectedMonth: number;
   agendamentos: AgendamentoRow[];
   metaAgendamentos: number;
-  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string, leadNome?: string) => Promise<void>;
+  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string, leadNome?: string, mesLead?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
+  onUpdateAgendamentoMesLead: (id: string, mesLead: string) => Promise<void>;
   canEdit: boolean;
 }
 
@@ -43,8 +45,9 @@ interface SdrSlotProps {
   entries: AgendamentoRow[];
   selectedMonth: number;
   canEdit: boolean;
-  onAdd: (pessoa: string, qtd: number, dataLancamento: string, origem: string, leadNome: string) => Promise<void>;
+  onAdd: (pessoa: string, qtd: number, dataLancamento: string, origem: string, leadNome: string, mesLead: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onSetMesLead: (id: string, mesLead: string) => Promise<void>;
   onRename: (newName: string) => Promise<void>;
   iconColor?: string;
 }
@@ -66,6 +69,7 @@ const SdrSlot = ({
   canEdit,
   onAdd,
   onDelete,
+  onSetMesLead,
   onRename,
   iconColor = 'text-primary',
 }: SdrSlotProps) => {
@@ -73,6 +77,7 @@ const SdrSlot = ({
   const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [origem, setOrigem] = useState('');
   const [leadNome, setLeadNome] = useState('');
+  const [mesLead, setMesLead] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -103,11 +108,14 @@ const SdrSlot = ({
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(name, qtd, dataLancamento, origem, leadNome);
+      // "mês do lead" só faz sentido pra tráfego pago; nas outras origens vai vazio.
+      const mesLeadFinal = origem === ORIGEM_TRAFEGO_LEAD ? mesLead : '';
+      await onAdd(name, qtd, dataLancamento, origem, leadNome, mesLeadFinal);
       setQuantidade('');
       setDataLancamento(todayISO());
       setOrigem('');
       setLeadNome('');
+      setMesLead('');
     } catch {
       setError('Erro ao adicionar');
     } finally {
@@ -237,6 +245,18 @@ const SdrSlot = ({
               ))}
             </SelectContent>
           </Select>
+          {origem === ORIGEM_TRAFEGO_LEAD && (
+            <Select value={mesLead} onValueChange={setMesLead}>
+              <SelectTrigger className="text-xs h-9">
+                <SelectValue placeholder="📅 De qual mês veio o lead? (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <div className="flex gap-2">
             <Input
               type="number"
@@ -275,6 +295,34 @@ const SdrSlot = ({
                   {a.origem === ORIGEM_TRAFEGO_LEAD ? '🚀 ' : ''}{a.origem}
                 </span>
               )}
+              {a.origem === ORIGEM_TRAFEGO_LEAD && canEdit ? (
+                <select
+                  value={a.mes_lead || ''}
+                  onChange={(e) => onSetMesLead(a.id, e.target.value)}
+                  title="De qual mês veio o lead?"
+                  className={`shrink-0 rounded px-1 py-0.5 text-[10px] border-0 cursor-pointer ${
+                    !a.mes_lead
+                      ? 'bg-muted text-muted-foreground'
+                      : a.mes_lead === a.month
+                        ? 'bg-[hsl(var(--success)/0.15)] text-[hsl(var(--success))]'
+                        : 'bg-amber-500/15 text-amber-600 font-semibold'
+                  }`}
+                >
+                  <option value="">📅 marcar mês</option>
+                  {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              ) : a.mes_lead ? (
+                <span
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+                    a.mes_lead === a.month
+                      ? 'bg-[hsl(var(--success)/0.15)] text-[hsl(var(--success))]'
+                      : 'bg-amber-500/15 text-amber-600 font-semibold'
+                  }`}
+                  title={a.mes_lead === a.month ? 'Lead deste mês' : `Lead veio de ${a.mes_lead}`}
+                >
+                  📅 {a.mes_lead === a.month ? 'do mês' : a.mes_lead}
+                </span>
+              ) : null}
               <span className="font-medium shrink-0">+{a.quantidade}</span>
               {canEdit && (
                 <Button
@@ -300,6 +348,7 @@ export const AgendamentosEditor = ({
   metaAgendamentos,
   onAddAgendamento,
   onDeleteAgendamento,
+  onUpdateAgendamentoMesLead,
   canEdit,
 }: AgendamentosEditorProps) => {
   const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
@@ -346,6 +395,17 @@ export const AgendamentosEditor = ({
     const tz = now.getTimezoneOffset() * 60000;
     return new Date(now.getTime() - tz).toISOString().slice(0, 10);
   })();
+
+  // Coorte: entre os agendamentos de Tráfego Pago do mês, quantos vieram de
+  // um lead DESTE mês vs de um lead ANTIGO (mês anterior) vs sem marcar.
+  const coorte = useMemo(() => {
+    const trafego = monthAgendamentos.filter((a) => a.origem === ORIGEM_TRAFEGO_LEAD);
+    const soma = (arr: AgendamentoRow[]) => arr.reduce((s, a) => s + Number(a.quantidade || 0), 0);
+    const desteMes = soma(trafego.filter((a) => a.mes_lead && a.mes_lead === a.month));
+    const antigos = soma(trafego.filter((a) => a.mes_lead && a.mes_lead !== a.month));
+    const semMarcar = soma(trafego.filter((a) => !a.mes_lead));
+    return { total: soma(trafego), desteMes, antigos, semMarcar };
+  }, [monthAgendamentos]);
 
   const iconColors = ['text-primary', 'text-secondary-foreground', 'text-accent-foreground'];
 
@@ -415,6 +475,42 @@ export const AgendamentosEditor = ({
           </div>
         </div>
 
+        {coorte.total > 0 && (
+          <div className="rounded-xl border border-primary/25 bg-card/70 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-sm font-bold text-foreground">🚀 Agendamentos de tráfego · de onde vieram os leads</span>
+              <span className="text-[11px] font-semibold text-muted-foreground bg-muted/50 rounded-full px-2 py-0.5">{coorte.total} no total</span>
+            </div>
+            <div className="flex h-2.5 rounded-full overflow-hidden bg-muted/50">
+              {coorte.desteMes > 0 && <div className="bg-[hsl(var(--success))]" style={{ width: `${(coorte.desteMes / coorte.total) * 100}%` }} />}
+              {coorte.antigos > 0 && <div className="bg-amber-500" style={{ width: `${(coorte.antigos / coorte.total) * 100}%` }} />}
+              {coorte.semMarcar > 0 && <div className="bg-muted-foreground/50" style={{ width: `${(coorte.semMarcar / coorte.total) * 100}%` }} />}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg border border-[hsl(var(--success)/0.45)] bg-[hsl(var(--success)/0.15)] px-2 py-2.5">
+                <div className="text-2xl font-bold text-[hsl(var(--success))] leading-none">{coorte.desteMes}</div>
+                <div className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--success))]">🟢 Deste mês</div>
+              </div>
+              <div className="rounded-lg border border-amber-500/45 bg-amber-500/15 px-2 py-2.5">
+                <div className="text-2xl font-bold text-amber-500 leading-none">{coorte.antigos}</div>
+                <div className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">🟡 Antigos</div>
+              </div>
+              <div className={`rounded-lg border px-2 py-2.5 ${coorte.semMarcar > 0 ? "border-dashed border-muted-foreground/50 bg-muted/40" : "border-border/60 bg-muted/20"}`}>
+                <div className="text-2xl font-bold text-foreground leading-none">{coorte.semMarcar}</div>
+                <div className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">⚪ Sem marcar</div>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              {coorte.antigos > 0 && (
+                <><strong className="text-amber-500">{coorte.antigos}</strong> agendamento{coorte.antigos === 1 ? "" : "s"} de {monthName} vieram de leads de meses anteriores. </>
+              )}
+              {coorte.semMarcar > 0 && (
+                <>Ainda há <strong className="text-foreground">{coorte.semMarcar}</strong> sem marcar — use o seletor <strong>📅</strong> em cada lançamento de Tráfego Pago pra dizer de qual mês veio o lead.</>
+              )}
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {slots.map((slot, i) => {
             const realizadoHoje = slot.entries
@@ -432,8 +528,9 @@ export const AgendamentosEditor = ({
                 entries={slot.entries}
                 selectedMonth={selectedMonth}
                 canEdit={canEdit}
-                onAdd={(pessoa, qtd, dataLancamento, origem, leadNome) => onAddAgendamento(selectedMonth, pessoa, qtd, dataLancamento, origem, leadNome)}
+                onAdd={(pessoa, qtd, dataLancamento, origem, leadNome, mesLead) => onAddAgendamento(selectedMonth, pessoa, qtd, dataLancamento, origem, leadNome, mesLead)}
                 onDelete={onDeleteAgendamento}
+                onSetMesLead={onUpdateAgendamentoMesLead}
                 onRename={(newName) => handleRename(i, newName)}
                 iconColor={iconColors[i]}
               />

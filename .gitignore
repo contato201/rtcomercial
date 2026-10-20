@@ -28,3 +28,6 @@ dist-ssr
 
 # Arquivos temporários do Supabase CLI
 supabase/.temp/
+
+# Cache do Cloudflare (wrangler)
+.wrangler/

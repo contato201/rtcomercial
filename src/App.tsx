@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Growth from "./pages/Growth";
 import Planejamento from "./pages/Planejamento";
+import Prospeccao from "./pages/Prospeccao";
 import Reunioes from "./pages/Reunioes";
 import Sala from "./pages/Sala";
 import EntrarSala from "./pages/EntrarSala";
@@ -27,11 +28,12 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<RequireAuth><Index /></RequireAuth>} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/growth" element={<Growth />} />
-              <Route path="/planejamento" element={<Planejamento />} />
+              <Route path="/growth" element={<RequireAuth><Growth /></RequireAuth>} />
+              <Route path="/planejamento" element={<RequireAuth><Planejamento /></RequireAuth>} />
+              <Route path="/prospeccao" element={<RequireAuth><Prospeccao /></RequireAuth>} />
               <Route path="/reunioes" element={<RequireAuth><Reunioes /></RequireAuth>} />
               {/* Salas de reunião: públicas de propósito — o lead entra sem conta. */}
               <Route path="/entrar" element={<EntrarSala />} />

@@ -21,13 +21,16 @@ interface DataEntryFormProps {
   metaAgendamentos: number;
   filterType?: 'month' | 'quarter' | 'year';
   onUpdate: (monthIndex: number, updates: Partial<MonthData>) => void;
-  onAddUnitSale: (monthIndex: number, valor: number, cliente: string, pessoa: string, origem: string) => Promise<void> | void;
-  onUpdateUnitSale: (id: string, valor: number, cliente: string, pessoa: string, origem: string) => Promise<void> | void;
+  onAddUnitSale: (monthIndex: number, valor: number, cliente: string, pessoa: string, origem: string, mesTrafego?: string) => Promise<void> | void;
+  onUpdateUnitSale: (id: string, valor: number, cliente: string, pessoa: string, origem: string, mesTrafego?: string) => Promise<void> | void;
   onDeleteUnitSale: (id: string) => Promise<void> | void;
-  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string, leadNome?: string) => Promise<void>;
+  onAddAgendamento: (monthIndex: number, pessoa: string, quantidade: number, dataLancamento?: string, origem?: string, leadNome?: string, mesLead?: string) => Promise<void>;
   onDeleteAgendamento: (id: string) => Promise<void>;
-  onAddReuniaoEntry: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string) => Promise<void>;
+  onUpdateAgendamentoMesLead: (id: string, mesLead: string) => Promise<void>;
+  onAddReuniaoEntry: (monthIndex: number, tipo: 'primeira' | 'segunda', quantidade: number, dataLancamento?: string, pessoa?: string, leadNome?: string, origem?: string, funil?: string, comentario?: string, qualificacao?: string) => Promise<void>;
   onDeleteReuniaoEntry: (id: string) => Promise<void>;
+  onUpdateReuniaoComentario: (id: string, comentario: string) => Promise<void>;
+  onUpdateReuniaoQualificacao: (id: string, qualificacao: string) => Promise<void>;
   onReset: () => void;
   onOpenHistory: () => void;
   canEdit: boolean;
@@ -47,8 +50,11 @@ export const DataEntryForm = ({
   onDeleteUnitSale,
   onAddAgendamento,
   onDeleteAgendamento,
+  onUpdateAgendamentoMesLead,
   onAddReuniaoEntry,
   onDeleteReuniaoEntry,
+  onUpdateReuniaoComentario,
+  onUpdateReuniaoQualificacao,
   onReset,
   onOpenHistory,
   canEdit,
@@ -249,6 +255,7 @@ export const DataEntryForm = ({
           metaAgendamentos={metaAgendamentos}
           onAddAgendamento={onAddAgendamento}
           onDeleteAgendamento={onDeleteAgendamento}
+          onUpdateAgendamentoMesLead={onUpdateAgendamentoMesLead}
           canEdit={canEdit}
         />
       </div>
@@ -264,6 +271,7 @@ export const DataEntryForm = ({
           realizadoFallback={currentData.realizadoPrimeiraReuniao}
           onAdd={onAddReuniaoEntry}
           onDelete={onDeleteReuniaoEntry}
+          onUpdateQualificacao={onUpdateReuniaoQualificacao}
           canEdit={canEdit}
         />
         <ReunioesEditor
@@ -275,6 +283,7 @@ export const DataEntryForm = ({
           realizadoFallback={currentData.realizadoSegundaReuniao}
           onAdd={onAddReuniaoEntry}
           onDelete={onDeleteReuniaoEntry}
+          onUpdateComentario={onUpdateReuniaoComentario}
           canEdit={canEdit}
         />
       </div>
@@ -321,7 +330,7 @@ export const DataEntryForm = ({
             monthLabel={MONTHS[selectedMonth]}
             sales={unitSales}
             canEdit={canEdit}
-            onAdd={(valor, cliente, pessoa, origem) => onAddUnitSale(selectedMonth, valor, cliente, pessoa, origem)}
+            onAdd={(valor, cliente, pessoa, origem, mesTrafego) => onAddUnitSale(selectedMonth, valor, cliente, pessoa, origem, mesTrafego)}
             onUpdate={onUpdateUnitSale}
             onDelete={onDeleteUnitSale}
           />

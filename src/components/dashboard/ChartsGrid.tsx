@@ -7,7 +7,12 @@ import type { AgendamentoRow } from '@/hooks/useDashboardData';
 import type { ReuniaoEntry } from './ReunioesEditor';
 import type { UnitSale } from './UnitSalesEditor';
 import { CalendarRange } from 'lucide-react';
-import { DASHBOARD_YEAR } from '@/lib/businessDays';
+import {
+  DASHBOARD_YEAR,
+  businessDaysInMonth,
+  businessDaysElapsedInMonth,
+  businessDaysBetween,
+} from '@/lib/businessDays';
 
 interface ChartsGridProps {
   filteredData: MonthData[];
@@ -20,6 +25,42 @@ interface ChartsGridProps {
   unitSales?: UnitSale[];
   isLoading?: boolean;
 }
+
+interface PaceInfo {
+  paceRatio: number | null;
+  paceLabel?: string;
+}
+
+const computePace = (
+  filterType: FilterType,
+  selectedMonth: number,
+  week: { start: Date; end: Date } | null | undefined,
+): PaceInfo => {
+  if (filterType !== 'month') return { paceRatio: null };
+
+  const hoje = new Date();
+  const monthStart = new Date(DASHBOARD_YEAR, selectedMonth, 1);
+  const monthEnd = new Date(DASHBOARD_YEAR, selectedMonth + 1, 0);
+
+  if (week) {
+    const inicio = week.start < monthStart ? monthStart : week.start;
+    const fim = week.end > monthEnd ? monthEnd : week.end;
+    const totalUteis = businessDaysBetween(inicio, fim);
+    if (totalUteis === 0) return { paceRatio: null };
+    if (hoje > fim) return { paceRatio: 1, paceLabel: `semana encerrada (${totalUteis} dias úteis)` };
+    if (hoje < inicio) return { paceRatio: null };
+    const decorridos = businessDaysBetween(inicio, hoje);
+    return { paceRatio: decorridos / totalUteis, paceLabel: `dia útil ${decorridos} de ${totalUteis} da semana` };
+  }
+
+  const totalUteis = businessDaysInMonth(DASHBOARD_YEAR, selectedMonth);
+  if (totalUteis === 0) return { paceRatio: null };
+  if (hoje > monthEnd) return { paceRatio: 1, paceLabel: `mês encerrado (${totalUteis} dias úteis)` };
+  if (hoje < monthStart) return { paceRatio: null };
+  const decorridos = businessDaysElapsedInMonth(DASHBOARD_YEAR, selectedMonth, hoje);
+  if (decorridos === 0) return { paceRatio: null };
+  return { paceRatio: decorridos / totalUteis, paceLabel: `dia útil ${decorridos} de ${totalUteis} do mês` };
+};
 
 const ChartSkeleton = () => (
   <div className="rounded-xl border border-border bg-card p-4 space-y-4">
@@ -117,6 +158,11 @@ export const ChartsGrid = ({
   const monthName = aggregatedData.month;
   const metaPerWeek = (m: number) => m / weeksInMonth;
 
+  // Ritmo esperado: fração do período já decorrida, contada em dias úteis.
+  // Função pura, não hook: este trecho roda depois do return de isLoading,
+  // e um hook aqui mudaria a contagem entre renders (erro de ordem de hooks).
+  const { paceRatio, paceLabel } = computePace(filterType, selectedMonth, isWeekFilter ? week : null);
+
   const createChartData = (metaKey: keyof MonthData, realizadoKey: keyof MonthData, weekRealizado?: number) => {
     if (filterType === 'month') {
       const meta = aggregatedData[metaKey] as number;
@@ -203,6 +249,8 @@ export const ChartsGrid = ({
             title={chart.title}
             data={chart.data}
             formatValue={chart.formatValue}
+            paceRatio={paceRatio}
+            paceLabel={paceLabel}
           />
         ))}
       </div>

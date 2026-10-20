@@ -11,6 +11,7 @@ import {
   type SdrNames,
 } from "@/lib/sdrNames";
 import { ORIGENS_VENDA, labelDaOrigem, isTrafego } from "@/lib/origens";
+import { MONTHS } from "@/types/dashboard";
 
 export type UnitSale = {
   id: string;
@@ -19,6 +20,7 @@ export type UnitSale = {
   cliente: string;
   pessoa: string;
   origem: string;
+  mes_trafego?: string;
   created_at: string;
   updated_at: string;
 };
@@ -46,8 +48,8 @@ interface UnitSalesEditorProps {
   monthLabel: string;
   sales: UnitSale[];
   canEdit: boolean;
-  onAdd: (valor: number, cliente: string, pessoa: string, origem: string) => Promise<void> | void;
-  onUpdate: (id: string, valor: number, cliente: string, pessoa: string, origem: string) => Promise<void> | void;
+  onAdd: (valor: number, cliente: string, pessoa: string, origem: string, mesTrafego: string) => Promise<void> | void;
+  onUpdate: (id: string, valor: number, cliente: string, pessoa: string, origem: string, mesTrafego: string) => Promise<void> | void;
   onDelete: (id: string) => Promise<void> | void;
 }
 
@@ -64,12 +66,14 @@ export const UnitSalesEditor = ({
   const [newCliente, setNewCliente] = useState("");
   const [newPessoa, setNewPessoa] = useState("");
   const [newOrigem, setNewOrigem] = useState("");
+  const [newMesTrafego, setNewMesTrafego] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [editingCliente, setEditingCliente] = useState("");
   const [editingPessoa, setEditingPessoa] = useState("");
   const [editingOrigem, setEditingOrigem] = useState("");
+  const [editingMesTrafego, setEditingMesTrafego] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -110,11 +114,12 @@ export const UnitSalesEditor = ({
     try {
       setIsAdding(true);
       setFormError(null);
-      await onAdd(parsed.data, newCliente.trim(), newPessoa.trim(), newOrigem);
+      await onAdd(parsed.data, newCliente.trim(), newPessoa.trim(), newOrigem, isTrafego(newOrigem) ? newMesTrafego : "");
       setNewValue("");
       setNewCliente("");
       setNewPessoa("");
       setNewOrigem("");
+      setNewMesTrafego("");
     } catch (error) {
       console.error("Erro ao adicionar venda:", error);
       setFormError("Venda não salva. Faça login novamente com o email autorizado e tente de novo.");
@@ -130,6 +135,7 @@ export const UnitSalesEditor = ({
     setEditingCliente(sale.cliente ?? "");
     setEditingPessoa(sale.pessoa ?? "");
     setEditingOrigem(sale.origem ?? "");
+    setEditingMesTrafego(sale.mes_trafego ?? "");
     setEditError(null);
   };
 
@@ -139,6 +145,7 @@ export const UnitSalesEditor = ({
     setEditingCliente("");
     setEditingPessoa("");
     setEditingOrigem("");
+    setEditingMesTrafego("");
     setEditError(null);
   };
 
@@ -153,7 +160,7 @@ export const UnitSalesEditor = ({
     try {
       setBusyId(id);
       setEditError(null);
-      await onUpdate(id, parsed.data, editingCliente.trim(), editingPessoa.trim(), editingOrigem);
+      await onUpdate(id, parsed.data, editingCliente.trim(), editingPessoa.trim(), editingOrigem, isTrafego(editingOrigem) ? editingMesTrafego : "");
       cancelEdit();
     } catch (error) {
       console.error("Erro ao atualizar venda:", error);
@@ -269,6 +276,25 @@ export const UnitSalesEditor = ({
         </div>
       </div>
 
+      {isTrafego(newOrigem) && (
+        <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2">
+          <label className="text-xs font-medium text-foreground">
+            📅 De qual mês veio o tráfego? <span className="text-muted-foreground">(o ROAS conta esta venda no mês do investimento, não no mês do pagamento)</span>
+          </label>
+          <select
+            value={newMesTrafego}
+            onChange={(e) => setNewMesTrafego(e.target.value)}
+            disabled={!canEdit || isAdding}
+            className="input-field w-full sm:w-44"
+          >
+            <option value="">— mês do tráfego —</option>
+            {MONTHS.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {formError && (
         <p className="mt-2 text-sm text-destructive">{formError}</p>
       )}
@@ -317,6 +343,11 @@ export const UnitSalesEditor = ({
                           Sem origem
                         </Badge>
                       )}
+                      {isTrafego(sale.origem) && sale.mes_trafego && (
+                        <Badge variant="outline" className="text-xs border-[hsl(var(--gold)/0.5)] text-primary">
+                          📅 tráfego de {sale.mes_trafego}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {sale.created_at ? `Criada em ${formatDate(sale.created_at)}` : ""}
@@ -347,6 +378,20 @@ export const UnitSalesEditor = ({
                           <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
+                      {isTrafego(editingOrigem) && (
+                        <select
+                          value={editingMesTrafego}
+                          onChange={(e) => setEditingMesTrafego(e.target.value)}
+                          disabled={!canEdit || isBusy}
+                          className="input-field h-9 w-32"
+                          title="Mês do tráfego (de qual investimento veio)"
+                        >
+                          <option value="">📅 mês tráfego</option>
+                          {MONTHS.map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      )}
                       <input
                         type="text"
                         value={editingCliente}

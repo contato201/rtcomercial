@@ -39,7 +39,10 @@ const Index = () => {
     deleteUnitSale,
     addAgendamento,
     deleteAgendamento,
+    updateAgendamentoMesLead,
     addReuniaoEntry,
+    updateReuniaoComentario,
+    updateReuniaoQualificacao,
     deleteReuniaoEntry,
     getMetaAgendamentos,
     calculateVariation,
@@ -143,8 +146,11 @@ const Index = () => {
             onDeleteUnitSale={deleteUnitSale}
             onAddAgendamento={addAgendamento}
             onDeleteAgendamento={deleteAgendamento}
+            onUpdateAgendamentoMesLead={updateAgendamentoMesLead}
             onAddReuniaoEntry={addReuniaoEntry}
             onDeleteReuniaoEntry={deleteReuniaoEntry}
+            onUpdateReuniaoComentario={updateReuniaoComentario}
+            onUpdateReuniaoQualificacao={updateReuniaoQualificacao}
             onReset={resetData}
             onOpenHistory={() => setIsHistoryOpen(true)}
             canEdit={canEdit}

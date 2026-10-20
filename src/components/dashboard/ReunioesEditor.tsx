@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, User, Users, Pencil, Check, X } from 'lucide-react';
+import { Plus, Trash2, User, Users, Pencil, Check, X, MessageSquare, Filter, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { MONTHS } from '@/types/dashboard';
 import { clampPercentage, safePercentage } from '@/lib/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { businessDaysInMonth, businessDaysRemainingInMonth, DASHBOARD_YEAR } from '@/lib/businessDays';
+import { fetchFunis } from '@/lib/funis';
 import { SDR_COUNT, loadSdrNames, saveSdrNames, fetchSdrNamesFromDb, subscribeSdrNames, type SdrNames } from '@/lib/sdrNames';
 
 export interface ReuniaoEntry {
@@ -20,6 +22,9 @@ export interface ReuniaoEntry {
   pessoa: string;
   lead_nome: string;
   origem: string;
+  funil: string;
+  comentario: string;
+  qualificacao: string;
   data_lancamento: string;
   created_at: string;
 }
@@ -37,6 +42,10 @@ export const ORIGENS_LEAD = [
 // Origem que alimenta o funil de Growth / tráfego pago (usada em agendamentos e reuniões)
 export const ORIGEM_TRAFEGO_LEAD = 'Tráfego Pago';
 
+// Resultado da 1ª reunião
+export const QUALIFICACOES = ['Qualificado', 'Desqualificado'] as const;
+export type Qualificacao = (typeof QUALIFICACOES)[number];
+
 interface ReunioesEditorProps {
   selectedMonth: number;
   tipo: 'primeira' | 'segunda';
@@ -53,8 +62,13 @@ interface ReunioesEditorProps {
     pessoa?: string,
     leadNome?: string,
     origem?: string,
+    funil?: string,
+    comentario?: string,
+    qualificacao?: string,
   ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onUpdateComentario?: (id: string, comentario: string) => Promise<void>;
+  onUpdateQualificacao?: (id: string, qualificacao: string) => Promise<void>;
   canEdit: boolean;
 }
 
@@ -70,6 +84,160 @@ const formatDate = (dateStr: string) => {
   return new Date(y, m - 1, d).toLocaleDateString('pt-BR');
 };
 
+interface QualificacaoLeadProps {
+  entry: ReuniaoEntry;
+  canEdit: boolean;
+  onSave: (valor: string) => Promise<void>;
+}
+
+/** Qualificado/Desqualificado da 1ª reunião, trocável direto na lista. */
+const QualificacaoLead = ({ entry, canEdit, onSave }: QualificacaoLeadProps) => {
+  const [salvando, setSalvando] = useState(false);
+  const valor = entry.qualificacao ?? '';
+
+  const trocar = async (novo: string) => {
+    if (novo === valor) return;
+    setSalvando(true);
+    try {
+      await onSave(novo);
+    } catch {
+      toast({ title: 'Erro ao salvar', description: 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (!canEdit) {
+    if (!valor) return null;
+    return (
+      <span className={`mt-1 w-fit text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-1 ${
+        valor === 'Qualificado'
+          ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]'
+          : 'bg-destructive/15 text-destructive'
+      }`}>
+        {valor === 'Qualificado' ? <ThumbsUp className="h-2.5 w-2.5" /> : <ThumbsDown className="h-2.5 w-2.5" />}
+        {valor}
+      </span>
+    );
+  }
+
+  return (
+    <div className="mt-1 flex gap-1">
+      {QUALIFICACOES.map((q) => {
+        const ativo = valor === q;
+        const positivo = q === 'Qualificado';
+        return (
+          <button
+            key={q}
+            type="button"
+            disabled={salvando}
+            onClick={() => trocar(ativo ? '' : q)}
+            title={ativo ? 'Clique para desmarcar' : `Marcar como ${q}`}
+            className={`text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-1 border transition-colors disabled:opacity-50 ${
+              ativo
+                ? positivo
+                  ? 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/40'
+                  : 'bg-destructive/15 text-destructive border-destructive/40'
+                : 'text-muted-foreground border-border/60 hover:border-border'
+            }`}
+          >
+            {positivo ? <ThumbsUp className="h-2.5 w-2.5" /> : <ThumbsDown className="h-2.5 w-2.5" />}
+            {q}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+interface ComentarioLeadProps {
+  entry: ReuniaoEntry;
+  canEdit: boolean;
+  onSave: (texto: string) => Promise<void>;
+}
+
+/** Situação do lead: some quando vazio e sem permissão, para não poluir a lista. */
+const ComentarioLead = ({ entry, canEdit, onSave }: ComentarioLeadProps) => {
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState(entry.comentario ?? '');
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => { setTexto(entry.comentario ?? ''); }, [entry.comentario]);
+
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      await onSave(texto);
+      setEditando(false);
+    } catch {
+      toast({ title: 'Erro ao salvar', description: 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (editando) {
+    return (
+      <div className="mt-1 space-y-1">
+        <Textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Como está a situação dele?"
+          className="text-[11px] min-h-[52px]"
+          autoFocus
+          disabled={salvando}
+        />
+        <div className="flex gap-1">
+          <Button size="sm" className="h-6 text-[10px] px-2" onClick={salvar} disabled={salvando}>
+            Salvar
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 text-[10px] px-2"
+            onClick={() => { setTexto(entry.comentario ?? ''); setEditando(false); }}
+            disabled={salvando}
+          >
+            Cancelar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!entry.comentario) {
+    if (!canEdit) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => setEditando(true)}
+        className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary"
+      >
+        <MessageSquare className="h-2.5 w-2.5" />
+        Registrar situação
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1 flex items-start gap-1 rounded bg-background/60 px-1.5 py-1">
+      <MessageSquare className="h-2.5 w-2.5 mt-0.5 shrink-0 text-muted-foreground" />
+      <p className="text-[11px] text-foreground/90 whitespace-pre-wrap break-words flex-1">{entry.comentario}</p>
+      {canEdit && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-4 w-4 p-0 shrink-0"
+          onClick={() => setEditando(true)}
+          title="Editar situação"
+        >
+          <Pencil className="h-2.5 w-2.5" />
+        </Button>
+      )}
+    </div>
+  );
+};
+
 interface SdrSlotProps {
   name: string;
   metaPorPessoa: number;
@@ -79,9 +247,16 @@ interface SdrSlotProps {
   total: number;
   entries: ReuniaoEntry[];
   canEdit: boolean;
-  onAdd: (pessoa: string, qtd: number, dataLancamento: string, leadNome: string, origem: string) => Promise<void>;
+  onAdd: (pessoa: string, qtd: number, dataLancamento: string, leadNome: string, origem: string, funil: string, comentario: string, qualificacao: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onRename: (newName: string) => Promise<void>;
+  onUpdateComentario?: (id: string, comentario: string) => Promise<void>;
+  onUpdateQualificacao?: (id: string, qualificacao: string) => Promise<void>;
+  /** 2ª reunião pede funil de origem e acompanhamento da situação do lead. */
+  detalharLead?: boolean;
+  /** 1ª reunião registra se o lead saiu qualificado. */
+  qualificarLead?: boolean;
+  funis?: string[];
   iconColor?: string;
 }
 
@@ -97,12 +272,20 @@ const SdrSlot = ({
   onAdd,
   onDelete,
   onRename,
+  onUpdateComentario,
+  onUpdateQualificacao,
+  detalharLead = false,
+  qualificarLead = false,
+  funis = [],
   iconColor = 'text-primary',
 }: SdrSlotProps) => {
   const [quantidade, setQuantidade] = useState('');
   const [dataLancamento, setDataLancamento] = useState(todayISO);
   const [leadNome, setLeadNome] = useState('');
   const [origem, setOrigem] = useState<string>('');
+  const [funil, setFunil] = useState<string>('');
+  const [comentario, setComentario] = useState('');
+  const [qualificacao, setQualificacao] = useState<string>('');
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -128,10 +311,13 @@ const SdrSlot = ({
     setError('');
     setIsAdding(true);
     try {
-      await onAdd(name, qtd, dataLancamento, leadNome, origem);
+      await onAdd(name, qtd, dataLancamento, leadNome, origem, funil, comentario, qualificacao);
       setQuantidade('');
       setLeadNome('');
       setOrigem('');
+      setFunil('');
+      setComentario('');
+      setQualificacao('');
       setDataLancamento(todayISO());
     } catch (e) {
       console.error(e);
@@ -243,7 +429,13 @@ const SdrSlot = ({
             value={leadNome}
             onChange={(e) => setLeadNome(e.target.value)}
           />
-          <Select value={origem} onValueChange={setOrigem}>
+          <Select
+            value={origem}
+            onValueChange={(v) => {
+              setOrigem(v);
+              if (v !== ORIGEM_TRAFEGO_LEAD) setFunil('');
+            }}
+          >
             <SelectTrigger className="text-xs h-9">
               <SelectValue placeholder="Origem (opcional)" />
             </SelectTrigger>
@@ -253,6 +445,51 @@ const SdrSlot = ({
               ))}
             </SelectContent>
           </Select>
+
+          {detalharLead && origem === ORIGEM_TRAFEGO_LEAD && (
+            funis.length > 0 ? (
+              <Select value={funil} onValueChange={setFunil}>
+                <SelectTrigger className="text-xs h-9">
+                  <SelectValue placeholder="De qual funil veio?" />
+                </SelectTrigger>
+                <SelectContent>
+                  {funis.map((f) => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                type="text"
+                placeholder="De qual funil veio?"
+                value={funil}
+                onChange={(e) => setFunil(e.target.value)}
+                className="text-xs"
+              />
+            )
+          )}
+
+          {qualificarLead && (
+            <Select value={qualificacao} onValueChange={setQualificacao}>
+              <SelectTrigger className="text-xs h-9">
+                <SelectValue placeholder="Qualificado? (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {QUALIFICACOES.map((q) => (
+                  <SelectItem key={q} value={q}>{q}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {detalharLead && (
+            <Textarea
+              placeholder="Como está a situação dele? (opcional)"
+              value={comentario}
+              onChange={(e) => setComentario(e.target.value)}
+              className="text-xs min-h-[60px]"
+            />
+          )}
           <div className="flex gap-2">
             <Input
               type="number"
@@ -280,7 +517,7 @@ const SdrSlot = ({
             >
               <div className="flex flex-col flex-1 min-w-0">
                 <span className="text-muted-foreground">{formatDate(entry.data_lancamento)}</span>
-                {(entry.lead_nome || entry.origem) && (
+                {(entry.lead_nome || entry.origem || entry.funil) && (
                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                     {entry.lead_nome && (
                       <span className="text-foreground/80 truncate" title={entry.lead_nome}>
@@ -292,7 +529,30 @@ const SdrSlot = ({
                         {entry.origem}
                       </span>
                     )}
+                    {entry.funil && (
+                      <span
+                        className="text-[10px] bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] rounded px-1.5 py-0.5 inline-flex items-center gap-1"
+                        title="Funil de tráfego pago"
+                      >
+                        <Filter className="h-2.5 w-2.5" />
+                        {entry.funil}
+                      </span>
+                    )}
                   </div>
+                )}
+                {qualificarLead && (
+                  <QualificacaoLead
+                    entry={entry}
+                    canEdit={canEdit && !!onUpdateQualificacao}
+                    onSave={(valor) => onUpdateQualificacao!(entry.id, valor)}
+                  />
+                )}
+                {detalharLead && (
+                  <ComentarioLead
+                    entry={entry}
+                    canEdit={canEdit && !!onUpdateComentario}
+                    onSave={(texto) => onUpdateComentario!(entry.id, texto)}
+                  />
                 )}
               </div>
               <span className="font-bold">+{entry.quantidade}</span>
@@ -323,9 +583,21 @@ export const ReunioesEditor = ({
   realizadoFallback = 0,
   onAdd,
   onDelete,
+  onUpdateComentario,
+  onUpdateQualificacao,
   canEdit,
 }: ReunioesEditorProps) => {
   const [sdrNames, setSdrNames] = useState<SdrNames>(loadSdrNames);
+  // Detalhe de lead (funil + situação) é pedido só na 2ª reunião.
+  const detalharLead = tipo === 'segunda';
+  // Qualificação é o resultado da 1ª reunião.
+  const qualificarLead = tipo === 'primeira';
+  const [funis, setFunis] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!detalharLead) return;
+    fetchFunis().then(setFunis);
+  }, [detalharLead]);
 
   useEffect(() => {
     fetchSdrNamesFromDb().then(setSdrNames);
@@ -449,10 +721,15 @@ export const ReunioesEditor = ({
                 total={slot.total}
                 entries={slot.entries}
                 canEdit={canEdit}
-                onAdd={(pessoa, qtd, dataLancamento, leadNome, origem) =>
-                  onAdd(selectedMonth, tipo, qtd, dataLancamento, pessoa, leadNome, origem)
+                onAdd={(pessoa, qtd, dataLancamento, leadNome, origem, funil, comentario, qualificacao) =>
+                  onAdd(selectedMonth, tipo, qtd, dataLancamento, pessoa, leadNome, origem, funil, comentario, qualificacao)
                 }
                 onDelete={onDelete}
+                onUpdateComentario={onUpdateComentario}
+                onUpdateQualificacao={onUpdateQualificacao}
+                detalharLead={detalharLead}
+                qualificarLead={qualificarLead}
+                funis={funis}
                 onRename={(newName) => handleRename(i, newName)}
                 iconColor={iconColors[i]}
               />
