@@ -150,7 +150,22 @@ Responda olhando o estado atual e o trecho novo:
 - pendencias_novas: promessas ("te mando…"), condições ditas de boca, preços a enviar.
 - citacoes_fortes: frases do cliente que valem ser usadas depois, palavra por palavra.
 - spin_novas: quantas perguntas de cada tipo o closer fez NESTE trecho (seção 9.3).
-- termometro: qualificação atual de 0 a 100 (seção 5.5).`;
+- termometro: qualificação atual de 0 a 100 (seção 5.5).
+
+Engajamento (quando vier): medido pela câmera do cliente no último minuto. "Atenção" é quanto
+tempo ele ficou olhando para a tela. É um sinal, não uma certeza. Atenção abaixo de 50% por
+causa do closer falando demais → dica para fazer uma pergunta e devolver a palavra.`;
+
+// Engajamento do relatório: uma linha por pessoa, minuto a minuto.
+function linhasDoEngajamento(linhas: Array<{ quem: string; minuto: number; atencao: number; sorriso: number }>) {
+  const porPessoa = new Map<string, string[]>();
+  for (const l of linhas) {
+    const lista = porPessoa.get(l.quem) ?? [];
+    lista.push(`min ${l.minuto}: atenção ${l.atencao}%, sorriso ${l.sorriso}%`);
+    porPessoa.set(l.quem, lista);
+  }
+  return [...porPessoa.entries()].map(([quem, lista]) => `${quem}: ${lista.join("; ")}`).join("\n");
+}
 
 function linhasDaConversa(trechos: Array<{ quem: string; papel?: string; texto: string }>) {
   return trechos
@@ -216,7 +231,11 @@ Deno.serve(async (req) => {
           role: "user",
           content:
             `${INSTRUCAO_AO_VIVO}\n\n<reuniao>\n${contexto}\nMinuto: ${Number(corpo.minuto) || 0}. ` +
-            `Fala do closer até agora: ${Number(corpo.fala_closer_pct) || 0}%.\n</reuniao>\n\n` +
+            `Fala do closer até agora: ${Number(corpo.fala_closer_pct) || 0}%.` +
+            (typeof corpo.engajamento === "string" && corpo.engajamento
+              ? `\nEngajamento (câmera, último minuto): ${corpo.engajamento.slice(0, 500)}.`
+              : "") +
+            `\n</reuniao>\n\n` +
             `<estado_atual>\n${JSON.stringify(corpo.estado ?? {})}\n</estado_atual>\n\n` +
             `<trecho_novo>\n${linhasDaConversa(novos)}\n</trecho_novo>`,
         }],
@@ -238,6 +257,17 @@ Deno.serve(async (req) => {
       if (!trechos || trechos.length === 0) return json({ ok: false, erro: "sem_transcricao" }, 422);
 
       const { data: coach } = await db.from("reunioes_coach").select("estado").eq("sala_id", sala.id).maybeSingle();
+      const { data: engajamento } = await db
+        .from("reunioes_engajamento")
+        .select("quem, minuto, atencao, sorriso")
+        .eq("sala_id", sala.id)
+        .order("minuto", { ascending: true })
+        .limit(2000);
+      const blocoEngajamento = engajamento && engajamento.length > 0
+        ? `\n\n<engajamento>\nMedido pela câmera do cliente (atenção = olhando para a tela). É sinal, não certeza. ` +
+          `Na PARTE A, diga em que momentos a atenção caiu ou subiu e o que estava sendo falado.\n` +
+          `${linhasDoEngajamento(engajamento)}\n</engajamento>`
+        : "";
 
       const pedido = {
         model: MODELO,
@@ -251,7 +281,7 @@ Deno.serve(async (req) => {
             `em português direto, sem inventar dado: o que não foi dito fica "não informado"; estimativas ficam marcadas. ` +
             `Se a transcrição estiver ruim em algum ponto, avise.\n\n<reuniao>\n${contexto}\nData: ${sala.inicio}.\n</reuniao>\n\n` +
             `<estado_do_coach>\n${JSON.stringify(coach?.estado ?? {})}\n</estado_do_coach>\n\n` +
-            `<transcricao>\n${linhasDaConversa(trechos)}\n</transcricao>`,
+            `<transcricao>\n${linhasDaConversa(trechos)}\n</transcricao>` + blocoEngajamento,
         }],
       };
       // Relatório longo: em fluxo, para não estourar o tempo de espera.

@@ -223,6 +223,8 @@ export async function pedeDica(opts: {
   falaCloserPct: number;
   estado: EstadoCoach;
   novos: Trecho[];
+  /** "Mariana: atenção 45%, sorriu 10%" — último minuto, medido pela câmera. */
+  engajamento?: string;
 }): Promise<RespostaCoach | null> {
   const { data, error } = await supabase.functions.invoke('coach', {
     body: {
@@ -232,6 +234,7 @@ export async function pedeDica(opts: {
       fala_closer_pct: opts.falaCloserPct,
       estado: resumoParaCoach(opts.estado),
       novos: opts.novos.map((t) => ({ quem: t.quem, papel: t.papel, texto: t.texto })),
+      engajamento: opts.engajamento,
     },
   });
   if (error || !data?.ok || data.nada) return null;

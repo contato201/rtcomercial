@@ -28,10 +28,11 @@ import { geraRelatorio } from '@/lib/coach';
  * convidados, entra; se não estiver e a reunião tiver sala de espera, espera
  * o anfitrião aceitar.
  *
- * Antes de entrar, o lead vê um aviso curto de que a reunião pode ser gravada e
- * transcrita (pedido do Allan: o texto longo assustava). Isso cobre gravação e
- * transcrição. Análise do rosto é dado biométrico pela LGPD e exige um
- * consentimento próprio — fica para quando essa fase existir.
+ * Antes de entrar, o lead vê um aviso curto: a reunião pode ser gravada,
+ * transcrita e analisada por IA, "incluindo expressões do rosto". Clicar em
+ * Entrar vale como concordar (escolha do Allan — texto longo assustava). Como
+ * o rosto é dado biométrico (LGPD), o aviso cita o rosto com todas as letras e
+ * o "sim" para ele vai separado (`consentiu_rosto`).
  */
 
 type Etapa = 'porta' | 'entrando' | 'esperando' | 'ao_vivo' | 'saiu';
@@ -102,9 +103,11 @@ const Sala = () => {
     setErro('');
     setEtapa('entrando');
     try {
-      // `consentiu`: foi avisado de gravação e transcrição (o aviso aparece
-      // sempre antes do botão). Não vale para análise do rosto.
-      await trata(await entraNaSala({ slug, nome: nome.trim(), email: email.trim(), papel, consentiu: true }));
+      // O aviso aparece sempre antes do botão: quem clicou leu que a reunião
+      // é gravada, transcrita e que as expressões do rosto são analisadas.
+      await trata(await entraNaSala({
+        slug, nome: nome.trim(), email: email.trim(), papel, consentiu: true, consentiu_rosto: true,
+      }));
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não consegui abrir a sala.');
       setEtapa('porta');
@@ -326,7 +329,8 @@ const Sala = () => {
               </div>
 
               <p className="text-center text-xs leading-relaxed text-muted-foreground">
-                Esta reunião pode ser gravada e transcrita para melhorarmos o nosso atendimento.
+                Esta reunião pode ser gravada, transcrita e analisada por inteligência artificial,
+                incluindo expressões do rosto, para melhorarmos o nosso atendimento.
               </p>
 
               <Button type="submit" className="h-12 w-full text-sm font-semibold" disabled={etapa === 'entrando'}>

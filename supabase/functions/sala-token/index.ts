@@ -7,7 +7,8 @@
 // Ações (POST, corpo JSON):
 //   Visitante (sem login):
 //     { acao: "buscar", email }                         → reuniões daquele e-mail
-//     { acao: "entrar", slug, nome, email, consentiu }  → crachá, ou pedido na sala de espera
+//     { acao: "entrar", slug, nome, email, consentiu, consentiu_rosto }
+//                                                       → crachá, ou pedido na sala de espera
 //     { acao: "pedido", pedido_id, chave }              → como está meu pedido (e o crachá, se aceito)
 //   Equipe (JWT do Supabase + e-mail na lista de editores):
 //     { acao: "entrar", slug, papel? }                  → anfitrião, ou observador (invisível)
@@ -245,7 +246,9 @@ const comQuem = (sala: Sala) => primeiroNome(sala.closer) || primeiroNome(sala.s
  * Marca no banco que a reunião começou, que alguém de fora apareceu e o
  * consentimento — é o dado do funil nascendo sozinho, sem ninguém digitar.
  */
-async function registraEntrada(db: SupabaseClient, sala: Sala, papel: Papel, consentiu: boolean) {
+async function registraEntrada(
+  db: SupabaseClient, sala: Sala, papel: Papel, consentiu: boolean, rosto = false,
+) {
   const mudancas: Record<string, unknown> = {};
   if (papel !== "observador") {
     if (sala.status === "agendada") {
@@ -260,6 +263,9 @@ async function registraEntrada(db: SupabaseClient, sala: Sala, papel: Papel, con
   }
   const deFora = papel === "lead" || papel === "convidado";
   if (deFora && !sala.lead_entrou) mudancas.lead_entrou = true;
+  if (deFora && rosto && !sala.consentimento_rosto_em) {
+    mudancas.consentimento_rosto_em = new Date().toISOString();
+  }
   if (deFora && consentiu && !sala.consentimento_em) {
     mudancas.consentimento_em = new Date().toISOString();
   }
@@ -269,7 +275,7 @@ async function registraEntrada(db: SupabaseClient, sala: Sala, papel: Papel, con
 }
 
 /** Monta a resposta com o crachá. Quem é de fora recebe menos informação. */
-async function respostaComCracha(sala: Sala, papel: Papel, nome: string, consentiu: boolean) {
+async function respostaComCracha(sala: Sala, papel: Papel, nome: string, consentiu: boolean, rosto = false) {
   const equipe = papel === "anfitriao" || papel === "observador";
   const token = await criaCracha({
     identidade: `${papel}-${crypto.randomUUID().slice(0, 8)}`,
@@ -281,7 +287,14 @@ async function respostaComCracha(sala: Sala, papel: Papel, nome: string, consent
     // `consentiu` diz às próximas fases (transcrição, análise do rosto) se
     // podem processar essa pessoa. Equipe é sempre sim; quem é de fora, só
     // se marcou "Concordo".
-    metadata: { papel, sala_id: sala.id, consentiu: equipe ? true : consentiu },
+    // `consentiu_rosto`: leu o aviso que cita "expressões do rosto" e entrou.
+    // A equipe nunca é analisada.
+    metadata: {
+      papel,
+      sala_id: sala.id,
+      consentiu: equipe ? true : consentiu,
+      consentiu_rosto: equipe ? false : rosto,
+    },
   });
 
   return json({
@@ -390,13 +403,15 @@ Deno.serve(async (req) => {
 
     const email = limpaEmail(corpo.email);
     const consentiu = corpo.consentiu === true;
+    // Sem o "sim" geral não existe "sim" para o rosto.
+    const rosto = consentiu && corpo.consentiu_rosto === true;
     const convidado = listaDeConvidados(sala).includes(email);
 
     if (convidado) {
       const papel: Papel = email === limpaEmail(sala.lead_email) ? "lead" : "convidado";
       const nome = limpaNome(corpo.nome) || (papel === "lead" ? sala.lead_nome : "") || "Convidado";
-      await registraEntrada(db, sala, papel, consentiu);
-      return respostaComCracha(sala, papel, nome, consentiu);
+      await registraEntrada(db, sala, papel, consentiu, rosto);
+      return respostaComCracha(sala, papel, nome, consentiu, rosto);
     }
 
     // Não está na lista.
@@ -427,7 +442,7 @@ Deno.serve(async (req) => {
 
     const { data: pedido, error: erroPedido } = await db
       .from("reunioes_pedidos")
-      .insert({ sala_id: sala.id, nome, email, consentiu })
+      .insert({ sala_id: sala.id, nome, email, consentiu, consentiu_rosto: rosto })
       .select("id, chave")
       .single();
     if (erroPedido || !pedido) return json({ ok: false, erro: "falha_no_pedido" }, 500);
@@ -454,8 +469,9 @@ Deno.serve(async (req) => {
 
     const sala = pedido.sala as Sala;
     if (sala.status === "cancelada") return json({ ok: false, erro: "sala_cancelada" }, 410);
-    await registraEntrada(db, sala, "convidado", pedido.consentiu);
-    return respostaComCracha(sala, "convidado", pedido.nome, pedido.consentiu);
+    const rostoPedido = pedido.consentiu && pedido.consentiu_rosto === true;
+    await registraEntrada(db, sala, "convidado", pedido.consentiu, rostoPedido);
+    return respostaComCracha(sala, "convidado", pedido.nome, pedido.consentiu, rostoPedido);
   }
 
   // ── pedidos: o anfitrião vê quem está esperando ───────────────────────────

@@ -11,6 +11,7 @@ import { Check, Circle, Eye, Link2, MessageSquare, Send, Square, UserPlus, X } f
 import '@livekit/components-styles';
 import logo from '@/assets/logo-pequena.png';
 import { PainelCoach } from './PainelCoach';
+import { PainelEngajamento, useEngajamento, type Engajamento } from './Engajamento';
 import {
   decidePedido, gravaSala, linkDaSala, listaPedidos, type Cracha, type PedidoDeEntrada,
 } from '@/lib/salas';
@@ -168,6 +169,8 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
   }, [chatAberto, chatMessages.length]);
   const naoLidas = chatAberto ? 0 : Math.max(0, chatMessages.length - lidas);
   const gravacao = useGravacao(cracha);
+  // Roda mesmo com o painel escondido (janela estreita): o Coach e o relatório usam.
+  const engajamento = useEngajamento({ ativo: equipe, salaId: cracha.sala.id });
 
   return (
     <LayoutContextProvider value={layout}>
@@ -178,6 +181,7 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
               ocultarEu={observador}
               salaId={cracha.sala.id}
               tipo={cracha.sala.tipo_reuniao ?? 1}
+              engajamento={engajamento}
             />
           )}
 
@@ -462,11 +466,19 @@ function PainelChat({
 }
 
 /** O painel da equipe, à esquerda. O lead nunca vê. */
-function PainelEquipe({ ocultarEu, salaId, tipo }: { ocultarEu: boolean; salaId: string | null; tipo: 1 | 2 }) {
+function PainelEquipe({
+  ocultarEu, salaId, tipo, engajamento,
+}: {
+  ocultarEu: boolean;
+  salaId: string | null;
+  tipo: 1 | 2;
+  engajamento: Engajamento;
+}) {
   return (
     <aside className="hidden w-[320px] shrink-0 flex-col gap-3 overflow-y-auto pr-1 lg:flex">
       {/* Coach primeiro: é o que o closer olha durante a conversa. */}
-      {salaId && <PainelCoach salaId={salaId} tipo={tipo} />}
+      {salaId && <PainelCoach salaId={salaId} tipo={tipo} engajamento={engajamento.paraCoach} />}
+      <PainelEngajamento engajamento={engajamento} />
       <TempoDeFala ocultarEu={ocultarEu} />
     </aside>
   );

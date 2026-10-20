@@ -182,8 +182,10 @@ export async function entraNaSala(opts: {
   email?: string;
   nome?: string;
   papel?: 'anfitriao' | 'observador';
-  /** Marcou "Concordo" com transcrição e análise por IA (LGPD). */
+  /** Viu o aviso de gravação e transcrição e entrou (LGPD). */
   consentiu?: boolean;
+  /** Viu o aviso que cita "expressões do rosto" e entrou (dado biométrico). */
+  consentiu_rosto?: boolean;
 }): Promise<ResultadoEntrada> {
   return resultado(await chamaPorteiro<RespostaEntrada>({ acao: 'entrar', ...opts }));
 }

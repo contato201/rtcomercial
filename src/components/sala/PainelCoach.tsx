@@ -30,7 +30,14 @@ const papelDe = (p: Participant) => {
   }
 };
 
-export function PainelCoach({ salaId, tipo }: { salaId: string; tipo: TipoReuniao }) {
+export function PainelCoach({
+  salaId, tipo, engajamento,
+}: {
+  salaId: string;
+  tipo: TipoReuniao;
+  /** Frase do engajamento do último minuto (Fase 4), mandada junto com a fala. */
+  engajamento?: () => string;
+}) {
   const sala = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const participantes = useParticipants();
@@ -48,6 +55,8 @@ export function PainelCoach({ salaId, tipo }: { salaId: string; tipo: TipoReunia
   const jaPerguntados = useRef(0);
   const estadoAtual = useRef(estado);
   estadoAtual.current = estado;
+  const engajamentoAtual = useRef(engajamento);
+  engajamentoAtual.current = engajamento;
 
   useEffect(() => {
     // Todo anfitrião recebe o texto (o transcritor manda para todos eles),
@@ -90,6 +99,7 @@ export function PainelCoach({ salaId, tipo }: { salaId: string; tipo: TipoReunia
         falaCloserPct: falaDoCloserPct(trechos.current),
         estado: estadoAtual.current,
         novos,
+        engajamento: engajamentoAtual.current?.() || undefined,
       }).catch(() => null);
       if (!resposta) return;
       const proximo = aplicaResposta(estadoAtual.current, resposta, minuto, tipo);
