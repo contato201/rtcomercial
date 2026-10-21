@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import {
-  aplicaResposta, estadoInicial, falaDoCloserPct, quemGrava, resumoParaCoach,
+  aplicaResposta, dinheiroParado, estadoInicial, falaDoCloserPct, numeroDoTexto, quemGrava, resumoParaCoach,
   type RespostaCoach, type Trecho,
 } from './coach';
 
@@ -113,5 +113,54 @@ describe('tempo de fala e quem grava', () => {
   it('com dois anfitriões, todos escolhem o mesmo para gravar', () => {
     expect(quemGrava(['anfitriao-b2', 'anfitriao-a1'])).toBe('anfitriao-a1');
     expect(quemGrava([])).toBeNull();
+  });
+});
+
+describe('teleprompter (inspirado no Abracadabra Meet)', () => {
+  const orient = (fala: string, extra: Partial<NonNullable<RespostaCoach['orientacao']>> = {}) =>
+    resposta({ orientacao: { fala_sugerida: fala, proximo_passo: '', evite_agora: '', risco: '', ...extra } });
+
+  it('guarda a fala pronta, o próximo passo, o que evitar e o risco, com o minuto', () => {
+    const e = aplicaResposta(estadoInicial(), orient('Deixa eu parar um segundo. Quanto tempo leva para responder um pai?', {
+      proximo_passo: 'Volte para o funil', evite_agora: 'Não fale de preço', risco: 'Mantenedor decide',
+    }), 14, 1);
+    expect(e.orientacao).toEqual({
+      fala: 'Deixa eu parar um segundo. Quanto tempo leva para responder um pai?',
+      proximo_passo: 'Volte para o funil', evite: 'Não fale de preço', risco: 'Mantenedor decide', minuto: 14,
+    });
+  });
+
+  it('resposta toda vazia mantém o teleprompter anterior', () => {
+    const e = aplicaResposta(estadoInicial(), orient('Pergunta boa?'), 10, 1);
+    expect(aplicaResposta(e, orient('  '), 11, 1).orientacao?.fala).toBe('Pergunta boa?');
+  });
+});
+
+describe('dinheiro parado', () => {
+  const ficha = (campos: Record<string, string>) =>
+    Object.fromEntries(Object.entries(campos).map(([k, v]) => [k, { valor: v, fonte: 'cliente' as const, minuto: 1 }]));
+
+  it('lê número do jeito que a gente fala', () => {
+    expect(numeroDoTexto('R$ 1.250,00')).toBe(1250);
+    expect(numeroDoTexto('320 alunos')).toBe(320);
+    expect(numeroDoTexto('uns 1,5 mil')).toBe(1500);
+    expect(numeroDoTexto('R$ 850')).toBe(850);
+    expect(numeroDoTexto('não sabe')).toBeNull();
+  });
+
+  it('capacidade total: desconta os alunos de hoje', () => {
+    expect(dinheiroParado(ficha({ alunos: '320', capacidade: 'cabe 400', ticket: 'R$ 850' })))
+      .toEqual({ vagas: 80, ticket: 850, anual: 816000 });
+  });
+
+  it('vagas ociosas ditas direto: usa o número como está', () => {
+    expect(dinheiroParado(ficha({ capacidade: '60 vagas ociosas', ticket: 'R$ 1.000' })))
+      .toEqual({ vagas: 60, ticket: 1000, anual: 720000 });
+  });
+
+  it('sem ticket ou sem como saber as vagas, não inventa', () => {
+    expect(dinheiroParado(ficha({ alunos: '320', capacidade: '400' }))).toBeNull();
+    expect(dinheiroParado(ficha({ capacidade: '400', ticket: 'R$ 850' }))).toBeNull();
+    expect(dinheiroParado(ficha({ alunos: '420', capacidade: '400', ticket: 'R$ 850' }))).toBeNull();
   });
 });

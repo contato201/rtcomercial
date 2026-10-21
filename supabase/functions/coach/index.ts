@@ -74,7 +74,7 @@ const CAMPOS_FICHA = [
 const FORMATO_DICA = {
   type: "object",
   additionalProperties: false,
-  required: ["bloco_atual", "ficha", "dica", "pendencias_novas", "citacoes_fortes", "spin_novas", "termometro"],
+  required: ["bloco_atual", "ficha", "dica", "pendencias_novas", "citacoes_fortes", "spin_novas", "termometro", "orientacao"],
   properties: {
     bloco_atual: { type: "string", description: "Nome exato de um bloco do roteiro desta reunião." },
     ficha: {
@@ -115,6 +115,18 @@ const FORMATO_DICA = {
       },
     },
     termometro: { type: "integer", description: "Qualificação de 0 a 100, pela seção 5.5." },
+    // Teleprompter do closer (inspirado no Abracadabra Meet). Vazio = nada a dizer.
+    orientacao: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fala_sugerida", "proximo_passo", "evite_agora", "risco"],
+      properties: {
+        fala_sugerida: { type: "string", description: "Frase pronta para o closer ler agora, até 30 palavras, terminando com pergunta ao cliente." },
+        proximo_passo: { type: "string", description: "Para onde levar a conversa agora, até 15 palavras." },
+        evite_agora: { type: "string", description: "O que não fazer neste momento, até 15 palavras." },
+        risco: { type: "string", description: "Sinal de que a reunião pode acabar em 'vou pensar', até 15 palavras." },
+      },
+    },
   },
 };
 
@@ -151,6 +163,17 @@ Responda olhando o estado atual e o trecho novo:
 - citacoes_fortes: frases do cliente que valem ser usadas depois, palavra por palavra.
 - spin_novas: quantas perguntas de cada tipo o closer fez NESTE trecho (seção 9.3).
 - termometro: qualificação atual de 0 a 100 (seção 5.5).
+- orientacao: o teleprompter do closer. Escreva em português simples, na voz da RT.
+  - fala_sugerida: frase pronta para o closer ler AGORA, com as palavras dele, até 30 palavras,
+    sempre terminando com uma pergunta que devolve a palavra ao cliente. Use quando o closer
+    estiver falando demais, quando a atenção do cliente cair, ou quando faltar a pergunta-chave
+    do bloco atual. Use os números da ficha e o dinheiro_parado_ano quando ajudarem. Vazio se
+    a conversa estiver fluindo bem.
+  - proximo_passo: para onde levar a conversa agora, ligado ao roteiro e ao que falta da ficha.
+  - evite_agora: o que NÃO fazer neste momento (ex.: falar de preço antes de saber quem decide,
+    apresentar a RT antes do cliente sentir o problema). Vazio se não houver.
+  - risco: só com sinal real na conversa, o padrão que costuma terminar em "vou pensar" ou
+    "vou ver com o mantenedor". Vazio se não houver.
 
 Engajamento (quando vier): medido pela câmera do cliente no último minuto. "Atenção" é quanto
 tempo ele ficou olhando para a tela. É um sinal, não uma certeza. Atenção abaixo de 50% por

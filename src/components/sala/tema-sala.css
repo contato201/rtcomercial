@@ -1,0 +1,132 @@
+/*
+ * Cores da sala de reunião (RT Meet), nos dois temas.
+ * Cada cor do tema escuro virou uma variável com o próprio código no nome
+ * (--c-121212 = o cinza dos cartões). O tema claro só troca o valor.
+ * Arquivo gerado a partir das cores que a sala usa — para mudar uma cor,
+ * mude aqui nos dois blocos.
+ */
+.sala-tema {
+  --c-0A0A0A: #0A0A0A;
+  --c-0D0D0D: #0D0D0D;
+  --c-0F1A14: #0F1A14;
+  --c-101418: #101418;
+  --c-121212: #121212;
+  --c-141A2E: #141A2E;
+  --c-151B12: #151B12;
+  --c-171717: #171717;
+  --c-1C1A14: #1C1A14;
+  --c-1E1708: #1E1708;
+  --c-1E1E1E: #1E1E1E;
+  --c-1F1414: #1F1414;
+  --c-1F2A33: #1F2A33;
+  --c-1F3A2A: #1F3A2A;
+  --c-242424: #242424;
+  --c-25221A: #25221A;
+  --c-2A1212: #2A1212;
+  --c-2A2516: #2A2516;
+  --c-2C3A6B: #2C3A6B;
+  --c-2E2E2E: #2E2E2E;
+  --c-2F3A2A: #2F3A2A;
+  --c-333333: #333333;
+  --c-3A3524: #3A3524;
+  --c-3E9E6A: #3E9E6A;
+  --c-4A3A14: #4A3A14;
+  --c-5A2020: #5A2020;
+  --c-5A2A2A: #5A2A2A;
+  --c-5A5A5A: #5A5A5A;
+  --c-6F6A62: #6F6A62;
+  --c-6FA3C0: #6FA3C0;
+  --c-78736B: #78736B;
+  --c-7F93A0: #7F93A0;
+  --c-7FD1A0: #7FD1A0;
+  --c-8A8478: #8A8478;
+  --c-8EA2FF: #8EA2FF;
+  --c-8F8A80: #8F8A80;
+  --c-9A9488: #9A9488;
+  --c-9FC4D8: #9FC4D8;
+  --c-9FD8B5: #9FD8B5;
+  --c-A9A294: #A9A294;
+  --c-B5A27A: #B5A27A;
+  --c-B5AE9E: #B5AE9E;
+  --c-BDB6A8: #BDB6A8;
+  --c-C0B072: #C0B072;
+  --c-C9C2B4: #C9C2B4;
+  --c-D7D2C6: #D7D2C6;
+  --c-D9CBA4: #D9CBA4;
+  --c-E07A6E: #E07A6E;
+  --c-E5484D: #E5484D;
+  --c-E8A838: #E8A838;
+  --c-E8D6AE: #E8D6AE;
+  --c-E8E4DA: #E8E4DA;
+  --c-F0A35E: #F0A35E;
+  --c-F0D58C: #F0D58C;
+  --c-F0E3C6: #F0E3C6;
+  --c-F2B8B8: #F2B8B8;
+  --c-F2EFE7: #F2EFE7;
+  --c-F5A3A3: #F5A3A3;
+  --c-FF8A8E: #FF8A8E;
+  --c-FFFFFF: #FFFFFF;
+}
+
+.sala-tema[data-tema="claro"] {
+  --c-0A0A0A: #F4F3EF;
+  --c-0D0D0D: #0D0D0D;
+  --c-0F1A14: #EAF7EF;
+  --c-101418: #EAF1F6;
+  --c-121212: #FFFFFF;
+  --c-141A2E: #EEF1FF;
+  --c-151B12: #EDF7E8;
+  --c-171717: #F4F3EF;
+  --c-1C1A14: #FBF6E6;
+  --c-1E1708: #FFF7E0;
+  --c-1E1E1E: #EDEBE6;
+  --c-1F1414: #FDECEC;
+  --c-1F2A33: #C9D9E4;
+  --c-1F3A2A: #A9DCC0;
+  --c-242424: #E3E1DC;
+  --c-25221A: #F3EBD3;
+  --c-2A1212: #FDECEC;
+  --c-2A2516: #FBF3DA;
+  --c-2C3A6B: #B9C3F2;
+  --c-2E2E2E: #D9D6CF;
+  --c-2F3A2A: #B5D9A8;
+  --c-333333: #DDDAD3;
+  --c-3A3524: #E2D3A3;
+  --c-3E9E6A: #2E8A57;
+  --c-4A3A14: #E9C77A;
+  --c-5A2020: #F0B4B4;
+  --c-5A2A2A: #F0B4B4;
+  --c-5A5A5A: #B0B0B0;
+  --c-6F6A62: #807B72;
+  --c-6FA3C0: #2C6A8E;
+  --c-78736B: #7A756C;
+  --c-7F93A0: #52626D;
+  --c-7FD1A0: #2E9E62;
+  --c-8A8478: #85807A;
+  --c-8EA2FF: #3D52C4;
+  --c-8F8A80: #6E695F;
+  --c-9A9488: #77726A;
+  --c-9FC4D8: #2C6A8E;
+  --c-9FD8B5: #1E7A48;
+  --c-A9A294: #6B665C;
+  --c-B5A27A: #7A6830;
+  --c-B5AE9E: #5C574E;
+  --c-BDB6A8: #5C574E;
+  --c-C0B072: #A68C3C;
+  --c-C9C2B4: #4A463F;
+  --c-D7D2C6: #3A372F;
+  --c-D9CBA4: #6B5A2E;
+  --c-E07A6E: #C0392B;
+  --c-E5484D: #D93036;
+  --c-E8A838: #B4730A;
+  --c-E8D6AE: #6B5A2E;
+  --c-E8E4DA: #2B2924;
+  --c-F0A35E: #D97A1E;
+  --c-F0D58C: #8A6408;
+  --c-F0E3C6: #6B4E10;
+  --c-F2B8B8: #A12A2A;
+  --c-F2EFE7: #1A1915;
+  --c-F5A3A3: #B42323;
+  --c-FF8A8E: #C4282E;
+  --c-FFFFFF: #111111;
+}

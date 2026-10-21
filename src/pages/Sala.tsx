@@ -17,6 +17,7 @@ import {
   type Cracha, type ResultadoEntrada,
 } from '@/lib/salas';
 import { useTemaClaro } from '@/hooks/useTemaClaro';
+import { EsperaLead } from '@/components/sala/EsperaLead';
 import { useTituloAba } from '@/hooks/useTituloAba';
 import { geraRelatorio } from '@/lib/coach';
 
@@ -64,6 +65,9 @@ const Sala = () => {
   useTituloAba('Reunião — Reproduzindo Talentos');
   const { isAuthenticated, canEdit, isLoading } = useAuth();
   const equipe = isAuthenticated && canEdit;
+  // Link pessoal do lead que agendou pelo site (?k=): entra sem digitar nome e e-mail.
+  const chave = params.get('k') ?? '';
+  const peloLink = !!chave && !equipe;
 
   const [etapa, setEtapa] = useState<Etapa>('porta');
   const [cracha, setCracha] = useState<Cracha | null>(null);
@@ -105,9 +109,9 @@ const Sala = () => {
     try {
       // O aviso aparece sempre antes do botão: quem clicou leu que a reunião
       // é gravada, transcrita e que as expressões do rosto são analisadas.
-      await trata(await entraNaSala({
-        slug, nome: nome.trim(), email: email.trim(), papel, consentiu: true, consentiu_rosto: true,
-      }));
+      await trata(await entraNaSala(peloLink && !papel
+        ? { slug, chave, consentiu: true, consentiu_rosto: true }
+        : { slug, nome: nome.trim(), email: email.trim(), papel, consentiu: true, consentiu_rosto: true }));
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não consegui abrir a sala.');
       setEtapa('porta');
@@ -177,6 +181,20 @@ const Sala = () => {
       >
         <SalaAoVivo cracha={cracha} aoSair={saiu} />
       </Suspense>
+    );
+  }
+
+  // Link pessoal do lead: página de espera no estilo call.viverdeia.ai. O botão de
+  // entrar aparece quando o anfitrião abre a sala, e a chamada abre aqui mesmo.
+  if (peloLink && !isLoading && (etapa === 'porta' || etapa === 'entrando')) {
+    return (
+      <EsperaLead
+        slug={slug}
+        chave={chave}
+        entrando={etapa === 'entrando'}
+        erro={erro}
+        aoEntrar={() => void entrar()}
+      />
     );
   }
 
@@ -260,7 +278,9 @@ const Sala = () => {
           <p className="mb-7 text-center text-sm leading-relaxed text-muted-foreground">
             {equipe
               ? 'Você está logado como equipe. Escolha como quer entrar.'
-              : 'Informe seu nome e o e-mail em que recebeu o convite.'}
+              : peloLink
+                ? 'Sua sala já está pronta. É só entrar.'
+                : 'Informe seu nome e o e-mail em que recebeu o convite.'}
           </p>
 
           {equipe ? (
@@ -289,6 +309,21 @@ const Sala = () => {
               <p className="pt-1 text-center text-xs leading-relaxed text-muted-foreground">
                 Como observador você assiste sem aparecer: o lead não vê nem ouve você.
               </p>
+            </div>
+          ) : peloLink ? (
+            <div className="space-y-4">
+              <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                Esta reunião pode ser gravada, transcrita e analisada por inteligência artificial,
+                incluindo expressões do rosto, para melhorarmos o nosso atendimento.
+              </p>
+              <Button className="h-12 w-full text-sm font-semibold" disabled={etapa === 'entrando'} onClick={() => entrar()}>
+                {etapa === 'entrando' ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                )}
+                Entrar na sala
+              </Button>
             </div>
           ) : (
             <form
@@ -347,7 +382,7 @@ const Sala = () => {
           {erro && <Erro texto={erro} />}
         </div>
 
-        {!equipe && (
+        {!equipe && !peloLink && (
           <p className="mt-5 text-center text-xs text-muted-foreground">
             Não sabe qual e-mail usar?{' '}
             <Link to="/entrar" className="font-semibold text-foreground underline underline-offset-2">

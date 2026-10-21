@@ -59,6 +59,19 @@ export interface Spin {
   necessidade: number;
 }
 
+/**
+ * O "teleprompter" do closer (inspirado no Abracadabra Meet): a frase pronta para
+ * devolver a palavra, para onde levar a conversa, o que evitar e o risco à vista.
+ * Campo vazio = nada a dizer naquele ponto.
+ */
+export interface Orientacao {
+  fala: string;
+  proximo_passo: string;
+  evite: string;
+  risco: string;
+  minuto: number;
+}
+
 /** Tudo que o Coach sabe da reunião até agora. Vai para o banco a cada dica. */
 export interface EstadoCoach {
   bloco: string | null;
@@ -69,6 +82,8 @@ export interface EstadoCoach {
   citacoes: string[];
   spin: Spin;
   termometro: number | null;
+  /** Reuniões gravadas antes de 21/out não têm. */
+  orientacao?: Orientacao | null;
 }
 
 export const estadoInicial = (): EstadoCoach => ({
@@ -79,6 +94,7 @@ export const estadoInicial = (): EstadoCoach => ({
   citacoes: [],
   spin: { situacao: 0, problema: 0, implicacao: 0, necessidade: 0 },
   termometro: null,
+  orientacao: null,
 });
 
 /** O que a função `coach` devolve a cada chamada ao vivo. */
@@ -90,6 +106,7 @@ export interface RespostaCoach {
   citacoes_fortes: string[];
   spin_novas: Spin;
   termometro: number;
+  orientacao?: { fala_sugerida: string; proximo_passo: string; evite_agora: string; risco: string };
 }
 
 /** Um trecho da conversa, como o transcritor manda. */
@@ -176,7 +193,55 @@ export function aplicaResposta(
   if (Number.isFinite(resposta.termometro)) {
     novo.termometro = Math.max(0, Math.min(100, Math.round(resposta.termometro)));
   }
+
+  // Teleprompter: troca tudo de uma vez quando vem algo novo; resposta vazia mantém o anterior.
+  const o = resposta.orientacao;
+  const limpo = (v: unknown) => String(v ?? '').trim();
+  if (o && [o.fala_sugerida, o.proximo_passo, o.evite_agora, o.risco].some((v) => limpo(v))) {
+    novo.orientacao = {
+      fala: limpo(o.fala_sugerida),
+      proximo_passo: limpo(o.proximo_passo),
+      evite: limpo(o.evite_agora),
+      risco: limpo(o.risco),
+      minuto,
+    };
+  }
   return novo;
+}
+
+/** Lê o primeiro número de um texto falado: "R$ 1.250,00" → 1250, "320 alunos" → 320, "1,5 mil" → 1500. */
+export function numeroDoTexto(texto: string): number | null {
+  const m = String(texto ?? '').match(/\d[\d.,]*/);
+  if (!m) return null;
+  let t = m[0].replace(/[.,]$/, '');
+  if (t.includes('.') && t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (t.includes(',')) t = /,\d{3}$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.');
+  else if (/\.\d{3}$/.test(t)) t = t.replace(/\./g, '');
+  let n = Number(t);
+  if (!Number.isFinite(n)) return null;
+  if (/^\s*mil\b/i.test(String(texto).slice((m.index ?? 0) + m[0].length))) n *= 1000;
+  return n;
+}
+
+/**
+ * Bloco "Dinheiro parado" do roteiro: vagas vazias × mensalidade × 12 meses,
+ * com o que já está na ficha. Conta feita aqui, não pela IA, para nunca errar.
+ */
+export function dinheiroParado(ficha: EstadoCoach['ficha']): { vagas: number; ticket: number; anual: number } | null {
+  const cap = ficha.capacidade?.valor;
+  const ticket = ficha.ticket ? numeroDoTexto(ficha.ticket.valor) : null;
+  if (!cap || !ticket) return null;
+  const capNum = numeroDoTexto(cap);
+  if (!capNum) return null;
+  // "80 vagas ociosas" já é a sobra; "cabe 400" precisa descontar os alunos de hoje.
+  let vagas = capNum;
+  if (!/ocios|vaga|sobr|livre|vazi/i.test(cap)) {
+    const alunos = ficha.alunos ? numeroDoTexto(ficha.alunos.valor) : null;
+    if (!alunos || alunos >= capNum) return null;
+    vagas = capNum - alunos;
+  }
+  vagas = Math.round(vagas);
+  return vagas > 0 ? { vagas, ticket, anual: Math.round(vagas * ticket * 12) } : null;
 }
 
 /** O que mandar para o Claude junto com o trecho novo: curto, sem o histórico inteiro. */
@@ -188,6 +253,7 @@ export function resumoParaCoach(estado: EstadoCoach) {
     dicas_recentes: estado.dicas.slice(0, 5).map((d) => `min ${d.minuto}: ${d.texto}`),
     pendencias: estado.pendencias,
     spin: estado.spin,
+    dinheiro_parado_ano: dinheiroParado(estado.ficha)?.anual ?? null,
   };
 }
 

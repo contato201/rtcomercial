@@ -4,7 +4,7 @@ import type { Participant } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, Circle, Lightbulb, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import {
-  CAMPOS_FICHA, ROTEIRO, aplicaResposta, buscaCoach, estadoInicial, falaDoCloserPct, pedeDica,
+  CAMPOS_FICHA, ROTEIRO, aplicaResposta, buscaCoach, dinheiroParado, estadoInicial, falaDoCloserPct, pedeDica,
   quemGrava, salvaEstado, salvaTrechos,
   type Dica, type EstadoCoach, type TipoReuniao, type Trecho,
 } from '@/lib/coach';
@@ -66,6 +66,9 @@ export function PainelCoach({
   const [aoVivo, setAoVivo] = useState(true);
   const aoVivoAtual = useRef(aoVivo);
   aoVivoAtual.current = aoVivo;
+  // Para o closer ver que o Coach está trabalhando, mesmo quando não há dica.
+  const [analisando, setAnalisando] = useState(false);
+  const [ultimaAnalise, setUltimaAnalise] = useState<number | null>(null);
 
   useEffect(() => {
     // Todo anfitrião recebe o texto (o transcritor manda para todos eles),
@@ -103,6 +106,7 @@ export function PainelCoach({
       if (novos.length === 0) return;
       jaPerguntados.current = trechos.current.length;
       const minuto = Math.floor((Date.now() - inicio.current) / 60_000);
+      setAnalisando(true);
       const resposta = await pedeDica({
         salaId,
         minuto,
@@ -111,7 +115,9 @@ export function PainelCoach({
         novos,
         engajamento: engajamentoAtual.current?.() || undefined,
       }).catch(() => null);
+      setAnalisando(false);
       if (!resposta) return;
+      setUltimaAnalise(Date.now());
       const proximo = aplicaResposta(estadoAtual.current, resposta, minuto, tipo);
       setEstado(proximo);
       void salvaEstado(salaId, proximo).catch(() => undefined);
@@ -146,6 +152,7 @@ export function PainelCoach({
     <TelaDoCoach
       estado={estado} tipo={tipo} falas={falas} gravo={gravo}
       aoVivo={aoVivo} mudaAoVivo={setAoVivo}
+      analisando={analisando} ultimaAnalise={ultimaAnalise}
     />
   );
 }
@@ -153,13 +160,13 @@ export function PainelCoach({
 // ── A tela ─────────────────────────────────────────────────────────────────
 
 const COR_DICA: Record<Dica['nivel'], { caixa: string; texto: string; rotulo: string }> = {
-  critico: { caixa: 'border-[#5A2020] bg-[#2A1212]', texto: 'text-[#F5A3A3]', rotulo: 'Crítico' },
-  atencao: { caixa: 'border-[#4A3A14] bg-[#1E1708]', texto: 'text-[#F0D58C]', rotulo: 'Atenção' },
-  sugestao: { caixa: 'border-[#1F3A2A] bg-[#0F1A14]', texto: 'text-[#9FD8B5]', rotulo: 'Sugestão' },
+  critico: { caixa: 'border-[var(--c-5A2020)] bg-[var(--c-2A1212)]', texto: 'text-[var(--c-F5A3A3)]', rotulo: 'Crítico' },
+  atencao: { caixa: 'border-[var(--c-4A3A14)] bg-[var(--c-1E1708)]', texto: 'text-[var(--c-F0D58C)]', rotulo: 'Atenção' },
+  sugestao: { caixa: 'border-[var(--c-1F3A2A)] bg-[var(--c-0F1A14)]', texto: 'text-[var(--c-9FD8B5)]', rotulo: 'Sugestão' },
 };
 
-function TelaDoCoach({
-  estado, tipo, falas, gravo, aoVivo, mudaAoVivo,
+export function TelaDoCoach({
+  estado, tipo, falas, gravo, aoVivo, mudaAoVivo, analisando, ultimaAnalise,
 }: {
   estado: EstadoCoach;
   tipo: TipoReuniao;
@@ -167,7 +174,17 @@ function TelaDoCoach({
   gravo: boolean;
   aoVivo: boolean;
   mudaAoVivo: (ligado: boolean) => void;
+  analisando: boolean;
+  ultimaAnalise: number | null;
 }) {
+  // Relógio de 5 em 5 s só para o "há X s" andar sozinho.
+  const [, setTique] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTique((n) => n + 1), 5000);
+    return () => clearInterval(t);
+  }, []);
+  const ha = ultimaAnalise ? Math.max(0, Math.round((Date.now() - ultimaAnalise) / 1000)) : null;
+  const haTexto = ha === null ? null : ha < 60 ? `há ${ha} s` : `há ${Math.floor(ha / 60)} min`;
   const roteiro = ROTEIRO[tipo];
   const atual = estado.bloco ? roteiro.indexOf(estado.bloco) : -1;
   const [ultima, ...anteriores] = estado.dicas;
@@ -178,132 +195,191 @@ function TelaDoCoach({
     const entradas = Object.entries(estado.spin) as Array<[keyof EstadoCoach['spin'], number]>;
     return entradas.reduce((a, b) => (b[1] < a[1] ? b : a))[0];
   }, [estado.spin]);
+  const o = estado.orientacao ?? null;
+  const parado = useMemo(() => dinheiroParado(estado.ficha), [estado.ficha]);
+  const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
+      <div className="rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
         <div className="mb-3 flex items-center justify-between">
-          <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[1.6px] text-[#C0B072]">
+          <span className="inline-flex items-center gap-2 text-[13px] font-bold uppercase tracking-[1.6px] text-[var(--c-C0B072)]">
             <Sparkles className="h-4 w-4" />
             Coach IA
           </span>
-          <span className="text-[10px] text-[#78736B]">
+          <span className="text-xs text-[var(--c-A9A294)]">
             {gravo ? (falas > 0 ? `${falas} falas` : 'aguardando a 1ª fala') : 'acompanhando'}
           </span>
         </div>
 
         {gravo && (
-          <label className="mb-3 flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-[#242424] bg-[#171717] px-3 py-2">
-            <span className="text-xs font-medium text-[#D7D2C6]">Dicas ao vivo</span>
+          <label className="mb-3 flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-[var(--c-333333)] bg-[var(--c-171717)] px-3 py-2">
+            <span className="text-sm font-medium text-[var(--c-D7D2C6)]">Dicas ao vivo</span>
             <Switch checked={aoVivo} onCheckedChange={mudaAoVivo} aria-label="Ligar ou desligar as dicas ao vivo" />
           </label>
         )}
 
         {gravo && !aoVivo ? (
-          <p className="text-xs leading-relaxed text-[#78736B]">
+          <p className="text-sm leading-relaxed text-[var(--c-A9A294)]">
             Dicas pausadas. A conversa continua sendo guardada e o relatório chega no fim da reunião.
           </p>
         ) : ultima ? (
           <div className={`rounded-xl border p-3 ${COR_DICA[ultima.nivel].caixa}`}>
-            <p className={`mb-1 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[1.4px] ${COR_DICA[ultima.nivel].texto}`}>
-              {ultima.nivel === 'critico' ? <AlertTriangle className="h-3 w-3" /> : <Lightbulb className="h-3 w-3" />}
+            <p className={`mb-1 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[1.4px] ${COR_DICA[ultima.nivel].texto}`}>
+              {ultima.nivel === 'critico' ? <AlertTriangle className="h-4 w-4" /> : <Lightbulb className="h-4 w-4" />}
               {COR_DICA[ultima.nivel].rotulo} · min {ultima.minuto}
             </p>
-            <p className="text-sm font-medium leading-snug text-[#F2EFE7]">{ultima.texto}</p>
+            <p className="text-lg font-semibold leading-snug text-[var(--c-FFFFFF)]">{ultima.texto}</p>
           </div>
         ) : (
-          <p className="text-xs leading-relaxed text-[#78736B]">
-            As dicas aparecem aqui conforme a conversa anda — no máximo uma por minuto.
+          <p className="text-sm leading-relaxed text-[var(--c-A9A294)]">
+            {gravo && falas === 0
+              ? 'Esperando a conversa começar. As dicas aparecem aqui — no máximo uma por minuto.'
+              : 'Nenhuma dica agora: a conversa está andando bem. Quando houver algo importante, aparece aqui.'}
           </p>
+        )}
+
+        {/* Sinal de vida: mostra que o Coach está ouvindo e analisando. */}
+        {gravo && aoVivo && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-[var(--c-333333)] pt-3 text-[13px] text-[var(--c-BDB6A8)]">
+            <span className={`h-2.5 w-2.5 rounded-full ${analisando ? 'animate-pulse bg-[var(--c-C0B072)]' : falas > 0 ? 'bg-[var(--c-3E9E6A)]' : 'bg-[var(--c-5A5A5A)]'}`} />
+            {analisando
+              ? 'Analisando a conversa…'
+              : haTexto
+                ? `Última análise ${haTexto}`
+                : falas > 0 ? 'Ouvindo — 1ª análise em menos de 1 min' : 'Ouvindo'}
+            {estado.bloco && <span className="text-[var(--c-F2EFE7)]">· agora em <strong>{estado.bloco}</strong></span>}
+          </div>
         )}
 
         {anteriores.length > 0 && (
           <ul className="mt-2 space-y-1">
             {anteriores.slice(0, 3).map((d) => (
-              <li key={`${d.minuto}-${d.texto}`} className="text-[11px] leading-snug text-[#8F8A80]">
-                <span className="text-[#5F5A52]">min {d.minuto} · </span>{d.texto}
+              <li key={`${d.minuto}-${d.texto}`} className="text-[13px] leading-snug text-[var(--c-BDB6A8)]">
+                <span className="text-[var(--c-8A8478)]">min {d.minuto} · </span>{d.texto}
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[1.6px] text-[#8F8A80]">
+      {!(gravo && !aoVivo) && (o || parado) && (
+        <div className="space-y-2.5 rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
+          <p className="text-xs font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">
+            Teleprompter{o ? ` · min ${o.minuto}` : ''}
+          </p>
+          {o?.fala && (
+            <div className="rounded-xl border border-[var(--c-2C3A6B)] bg-[var(--c-141A2E)] p-3">
+              <p className="mb-1 text-xs font-bold uppercase tracking-[1.4px] text-[var(--c-8EA2FF)]">Fale e devolva a palavra</p>
+              <p className="text-lg font-semibold leading-snug text-[var(--c-FFFFFF)]">“{o.fala}”</p>
+            </div>
+          )}
+          {o?.proximo_passo && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[1.4px] text-[var(--c-BDB6A8)]">Próximo passo</p>
+              <p className="text-base leading-snug text-[var(--c-F2EFE7)]">{o.proximo_passo}</p>
+            </div>
+          )}
+          {o?.evite && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[1.4px] text-[var(--c-E8A838)]">Evite agora</p>
+              <p className="text-base leading-snug text-[var(--c-F2EFE7)]">{o.evite}</p>
+            </div>
+          )}
+          {o?.risco && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[1.4px] text-[var(--c-E07A6E)]">Risco</p>
+              <p className="text-base leading-snug text-[var(--c-F2EFE7)]">{o.risco}</p>
+            </div>
+          )}
+          {parado && (
+            <div className="rounded-xl border border-[var(--c-2F3A2A)] bg-[var(--c-151B12)] p-3">
+              <p className="mb-1 text-xs font-bold uppercase tracking-[1.4px] text-[var(--c-9FD8B5)]">Dinheiro parado</p>
+              <p className="text-sm leading-snug text-[var(--c-E8E4DA)]">
+                {parado.vagas} vagas vazias × {reais(parado.ticket)} × 12 ={' '}
+                <strong className="text-base text-[var(--c-F2EFE7)]">{reais(parado.anual)} por ano</strong>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">
           Roteiro · reunião {tipo}
         </p>
         <ol className="space-y-1">
           {roteiro.map((bloco, i) => (
             <li
               key={bloco}
-              className={`flex items-center gap-2 rounded-md px-2 py-1 text-xs ${
-                i === atual ? 'border border-[#3A3524] bg-[#1C1A14] font-semibold text-[#F2EFE7]' : i < atual ? 'text-[#6F6A62]' : 'text-[#9B9488]'
+              className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm ${
+                i === atual ? 'border border-[var(--c-C0B072)] bg-[var(--c-2A2516)] font-bold text-[var(--c-FFFFFF)]' : i < atual ? 'text-[var(--c-9A9488)]' : 'text-[var(--c-C9C2B4)]'
               }`}
             >
-              {i < atual ? <CheckCircle2 className="h-3.5 w-3.5 text-[#3E9E6A]" /> : <Circle className={`h-3.5 w-3.5 ${i === atual ? 'text-[#C0B072]' : 'text-[#3A3A3A]'}`} />}
+              {i < atual ? <CheckCircle2 className="h-4 w-4 text-[var(--c-3E9E6A)]" /> : <Circle className={`h-4 w-4 ${i === atual ? 'text-[var(--c-C0B072)]' : 'text-[var(--c-5A5A5A)]'}`} />}
               {bloco}
             </li>
           ))}
         </ol>
       </div>
 
-      <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[1.6px] text-[#8F8A80]">Ficha · prioridade 1</p>
+      <div className="rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">Ficha · prioridade 1</p>
         <ul className="space-y-1.5">
           {p1.map((c) => {
             const v = estado.ficha[c.chave];
             return (
-              <li key={c.chave} className="flex items-start justify-between gap-2 text-xs">
-                <span className="text-[#9B9488]">{c.rotulo}</span>
+              <li key={c.chave} className="flex items-start justify-between gap-2 text-sm">
+                <span className="text-[var(--c-C9C2B4)]">{c.rotulo}</span>
                 {v ? (
-                  <span className="max-w-[55%] text-right font-medium text-[#9FD8B5]">
+                  <span className="max-w-[55%] text-right font-medium text-[var(--c-9FD8B5)]">
                     {v.valor}
-                    {v.fonte !== 'cliente' && <span className="ml-1 text-[10px] font-normal text-[#E8A838]">({v.fonte === 'estimativa' ? 'estimativa' : 'closer'}, confirmar)</span>}
+                    {v.fonte !== 'cliente' && <span className="ml-1 text-xs font-normal text-[var(--c-E8A838)]">({v.fonte === 'estimativa' ? 'estimativa' : 'closer'}, confirmar)</span>}
                   </span>
                 ) : (
-                  <span className="text-[#E8A838]">falta</span>
+                  <span className="text-[var(--c-E8A838)]">falta</span>
                 )}
               </li>
             );
           })}
         </ul>
-        <p className="mt-2 text-[10px] text-[#6F6A62]">Prioridade 2: {p2Preenchidos.length} de {p2.length} preenchidos</p>
+        <p className="mt-2 text-xs text-[var(--c-9A9488)]">Prioridade 2: {p2Preenchidos.length} de {p2.length} preenchidos</p>
       </div>
 
-      <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
+      <div className="rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-[10px] font-semibold uppercase tracking-[1.6px] text-[#8F8A80]">SPIN</p>
+          <p className="text-xs font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">SPIN</p>
           {estado.termometro !== null && (
-            <span className="text-[10px] text-[#9B9488]">qualificação <strong className="text-[#F2EFE7]">{estado.termometro}</strong>/100</span>
+            <span className="text-xs text-[var(--c-C9C2B4)]">qualificação <strong className="text-[var(--c-F2EFE7)]">{estado.termometro}</strong>/100</span>
           )}
         </div>
         <div className="grid grid-cols-4 gap-1.5 text-center">
           {(['situacao', 'problema', 'implicacao', 'necessidade'] as const).map((k) => (
-            <div key={k} className={`rounded-lg border px-1 py-1.5 ${k === spinMenor ? 'border-[#4A3A14] bg-[#1E1708]' : 'border-[#242424] bg-[#171717]'}`}>
-              <p className="text-base font-bold tabular-nums text-[#F2EFE7]">{estado.spin[k]}</p>
-              <p className="text-[9px] uppercase tracking-wide text-[#8F8A80]">{k === 'situacao' ? 'Situação' : k === 'problema' ? 'Problema' : k === 'implicacao' ? 'Implicação' : 'Necess.'}</p>
+            <div key={k} className={`rounded-lg border px-1 py-1.5 ${k === spinMenor ? 'border-[var(--c-4A3A14)] bg-[var(--c-1E1708)]' : 'border-[var(--c-333333)] bg-[var(--c-171717)]'}`}>
+              <p className="text-lg font-bold tabular-nums text-[var(--c-F2EFE7)]">{estado.spin[k]}</p>
+              <p className="text-[11px] uppercase tracking-wide text-[var(--c-BDB6A8)]">{k === 'situacao' ? 'Situação' : k === 'problema' ? 'Problema' : k === 'implicacao' ? 'Implicação' : 'Necess.'}</p>
             </div>
           ))}
         </div>
       </div>
 
       {estado.pendencias.length > 0 && (
-        <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[1.6px] text-[#8F8A80]">Pendências</p>
+        <div className="rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">Pendências</p>
           <ul className="space-y-1">
             {estado.pendencias.map((p) => (
-              <li key={p} className="text-xs leading-snug text-[#E8E4DA]">• {p}</li>
+              <li key={p} className="text-sm leading-snug text-[var(--c-E8E4DA)]">• {p}</li>
             ))}
           </ul>
         </div>
       )}
 
       {estado.citacoes.length > 0 && (
-        <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[1.6px] text-[#8F8A80]">Frases do cliente</p>
+        <div className="rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">Frases do cliente</p>
           <ul className="space-y-1.5">
             {estado.citacoes.slice(-4).map((c) => (
-              <li key={c} className="text-xs italic leading-snug text-[#D9CBA4]">“{c}”</li>
+              <li key={c} className="text-sm italic leading-snug text-[var(--c-D9CBA4)]">“{c}”</li>
             ))}
           </ul>
         </div>

@@ -7,8 +7,9 @@ import {
   useSpeakingParticipants, useTracks,
 } from '@livekit/components-react';
 import { ConnectionState, RoomEvent, Track, type Participant } from 'livekit-client';
-import { Check, Circle, Eye, Link2, MessageSquare, Send, Square, UserPlus, X } from 'lucide-react';
+import { Check, Circle, Eye, Link2, MessageSquare, Moon, Send, Square, Sun, UserPlus, X } from 'lucide-react';
 import '@livekit/components-styles';
+import './tema-sala.css';
 import logo from '@/assets/logo-pequena.png';
 import { PainelCoach } from './PainelCoach';
 import { PainelEngajamento, useEngajamento, type Engajamento } from './Engajamento';
@@ -26,8 +27,9 @@ import {
  * pedindo para entrar, o tempo de fala de cada um e, nas próximas fases, o
  * Coach IA. Quem é de fora nunca vê esse painel.
  *
- * A sala é sempre escura, independente do tema do dashboard: fundo claro atrás
- * de uma chamada de vídeo cansa a vista e rouba atenção do rosto.
+ * A sala abre escura (fundo escuro cansa menos a vista numa chamada de vídeo),
+ * mas tem o botão sol/lua no topo para a versão clara, pedido do Allan. A cor
+ * de cada peça vem de `tema-sala.css`; a escolha fica guardada no navegador.
  */
 
 const relogio = (segundos: number) => {
@@ -41,9 +43,33 @@ const relogio = (segundos: number) => {
 /** O assistente invisível (fases seguintes) é participante, mas não aparece na tela. */
 const ehGente = (p: Participant) => !p.isAgent;
 
+const CHAVE_TEMA = 'rt-sala-tema';
+/** Claro ou escuro, lembrado neste navegador para a próxima reunião. */
+function useTemaDaSala() {
+  const [tema, setTema] = useState<'escuro' | 'claro'>(() => {
+    try {
+      return localStorage.getItem(CHAVE_TEMA) === 'claro' ? 'claro' : 'escuro';
+    } catch {
+      return 'escuro';
+    }
+  });
+  const alterna = () =>
+    setTema((t) => {
+      const novo = t === 'claro' ? 'escuro' : 'claro';
+      try {
+        localStorage.setItem(CHAVE_TEMA, novo);
+      } catch {
+        // navegador sem armazenamento: vale só para esta reunião
+      }
+      return novo;
+    });
+  return { tema, alterna };
+}
+
 export const SalaAoVivo = ({ cracha, aoSair }: { cracha: Cracha; aoSair: () => void }) => {
   const [segundos, setSegundos] = useState(0);
   const [copiado, setCopiado] = useState(false);
+  const { tema, alterna } = useTemaDaSala();
   const observador = cracha.papel === 'observador';
   const equipe = cracha.papel === 'anfitriao' || observador;
 
@@ -74,25 +100,28 @@ export const SalaAoVivo = ({ cracha, aoSair }: { cracha: Cracha; aoSair: () => v
       : 'Reproduzindo Talentos';
 
   return (
-    <div className="flex h-screen flex-col bg-[#0A0A0A] text-[#F2EFE7]">
+    <div
+      className="sala-tema flex h-screen flex-col bg-[var(--c-0A0A0A)] text-[var(--c-F2EFE7)]"
+      data-tema={tema}
+    >
       {observador && (
-        <div className="flex flex-wrap items-center justify-center gap-2 border-b border-[#1F2A33] bg-[#101418] px-6 py-2.5 text-center">
-          <Eye className="h-4 w-4 text-[#6FA3C0]" />
-          <span className="text-xs font-semibold text-[#9FC4D8]">Modo observador</span>
-          <span className="text-xs text-[#7F93A0]">— você não é visto nem ouvido pelo lead</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 border-b border-[var(--c-1F2A33)] bg-[var(--c-101418)] px-6 py-2.5 text-center">
+          <Eye className="h-4 w-4 text-[var(--c-6FA3C0)]" />
+          <span className="text-xs font-semibold text-[var(--c-9FC4D8)]">Modo observador</span>
+          <span className="text-xs text-[var(--c-7F93A0)]">— você não é visto nem ouvido pelo lead</span>
         </div>
       )}
 
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#242424] px-6 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--c-242424)] px-6 py-3">
         <div className="flex min-w-0 items-center gap-3.5">
           <img
             src={logo}
             alt="Reproduzindo Talentos"
-            className="h-10 w-10 shrink-0 rounded-[10px] border border-[#2E2E2E]"
+            className="h-10 w-10 shrink-0 rounded-[10px] border border-[var(--c-2E2E2E)]"
           />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{cracha.sala.titulo}</p>
-            <p className="truncate text-[11px] text-[#8F8A80]">{subtitulo}</p>
+            <p className="truncate text-[11px] text-[var(--c-8F8A80)]">{subtitulo}</p>
           </div>
         </div>
 
@@ -101,13 +130,23 @@ export const SalaAoVivo = ({ cracha, aoSair }: { cracha: Cracha; aoSair: () => v
             <button
               type="button"
               onClick={convidar}
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-[#3A3524] bg-[#1C1A14] px-3.5 text-xs font-semibold text-[#C0B072] transition-colors hover:bg-[#25221A]"
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-[var(--c-3A3524)] bg-[var(--c-1C1A14)] px-3.5 text-xs font-semibold text-[var(--c-C0B072)] transition-colors hover:bg-[var(--c-25221A)]"
             >
               {copiado ? <Check className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
               {copiado ? 'Link copiado' : 'Convidar'}
             </button>
           )}
-          <span className="rounded-full border border-[#2E2E2E] bg-[#171717] px-3 py-1.5 text-xs font-semibold tabular-nums text-[#D7D2C6]">
+          <button
+            type="button"
+            onClick={alterna}
+            aria-label={tema === 'claro' ? 'Mudar para o tema escuro' : 'Mudar para o tema claro'}
+            title={tema === 'claro' ? 'Tema escuro' : 'Tema claro'}
+            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-[var(--c-2E2E2E)] bg-[var(--c-171717)] px-3.5 text-xs font-semibold text-[var(--c-D7D2C6)] transition-colors hover:bg-[var(--c-1E1E1E)]"
+          >
+            {tema === 'claro' ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+            {tema === 'claro' ? 'Escuro' : 'Claro'}
+          </button>
+          <span className="rounded-full border border-[var(--c-2E2E2E)] bg-[var(--c-171717)] px-3 py-1.5 text-xs font-semibold tabular-nums text-[var(--c-D7D2C6)]">
             {relogio(segundos)}
           </span>
         </div>
@@ -121,18 +160,18 @@ export const SalaAoVivo = ({ cracha, aoSair }: { cracha: Cracha; aoSair: () => v
         data-lk-theme="default"
         style={{
           ['--lk-font-family' as string]: "'Montserrat', system-ui, sans-serif",
-          ['--lk-bg' as string]: '#0A0A0A',
-          ['--lk-bg2' as string]: '#121212',
-          ['--lk-bg3' as string]: '#171717',
-          ['--lk-bg4' as string]: '#1E1E1E',
-          ['--lk-fg' as string]: '#F2EFE7',
-          ['--lk-fg2' as string]: '#B5AE9E',
-          ['--lk-border-color' as string]: '#242424',
-          ['--lk-accent-bg' as string]: '#C0B072',
-          ['--lk-accent-fg' as string]: '#0D0D0D',
-          ['--lk-danger' as string]: '#E5484D',
-          ['--lk-control-bg' as string]: '#171717',
-          ['--lk-control-hover-bg' as string]: '#242424',
+          ['--lk-bg' as string]: 'var(--c-0A0A0A)',
+          ['--lk-bg2' as string]: 'var(--c-121212)',
+          ['--lk-bg3' as string]: 'var(--c-171717)',
+          ['--lk-bg4' as string]: 'var(--c-1E1E1E)',
+          ['--lk-fg' as string]: 'var(--c-F2EFE7)',
+          ['--lk-fg2' as string]: 'var(--c-B5AE9E)',
+          ['--lk-border-color' as string]: 'var(--c-242424)',
+          ['--lk-accent-bg' as string]: 'var(--c-C0B072)',
+          ['--lk-accent-fg' as string]: 'var(--c-0D0D0D)',
+          ['--lk-danger' as string]: 'var(--c-E5484D)',
+          ['--lk-control-bg' as string]: 'var(--c-171717)',
+          ['--lk-control-hover-bg' as string]: 'var(--c-242424)',
           ['--lk-border-radius' as string]: '12px',
           height: '100%',
         }}
@@ -189,13 +228,13 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
             <Palco ocultarEu={observador} />
             {/* Todo mundo vê quando está gravando — o lead inclusive. */}
             {gravacao.gravando && (
-              <div className="pointer-events-none absolute left-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-[#E5484D] px-3 py-1 text-xs font-semibold text-white shadow-lg">
+              <div className="pointer-events-none absolute left-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-[var(--c-E5484D)] px-3 py-1 text-xs font-semibold text-white shadow-lg">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
                 Gravando
               </div>
             )}
             {gravacao.erro && (
-              <div className="absolute bottom-3 left-3 z-20 max-w-[320px] rounded-xl border border-[#5A2A2A] bg-[#1F1414] px-3 py-2 text-xs text-[#F2B8B8]">
+              <div className="absolute bottom-3 left-3 z-20 max-w-[320px] rounded-xl border border-[var(--c-5A2A2A)] bg-[var(--c-1F1414)] px-3 py-2 text-xs text-[var(--c-F2B8B8)]">
                 {gravacao.erro}
               </div>
             )}
@@ -255,7 +294,7 @@ function Palco({ ocultarEu }: { ocultarEu: boolean }) {
 
   if (trilhas.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center rounded-2xl border border-[#242424] bg-[#121212] text-sm text-[#8F8A80]">
+      <div className="flex h-full items-center justify-center rounded-2xl border border-[var(--c-242424)] bg-[var(--c-121212)] text-sm text-[var(--c-8F8A80)]">
         Ninguém na sala ainda.
       </div>
     );
@@ -292,7 +331,7 @@ function BarraDeBotoes({
   const { isScreenShareEnabled } = useLocalParticipant();
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2.5 border-t border-[#242424] px-4 py-3">
+    <div className="flex flex-wrap items-center justify-center gap-2.5 border-t border-[var(--c-242424)] px-4 py-3">
       {!observador && (
         <>
           <div className="lk-button-group">
@@ -320,7 +359,7 @@ function BarraDeBotoes({
         <MessageSquare className="h-4 w-4" />
         Chat
         {naoLidas > 0 && (
-          <span className="ml-1 rounded-full bg-[#C0B072] px-1.5 text-[11px] font-bold text-[#0D0D0D]">
+          <span className="ml-1 rounded-full bg-[var(--c-C0B072)] px-1.5 text-[11px] font-bold text-[var(--c-0D0D0D)]">
             {naoLidas}
           </span>
         )}
@@ -332,11 +371,11 @@ function BarraDeBotoes({
           className="lk-button"
           disabled={gravacao.mudando}
           onClick={gravacao.alternar}
-          style={gravacao.gravando ? { color: '#FF8A8E' } : undefined}
+          style={gravacao.gravando ? { color: 'var(--c-FF8A8E)' } : undefined}
         >
           {gravacao.gravando
             ? <Square className="h-4 w-4 fill-current" />
-            : <Circle className="h-4 w-4 fill-[#E5484D] text-[#E5484D]" />}
+            : <Circle className="h-4 w-4 fill-[var(--c-E5484D)] text-[var(--c-E5484D)]" />}
           {gravacao.mudando ? 'Aguarde…' : gravacao.gravando ? 'Parar gravação' : 'Gravar'}
         </button>
       )}
@@ -410,27 +449,27 @@ function PainelChat({
   }
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col rounded-2xl border border-[#242424] bg-[#121212]">
-      <div className="flex items-center justify-between border-b border-[#242424] px-4 py-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[1.6px] text-[#8F8A80]">Chat</span>
-        <button type="button" onClick={fechar} aria-label="Fechar o chat" className="rounded-md p-1 text-[#8F8A80] hover:text-[#F2EFE7]">
+    <aside className="flex w-[300px] shrink-0 flex-col rounded-2xl border border-[var(--c-242424)] bg-[var(--c-121212)]">
+      <div className="flex items-center justify-between border-b border-[var(--c-242424)] px-4 py-3">
+        <span className="text-[11px] font-semibold uppercase tracking-[1.6px] text-[var(--c-8F8A80)]">Chat</span>
+        <button type="button" onClick={fechar} aria-label="Fechar o chat" className="rounded-md p-1 text-[var(--c-8F8A80)] hover:text-[var(--c-F2EFE7)]">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {mensagens.length === 0 ? (
-          <p className="pt-8 text-center text-sm text-[#78736B]">Nenhuma mensagem ainda.</p>
+          <p className="pt-8 text-center text-sm text-[var(--c-78736B)]">Nenhuma mensagem ainda.</p>
         ) : (
           mensagens.map((m) => (
             <div key={m.id ?? `${m.timestamp}-${m.message}`}>
-              <p className="text-[11px] font-semibold text-[#C0B072]">
+              <p className="text-[11px] font-semibold text-[var(--c-C0B072)]">
                 {m.from?.isLocal ? 'Você' : m.from?.name || 'Participante'}
-                <span className="ml-2 font-normal text-[#6F6A62]">
+                <span className="ml-2 font-normal text-[var(--c-6F6A62)]">
                   {new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </p>
-              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[#E8E4DA]">{m.message}</p>
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--c-E8E4DA)]">{m.message}</p>
             </div>
           ))
         )}
@@ -438,26 +477,26 @@ function PainelChat({
       </div>
 
       {podeEscrever ? (
-        <form onSubmit={mandar} className="flex gap-2 border-t border-[#242424] p-3">
+        <form onSubmit={mandar} className="flex gap-2 border-t border-[var(--c-242424)] p-3">
           <label htmlFor="msg-chat" className="sr-only">Mensagem</label>
           <input
             id="msg-chat"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Escreva uma mensagem"
-            className="min-h-[40px] min-w-0 flex-1 rounded-lg border border-[#2E2E2E] bg-[#171717] px-3 text-sm text-[#E8E4DA] placeholder:text-[#6F6A62] focus:border-[#C0B072] focus:outline-none"
+            className="min-h-[40px] min-w-0 flex-1 rounded-lg border border-[var(--c-2E2E2E)] bg-[var(--c-171717)] px-3 text-sm text-[var(--c-E8E4DA)] placeholder:text-[var(--c-6F6A62)] focus:border-[var(--c-C0B072)] focus:outline-none"
           />
           <button
             type="submit"
             disabled={enviando || !texto.trim()}
             aria-label="Enviar mensagem"
-            className="flex min-h-[40px] w-10 items-center justify-center rounded-lg bg-[#C0B072] text-[#0D0D0D] disabled:opacity-40"
+            className="flex min-h-[40px] w-10 items-center justify-center rounded-lg bg-[var(--c-C0B072)] text-[var(--c-0D0D0D)] disabled:opacity-40"
           >
             <Send className="h-4 w-4" />
           </button>
         </form>
       ) : (
-        <p className="border-t border-[#242424] p-3 text-center text-xs text-[#78736B]">
+        <p className="border-t border-[var(--c-242424)] p-3 text-center text-xs text-[var(--c-78736B)]">
           Observador só lê o chat.
         </p>
       )}
@@ -475,7 +514,7 @@ function PainelEquipe({
   engajamento: Engajamento;
 }) {
   return (
-    <aside className="hidden w-[320px] shrink-0 flex-col gap-3 overflow-y-auto pr-1 lg:flex">
+    <aside className="hidden w-[380px] shrink-0 flex-col gap-3 overflow-y-auto pr-1 lg:flex xl:w-[420px]">
       {/* Coach primeiro: é o que o closer olha durante a conversa. */}
       {salaId && <PainelCoach salaId={salaId} tipo={tipo} engajamento={engajamento.paraCoach} />}
       <PainelEngajamento engajamento={engajamento} />
@@ -591,24 +630,24 @@ function PedidosDeEntrada({ slug }: { slug: string }) {
   if (pedidos.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-[#4A3A14] bg-[#1E1708] p-4 shadow-2xl shadow-black/60">
+    <div className="rounded-2xl border border-[var(--c-4A3A14)] bg-[var(--c-1E1708)] p-4 shadow-2xl shadow-black/60">
       <div className="mb-3 flex items-center gap-2">
-        <UserPlus className="h-4 w-4 animate-pulse text-[#E8A838]" />
-        <span className="text-[11px] font-bold uppercase tracking-[1.6px] text-[#E8A838]">
+        <UserPlus className="h-4 w-4 animate-pulse text-[var(--c-E8A838)]" />
+        <span className="text-[11px] font-bold uppercase tracking-[1.6px] text-[var(--c-E8A838)]">
           Pedindo para entrar · {pedidos.length}
         </span>
       </div>
       <ul className="space-y-3">
         {pedidos.map((p) => (
           <li key={p.id}>
-            <p className="text-sm font-semibold text-[#F0E3C6]">{p.nome}</p>
-            <p className="mb-2 truncate text-xs text-[#B5A27A]">{p.email}</p>
+            <p className="text-sm font-semibold text-[var(--c-F0E3C6)]">{p.nome}</p>
+            <p className="mb-2 truncate text-xs text-[var(--c-B5A27A)]">{p.email}</p>
             <div className="flex gap-2">
               <button
                 type="button"
                 disabled={decidindo === p.id}
                 onClick={() => decidir(p.id, true)}
-                className="min-h-[36px] flex-1 rounded-lg bg-[#C0B072] text-xs font-semibold text-[#0D0D0D] disabled:opacity-50"
+                className="min-h-[36px] flex-1 rounded-lg bg-[var(--c-C0B072)] text-xs font-semibold text-[var(--c-0D0D0D)] disabled:opacity-50"
               >
                 Aceitar
               </button>
@@ -616,7 +655,7 @@ function PedidosDeEntrada({ slug }: { slug: string }) {
                 type="button"
                 disabled={decidindo === p.id}
                 onClick={() => decidir(p.id, false)}
-                className="min-h-[36px] flex-1 rounded-lg border border-[#4A3A14] text-xs font-semibold text-[#E8D6AE] disabled:opacity-50"
+                className="min-h-[36px] flex-1 rounded-lg border border-[var(--c-4A3A14)] text-xs font-semibold text-[var(--c-E8D6AE)] disabled:opacity-50"
               >
                 Recusar
               </button>
@@ -663,10 +702,10 @@ function TempoDeFala({ ocultarEu }: { ocultarEu: boolean }) {
     : undefined;
 
   return (
-    <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[1.6px] text-[#8F8A80]">Tempo de fala</p>
+    <div className="rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
+      <p className="mb-3 text-[13px] font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">Tempo de fala</p>
       {total === 0 ? (
-        <p className="text-xs text-[#78736B]">Começa a contar quando alguém falar.</p>
+        <p className="text-sm text-[var(--c-A9A294)]">Começa a contar quando alguém falar.</p>
       ) : (
         <ul className="space-y-2.5">
           {pessoas.map((p) => {
@@ -674,14 +713,14 @@ function TempoDeFala({ ocultarEu }: { ocultarEu: boolean }) {
             const pct = Math.round((s / total) * 100);
             return (
               <li key={p.identity}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="truncate text-[#E8E4DA]">{p.isLocal ? 'Você' : p.name || 'Participante'}</span>
-                  <span className="tabular-nums text-[#B5AE9E]">
-                    {relogio(s)} · <strong className="text-[#F2EFE7]">{pct}%</strong>
+                <div className="mb-1 flex items-center justify-between text-sm">
+                  <span className="truncate text-[var(--c-E8E4DA)]">{p.isLocal ? 'Você' : p.name || 'Participante'}</span>
+                  <span className="tabular-nums text-[var(--c-B5AE9E)]">
+                    {relogio(s)} · <strong className="text-[var(--c-F2EFE7)]">{pct}%</strong>
                   </span>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-[#242424]">
-                  <div className="h-1.5 rounded-full bg-[#C0B072]" style={{ width: `${pct}%` }} />
+                <div className="h-1.5 w-full rounded-full bg-[var(--c-242424)]">
+                  <div className="h-1.5 rounded-full bg-[var(--c-C0B072)]" style={{ width: `${pct}%` }} />
                 </div>
               </li>
             );
@@ -689,7 +728,7 @@ function TempoDeFala({ ocultarEu }: { ocultarEu: boolean }) {
         </ul>
       )}
       {quemDomina && (
-        <p className="mt-3 rounded-lg border border-[#4A3A14] bg-[#1E1708] px-3 py-2 text-xs leading-relaxed text-[#F0E3C6]">
+        <p className="mt-3 rounded-lg border border-[var(--c-4A3A14)] bg-[var(--c-1E1708)] px-3 py-2 text-sm leading-relaxed text-[var(--c-F0E3C6)]">
           {quemDomina.isLocal ? 'Você está' : `${quemDomina.name || 'Alguém'} está`} com mais de 65% da fala.
           {quemDomina.isLocal ? ' Faça uma pergunta e devolva a palavra.' : ''}
         </p>

@@ -119,6 +119,7 @@ const RECADOS: Record<string, string> = {
   fila_cheia: 'Tem gente demais esperando para entrar agora. Tente de novo em instantes.',
   gravacao_nao_configurada: 'A gravação ainda não foi ligada: faltam as chaves do armazém no Supabase.',
   gravacao_falhou: 'Não consegui começar a gravação agora. Tente de novo em instantes.',
+  link_invalido: 'Este link de reunião não é válido. Use o link que você recebeu ao agendar.',
 };
 
 /** Monta o recado. Fora do horário, diz a hora em que a sala abre. */
@@ -161,6 +162,21 @@ async function chamaPorteiro<T>(corpo: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
+/** O que a página de espera do lead (link pessoal ?k=) mostra. */
+export interface ConviteLead {
+  nome: string;
+  especialista: string | null;
+  inicio: string;
+  duracao_min: number;
+  status: 'agendada' | 'ao_vivo' | 'encerrada' | 'cancelada';
+  aberta: boolean;
+}
+
+/** Página de espera do lead: dados da reunião e se o anfitrião já abriu a sala. */
+export async function buscaConvite(slug: string, chave: string): Promise<ConviteLead> {
+  return chamaPorteiro<ConviteLead>({ acao: 'convite', slug, chave });
+}
+
 /** O lead digita o e-mail e descobre quais reuniões tem marcadas. */
 export async function buscaReunioesPorEmail(email: string): Promise<SalaDoLead[]> {
   const r = await chamaPorteiro<{ salas: SalaDoLead[] }>({ acao: 'buscar', email });
@@ -182,6 +198,8 @@ export async function entraNaSala(opts: {
   email?: string;
   nome?: string;
   papel?: 'anfitriao' | 'observador';
+  /** Chave do link pessoal do lead (?k=), gerada quando ele agenda pelo site: entra sem digitar nada. */
+  chave?: string;
   /** Viu o aviso de gravação e transcrição e entrou (LGPD). */
   consentiu?: boolean;
   /** Viu o aviso que cita "expressões do rosto" e entrou (dado biométrico). */

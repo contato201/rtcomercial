@@ -187,11 +187,11 @@ export function useEngajamento({ ativo, salaId }: { ativo: boolean; salaId: stri
 // ── A tela ─────────────────────────────────────────────────────────────────
 
 const ROTULO: Record<PessoaEngajamento['situacao'], { texto: string; cor: string }> = {
-  atento: { texto: 'Atento', cor: 'text-[#7FD1A0]' },
-  sorrindo: { texto: 'Sorrindo', cor: 'text-[#C0B072]' },
-  distraido: { texto: 'Distraído', cor: 'text-[#F0A35E]' },
-  sem_rosto: { texto: 'Fora da câmera', cor: 'text-[#8F8A80]' },
-  sem_dado: { texto: 'Câmera desligada', cor: 'text-[#8F8A80]' },
+  atento: { texto: 'Atento', cor: 'text-[var(--c-7FD1A0)]' },
+  sorrindo: { texto: 'Sorrindo', cor: 'text-[var(--c-C0B072)]' },
+  distraido: { texto: 'Distraído', cor: 'text-[var(--c-F0A35E)]' },
+  sem_rosto: { texto: 'Fora da câmera', cor: 'text-[var(--c-BDB6A8)]' },
+  sem_dado: { texto: 'Câmera desligada', cor: 'text-[var(--c-BDB6A8)]' },
 };
 
 export function PainelEngajamento({ engajamento }: { engajamento: Engajamento }) {
@@ -199,13 +199,13 @@ export function PainelEngajamento({ engajamento }: { engajamento: Engajamento })
   const distraido = useMemo(() => pessoas.find((p) => p.situacao === 'distraido'), [pessoas]);
 
   return (
-    <div className="rounded-2xl border border-[#242424] bg-[#121212] p-4">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[1.6px] text-[#8F8A80]">Engajamento</p>
+    <div className="rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4">
+      <p className="mb-3 text-[13px] font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">Engajamento</p>
 
       {falhou ? (
-        <p className="text-xs text-[#78736B]">Este computador não conseguiu rodar a análise do rosto.</p>
+        <p className="text-sm text-[var(--c-A9A294)]">Este computador não conseguiu rodar a análise do rosto.</p>
       ) : pessoas.length === 0 ? (
-        <p className="text-xs text-[#78736B]">
+        <p className="text-sm text-[var(--c-A9A294)]">
           {semPermissao > 0
             ? 'Quem entrou não viu o aviso de análise do rosto, então não é analisado.'
             : 'Começa quando o cliente entrar com a câmera ligada.'}
@@ -217,20 +217,20 @@ export function PainelEngajamento({ engajamento }: { engajamento: Engajamento })
             const temDado = p.resumo.amostras > 0 && p.situacao !== 'sem_rosto';
             return (
               <li key={p.identidade}>
-                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate text-[#E8E4DA]">{p.nome}</span>
+                <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate text-[var(--c-E8E4DA)]">{p.nome}</span>
                   <span className={`shrink-0 font-semibold ${rotulo.cor}`}>
                     {carregando ? 'Preparando…' : rotulo.texto}
                   </span>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-[#242424]">
+                <div className="h-1.5 w-full rounded-full bg-[var(--c-242424)]">
                   <div
-                    className={`h-1.5 rounded-full ${p.resumo.atencao < 50 ? 'bg-[#F0A35E]' : 'bg-[#7FD1A0]'}`}
+                    className={`h-1.5 rounded-full ${p.resumo.atencao < 50 ? 'bg-[var(--c-F0A35E)]' : 'bg-[var(--c-7FD1A0)]'}`}
                     style={{ width: `${temDado ? p.resumo.atencao : 0}%` }}
                   />
                 </div>
                 {temDado && (
-                  <p className="mt-1 text-[11px] tabular-nums text-[#8F8A80]">
+                  <p className="mt-1 text-[13px] tabular-nums text-[var(--c-BDB6A8)]">
                     Atenção {p.resumo.atencao}% · sorriu {p.resumo.sorriso}% · último minuto
                   </p>
                 )}
@@ -241,12 +241,12 @@ export function PainelEngajamento({ engajamento }: { engajamento: Engajamento })
       )}
 
       {distraido && (
-        <p className="mt-3 rounded-lg border border-[#4A3A14] bg-[#1E1708] px-3 py-2 text-xs leading-relaxed text-[#F0E3C6]">
+        <p className="mt-3 rounded-lg border border-[var(--c-4A3A14)] bg-[var(--c-1E1708)] px-3 py-2 text-sm leading-relaxed text-[var(--c-F0E3C6)]">
           {distraido.nome} está olhando pouco para a tela. Faça uma pergunta direta para trazer de volta.
         </p>
       )}
       {semPermissao > 0 && pessoas.length > 0 && (
-        <p className="mt-2 text-[11px] text-[#78736B]">
+        <p className="mt-2 text-[13px] text-[var(--c-A9A294)]">
           {semPermissao} pessoa{semPermissao > 1 ? 's' : ''} sem o aviso do rosto (não analisada{semPermissao > 1 ? 's' : ''}).
         </p>
       )}

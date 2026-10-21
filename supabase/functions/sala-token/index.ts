@@ -8,6 +8,8 @@
 //   Visitante (sem login):
 //     { acao: "buscar", email }                         → reuniões daquele e-mail
 //     { acao: "entrar", slug, nome, email, consentiu, consentiu_rosto }
+//     { acao: "entrar", slug, chave, consentiu, consentiu_rosto }  → link pessoal do site, sem digitar nada
+//     { acao: "convite", slug, chave }                  → dados da página de espera do lead e se a sala já abriu
 //                                                       → crachá, ou pedido na sala de espera
 //     { acao: "pedido", pedido_id, chave }              → como está meu pedido (e o crachá, se aceito)
 //   Equipe (JWT do Supabase + e-mail na lista de editores):
@@ -15,6 +17,9 @@
 //     { acao: "pedidos", slug }                         → quem está esperando para entrar
 //     { acao: "decidir", pedido_id, aceitar }           → aceita ou recusa um pedido
 //     { acao: "encerrar", slug }                        → fecha a reunião (chamado quando o anfitrião sai)
+//   Site /rtedu (Worker, cabeçalho x-rt-site = SITE_AGENDA_TOKEN):
+//     { acao: "agendar_site", inicio, nome, email, closer, origem, notas } → cria a sala, devolve slug e chave do lead
+//     { acao: "cancelar_site", slug }                   → desfaz, se a agenda do Google recusar o horário
 //
 // Quem entra direto: o e-mail do lead e os da lista de convidados. Os outros:
 //   • reunião "só convidados" → barrados;
@@ -108,8 +113,9 @@ async function assinaJwt(payload: Record<string, unknown>) {
 // O LiveKit "assiste" a sala como uma pessoa invisível, junta todo mundo numa
 // tela só e manda o MP4 direto para o armazém `gravacoes` do Supabase (que
 // fala a mesma língua do S3 da Amazon).
-const S3_KEY = Deno.env.get("SUPABASE_S3_ACCESS_KEY_ID") ?? "";
-const S3_SECRET = Deno.env.get("SUPABASE_S3_SECRET_ACCESS_KEY") ?? "";
+// O Supabase não deixa criar segredo começando com "SUPABASE_", daí o prefixo GRAVACAO_.
+const S3_KEY = Deno.env.get("GRAVACAO_S3_ACCESS_KEY_ID") ?? "";
+const S3_SECRET = Deno.env.get("GRAVACAO_S3_SECRET_ACCESS_KEY") ?? "";
 const PROJETO = new URL(SUPABASE_URL || "https://x.supabase.co").hostname.split(".")[0];
 
 async function chamaEgress(metodo: "StartRoomCompositeEgress" | "StopEgress", corpo: unknown) {
@@ -192,6 +198,27 @@ async function paraGravacao(db: SupabaseClient, salaId: string) {
       .eq("id", g.id);
   }
 }
+
+// ── Chave pessoal do lead (link do site /rtedu) ─────────────────────────────
+// O link que o lead recebe leva ?k=<chave>: com ela ele entra direto, sem digitar
+// nome e e-mail (igual ao call.viverdeia.ai). A chave é uma assinatura do slug com
+// SITE_AGENDA_TOKEN, então não precisa de coluna nova e não dá para inventar.
+async function chaveDoLead(slug: string) {
+  const segredo = Deno.env.get("SITE_AGENDA_TOKEN") ?? "";
+  if (!segredo) return "";
+  const k = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(segredo), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const a = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(`lead:${slug}`)));
+  return b64url(a).slice(0, 24);
+}
+
+const iguais = (a: string, b: string) => {
+  if (!a || a.length !== b.length) return false;
+  let dif = 0;
+  for (let i = 0; i < a.length; i++) dif |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return dif === 0;
+};
 
 // ── Quem está chamando ──────────────────────────────────────────────────────
 async function equipeLogada(req: Request) {
@@ -381,6 +408,26 @@ Deno.serve(async (req) => {
     return json({ ok: true, salas });
   }
 
+  // ── convite: a página de espera do lead (link pessoal ?k=) ────────────────
+  // Devolve o que a tela mostra (primeiro nome, especialista, horário) e se o
+  // anfitrião já está na sala — é isso que faz o botão de entrar aparecer.
+  if (acao === "convite") {
+    const { sala, erro } = await buscaSala(db, corpo.slug);
+    if (erro) return erro;
+    if (!iguais(String(corpo.chave ?? ""), await chaveDoLead(sala.slug))) {
+      return json({ ok: false, erro: "link_invalido" }, 403);
+    }
+    return json({
+      ok: true,
+      nome: primeiroNome(sala.lead_nome),
+      especialista: String(sala.closer ?? "").trim() || null,
+      inicio: sala.inicio,
+      duracao_min: sala.duracao_min,
+      status: sala.status,
+      aberta: dentroDaJanela(sala),
+    });
+  }
+
   // ── entrar ────────────────────────────────────────────────────────────────
   if (acao === "entrar") {
     const { sala, erro } = await buscaSala(db, corpo.slug);
@@ -401,10 +448,19 @@ Deno.serve(async (req) => {
       return json({ ok: false, erro: "fora_do_horario", inicio: sala.inicio }, 403);
     }
 
-    const email = limpaEmail(corpo.email);
     const consentiu = corpo.consentiu === true;
     // Sem o "sim" geral não existe "sim" para o rosto.
     const rosto = consentiu && corpo.consentiu_rosto === true;
+
+    // Link pessoal do lead (?k=): entra como lead, com o nome que ele deu no site.
+    const chave = String(corpo.chave ?? "");
+    if (chave) {
+      if (!iguais(chave, await chaveDoLead(sala.slug))) return json({ ok: false, erro: "link_invalido" }, 403);
+      await registraEntrada(db, sala, "lead", consentiu, rosto);
+      return respostaComCracha(sala, "lead", limpaNome(sala.lead_nome) || "Convidado", consentiu, rosto);
+    }
+
+    const email = limpaEmail(corpo.email);
     const convidado = listaDeConvidados(sala).includes(email);
 
     if (convidado) {
@@ -531,5 +587,45 @@ Deno.serve(async (req) => {
     return json({ ok: true, gravando: false });
   }
 
+  // ── agendar_site / cancelar_site: o lead marcou sozinho pela página /rtedu ──
+  // Quem chama é o Worker do site (servidor), com a senha SITE_AGENDA_TOKEN no
+  // cabeçalho x-rt-site. O navegador do lead nunca vê essa senha.
+  if (acao === "agendar_site" || acao === "cancelar_site") {
+    if (!siteAutorizado(req)) return json({ ok: false, erro: "nao_autorizado" }, 401);
+
+    if (acao === "cancelar_site") {
+      const slug = String(corpo.slug ?? "").trim().toLowerCase();
+      await db.from("reunioes_salas").update({ status: "cancelada" })
+        .eq("slug", slug).in("status", ["agendada", "ao_vivo"]);
+      return json({ ok: true });
+    }
+
+    const inicio = new Date(String(corpo.inicio ?? ""));
+    if (isNaN(inicio.getTime())) return json({ ok: false, erro: "inicio_invalido" }, 400);
+    const email = limpaEmail(corpo.email);
+    const texto = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max) || null;
+
+    const { data, error } = await db.from("reunioes_salas").insert({
+      titulo: texto(corpo.titulo, 120) ?? "Reunião de diagnóstico",
+      lead_nome: limpaNome(corpo.nome) || "Lead",
+      lead_email: EMAIL_OK.test(email) ? email : null,
+      closer: texto(corpo.closer, 60),
+      origem: texto(corpo.origem, 40),
+      inicio: inicio.toISOString(),
+      duracao_min: 60,
+      notas_sdr: texto(corpo.notas, 3000),
+    }).select("slug").single();
+    if (error || !data) {
+      console.error("agendar_site falhou", error);
+      return json({ ok: false, erro: "falha_ao_criar" }, 500);
+    }
+    return json({ ok: true, slug: data.slug, chave: await chaveDoLead(data.slug) });
+  }
+
   return json({ ok: false, erro: "acao_desconhecida" }, 400);
 });
+
+function siteAutorizado(req: Request) {
+  const esperado = Deno.env.get("SITE_AGENDA_TOKEN") ?? "";
+  return !!esperado && iguais(req.headers.get("x-rt-site") ?? "", esperado);
+}
