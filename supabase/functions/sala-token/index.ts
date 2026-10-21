@@ -345,6 +345,7 @@ async function respostaComCracha(sala: Sala, papel: Papel, nome: string, consent
       closer: equipe ? sala.closer : null,
       origem: equipe ? sala.origem : null,
       acesso: equipe ? sala.acesso : null,
+      abordagem: equipe ? (sala.abordagem ?? null) : null,
       // Gravar sozinho quando o anfitrião entrar.
       gravar: equipe ? sala.gravar === true : false,
     },
@@ -614,6 +615,7 @@ Deno.serve(async (req) => {
       inicio: inicio.toISOString(),
       duracao_min: 60,
       notas_sdr: texto(corpo.notas, 3000),
+      abordagem: "inbound", // quem agenda pelo site preencheu o diagnóstico
     }).select("slug").single();
     if (error || !data) {
       console.error("agendar_site falhou", error);

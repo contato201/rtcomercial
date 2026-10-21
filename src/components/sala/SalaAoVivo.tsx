@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CarouselLayout, DisconnectButton, FocusLayout, FocusLayoutContainer, GridLayout,
-  LayoutContextProvider, LiveKitRoom, MediaDeviceMenu, ParticipantTile, RoomAudioRenderer,
-  TrackToggle, isTrackReference, useChat, useConnectionState, useCreateLayoutContext,
-  useIsRecording, useLocalParticipant, useParticipants, usePinnedTracks,
-  useSpeakingParticipants, useTracks,
+  CarouselLayout, DisconnectButton, FocusLayout, FocusLayoutContainer, FocusToggle, GridLayout,
+  LayoutContextProvider, LiveKitRoom, ParticipantTile, RoomAudioRenderer,
+  TrackToggle, VideoTrack, isTrackReference, useChat, useConnectionState, useCreateLayoutContext,
+  useEnsureTrackRef, useIsMuted, useIsRecording, useIsSpeaking, useLocalParticipant,
+  useMediaDeviceSelect, useParticipants, usePinnedTracks, useSpeakingParticipants, useTracks,
 } from '@livekit/components-react';
 import { ConnectionState, RoomEvent, Track, type Participant } from 'livekit-client';
-import { Check, Circle, Eye, Link2, MessageSquare, Moon, Send, Square, Sun, UserPlus, X } from 'lucide-react';
+import { Check, Circle, Eye, Link2, MessageSquare, MicOff, Moon, Send, Settings, Square, Sun, UserPlus, X } from 'lucide-react';
 import '@livekit/components-styles';
 import './tema-sala.css';
 import logo from '@/assets/logo-pequena.png';
 import { PainelCoach } from './PainelCoach';
-import { PainelEngajamento, useEngajamento, type Engajamento } from './Engajamento';
+import { CanetaLaser } from './CanetaLaser';
+import { PainelEngajamento, SeloEngajamento, useEngajamento, type Engajamento } from './Engajamento';
+import { ROTEIRO } from '@/lib/coach';
 import {
-  decidePedido, gravaSala, linkDaSala, listaPedidos, type Cracha, type PedidoDeEntrada,
+  ALERTA_MONOLOGO_MS, MONOLOGO_INICIAL, avancaMonologo, duracaoMonologo, tempoFalado, textoDoAlerta,
+} from '@/lib/monologo';
+import {
+  ABORDAGENS, decidePedido, gravaSala, linkDaSala, listaPedidos, mudaAbordagem,
+  type Abordagem, type Cracha, type PedidoDeEntrada,
 } from '@/lib/salas';
 
 /**
@@ -42,6 +48,43 @@ const relogio = (segundos: number) => {
 
 /** O assistente invisível (fases seguintes) é participante, mas não aparece na tela. */
 const ehGente = (p: Participant) => !p.isAgent;
+const papelDe = (p: Participant) => {
+  try {
+    return (JSON.parse(p.metadata || '{}') as { papel?: string }).papel ?? null;
+  } catch {
+    return null;
+  }
+};
+const ehCliente = (p: Participant) => ehGente(p) && (papelDe(p) === 'lead' || papelDe(p) === 'convidado');
+const ehCloser = (p: Participant) => papelDe(p) === 'anfitriao';
+
+/**
+ * Quem fala e por quanto tempo, contado de segundo em segundo: o tempo de fala
+ * de cada um e o monólogo do closer (ver `src/lib/monologo.ts`).
+ */
+function useFalaDaSala() {
+  const falando = useSpeakingParticipants();
+  const falandoAgora = useRef(falando);
+  falandoAgora.current = falando;
+  const [segundos, setSegundos] = useState<Record<string, number>>({});
+  const [monologo, setMonologo] = useState(MONOLOGO_INICIAL);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      const agora = falandoAgora.current.filter(ehGente);
+      setMonologo((e) => avancaMonologo(e, Date.now(), agora.some(ehCloser), agora.some(ehCliente)));
+      if (agora.length === 0) return;
+      setSegundos((s) => {
+        const novo = { ...s };
+        agora.forEach((p) => (novo[p.identity] = (novo[p.identity] ?? 0) + 1));
+        return novo;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  return { segundos, monologoMs: duracaoMonologo(monologo) };
+}
 
 const CHAVE_TEMA = 'rt-sala-tema';
 /** Claro ou escuro, lembrado neste navegador para a próxima reunião. */
@@ -210,6 +253,25 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
   const gravacao = useGravacao(cracha);
   // Roda mesmo com o painel escondido (janela estreita): o Coach e o relatório usam.
   const engajamento = useEngajamento({ ativo: equipe, salaId: cracha.sala.id });
+  const fala = useFalaDaSala();
+  const [bloco, setBloco] = useState<string | null>(null);
+  const tipo = cracha.sala.tipo_reuniao ?? 1;
+
+  // O cliente principal (o primeiro analisado) é quem aparece em destaque.
+  const cliente = engajamento.pessoas[0] ?? null;
+  const alerta = fala.monologoMs >= ALERTA_MONOLOGO_MS
+    ? textoDoAlerta(fala.monologoMs, cliente && cliente.resumo.amostras > 0
+      ? { nome: cliente.nome, atencao: cliente.resumo.atencao, acenou: cliente.sinais.some((x) => x.texto.startsWith('Acenou')) }
+      : null)
+    : null;
+
+  // O que vai junto com a fala para o Coach: rosto do cliente + monólogo.
+  const monologoAtual = useRef(fala.monologoMs);
+  monologoAtual.current = fala.monologoMs;
+  const contextoParaCoach = () => [
+    engajamento.paraCoach(),
+    monologoAtual.current >= 60_000 ? `Closer falando sozinho há ${tempoFalado(monologoAtual.current)}` : '',
+  ].filter(Boolean).join('; ');
 
   return (
     <LayoutContextProvider value={layout}>
@@ -219,8 +281,14 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
             <PainelEquipe
               ocultarEu={observador}
               salaId={cracha.sala.id}
-              tipo={cracha.sala.tipo_reuniao ?? 1}
+              tipo={tipo}
               engajamento={engajamento}
+              contextoParaCoach={contextoParaCoach}
+              segundos={fala.segundos}
+              alerta={alerta}
+              aoMudarBloco={setBloco}
+              abordagem={cracha.sala.abordagem ?? null}
+              podeMudar={anfitriao}
             />
           )}
 
@@ -245,6 +313,18 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
                 <PedidosDeEntrada slug={cracha.sala.slug} />
               </div>
             )}
+            {/* Só a equipe: o número grande da atenção do cliente, em cima do vídeo. */}
+            {equipe && cliente && (
+              <div className="pointer-events-none absolute bottom-3 right-3 z-20">
+                <SeloEngajamento pessoa={cliente} />
+              </div>
+            )}
+            {/* Janela estreita (painel escondido): o alerta aparece em cima do vídeo. */}
+            {equipe && alerta && (
+              <div className="absolute left-1/2 top-3 z-30 w-[420px] max-w-[calc(100%-1.5rem)] -translate-x-1/2 lg:hidden">
+                <AlertaMonologo texto={alerta} />
+              </div>
+            )}
           </div>
 
           {chatAberto && (
@@ -257,6 +337,15 @@ function Conteudo({ cracha }: { cracha: Cracha }) {
             />
           )}
         </div>
+
+        {equipe && (
+          <FaixaDaReuniao
+            cliente={cliente}
+            segundos={fala.segundos}
+            bloco={bloco}
+            roteiro={ROTEIRO[tipo]}
+          />
+        )}
 
         <BarraDeBotoes
           observador={observador}
@@ -304,17 +393,73 @@ function Palco({ ocultarEu }: { ocultarEu: boolean }) {
     <div className="lk-focus-layout-wrapper" style={{ height: '100%' }}>
       <FocusLayoutContainer>
         <CarouselLayout tracks={resto}>
-          <ParticipantTile />
+          <Ladrilho />
         </CarouselLayout>
-        <FocusLayout trackRef={foco} />
+        {/* Na tela compartilhada, a caneta laser fica por cima (todos veem o risco). */}
+        <div className="relative h-full min-h-0 min-w-0">
+          <FocusLayout trackRef={foco} style={{ height: '100%' }} />
+          {foco.source === Track.Source.ScreenShare && <CanetaLaser podeRiscar={!ocultarEu} />}
+        </div>
       </FocusLayoutContainer>
     </div>
   ) : (
     <div className="lk-grid-layout-wrapper" style={{ height: '100%' }}>
       <GridLayout tracks={trilhas}>
-        <ParticipantTile />
+        <Ladrilho />
       </GridLayout>
     </div>
+  );
+}
+
+// ── O quadro de cada pessoa ────────────────────────────────────────────────
+
+const CORES_DO_AVATAR = ['#8A6A1F', '#1F7A55', '#245C8F', '#6E3A8F', '#8F2F45', '#2F6E7A', '#7A4A2A'];
+const corDoNome = (nome: string) =>
+  CORES_DO_AVATAR[[...nome].reduce((t, c) => t + c.charCodeAt(0), 0) % CORES_DO_AVATAR.length];
+const inicial = (nome: string) => (nome.trim()[0] ?? '?').toUpperCase();
+
+/**
+ * O quadro de cada pessoa (feedback da 1ª reunião): com a câmera desligada
+ * aparece um círculo colorido com a inicial do nome, em vez do bonequinho
+ * branco do LiveKit; o nome fica numa etiqueta escura, legível em cima de
+ * qualquer vídeo; quem está falando ganha uma borda dourada.
+ */
+function Ladrilho() {
+  const ref = useEnsureTrackRef();
+  const pessoa = ref.participant;
+  const nome = pessoa.name || 'Participante';
+  const ehCamera = ref.source === Track.Source.Camera;
+  const videoDesligado = useIsMuted(ref);
+  const micDesligado = useIsMuted({ participant: pessoa, source: Track.Source.Microphone });
+  const falando = useIsSpeaking(pessoa);
+  const temVideo = isTrackReference(ref) && !videoDesligado;
+
+  return (
+    <ParticipantTile
+      trackRef={ref}
+      className={`h-full !rounded-xl transition-shadow ${falando && ehCamera ? 'shadow-[0_0_0_3px_var(--c-C0B072)]' : ''}`}
+    >
+      {temVideo ? (
+        <VideoTrack trackRef={ref} />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-[var(--c-1E1E1E)]">
+          <span
+            className="flex aspect-square h-[42%] max-h-[140px] min-h-[48px] items-center justify-center rounded-full text-[clamp(1.5rem,4vh,3.5rem)] font-bold text-white"
+            style={{ backgroundColor: corDoNome(nome) }}
+            aria-hidden
+          >
+            {inicial(nome)}
+          </span>
+        </div>
+      )}
+      <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-md bg-black/75 px-2.5 py-1 text-sm font-semibold text-white">
+        {ehCamera && micDesligado && <MicOff className="h-3.5 w-3.5 shrink-0 text-[#FF8A8E]" aria-label="Microfone desligado" />}
+        <span className="truncate">
+          {nome}{pessoa.isLocal ? ' (você)' : ''}{!ehCamera ? ' · tela' : ''}
+        </span>
+      </div>
+      <FocusToggle className="!absolute right-2 top-2 opacity-70 hover:opacity-100" />
+    </ParticipantTile>
   );
 }
 
@@ -329,23 +474,17 @@ function BarraDeBotoes({
   alternarChat: () => void;
 }) {
   const { isScreenShareEnabled } = useLocalParticipant();
+  const [aparelhosAbertos, setAparelhosAbertos] = useState(false);
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2.5 border-t border-[var(--c-242424)] px-4 py-3">
+    <div className="relative flex flex-wrap items-center justify-center gap-2.5 border-t border-[var(--c-242424)] px-4 py-3">
+      {aparelhosAbertos && (
+        <PainelDeAparelhos observador={observador} fechar={() => setAparelhosAbertos(false)} />
+      )}
       {!observador && (
         <>
-          <div className="lk-button-group">
-            <TrackToggle source={Track.Source.Microphone}>Microfone</TrackToggle>
-            <div className="lk-button-group-menu">
-              <MediaDeviceMenu kind="audioinput" />
-            </div>
-          </div>
-          <div className="lk-button-group">
-            <TrackToggle source={Track.Source.Camera}>Câmera</TrackToggle>
-            <div className="lk-button-group-menu">
-              <MediaDeviceMenu kind="videoinput" />
-            </div>
-          </div>
+          <TrackToggle source={Track.Source.Microphone}>Microfone</TrackToggle>
+          <TrackToggle source={Track.Source.Camera}>Câmera</TrackToggle>
           <TrackToggle
             source={Track.Source.ScreenShare}
             captureOptions={{ audio: true, selfBrowserSurface: 'include' }}
@@ -354,6 +493,16 @@ function BarraDeBotoes({
           </TrackToggle>
         </>
       )}
+
+      <button
+        type="button"
+        className="lk-button"
+        aria-pressed={aparelhosAbertos}
+        onClick={() => setAparelhosAbertos((v) => !v)}
+      >
+        <Settings className="h-4 w-4" />
+        Áudio e vídeo
+      </button>
 
       <button type="button" className="lk-button" aria-pressed={chatAberto} onClick={alternarChat}>
         <MessageSquare className="h-4 w-4" />
@@ -381,6 +530,66 @@ function BarraDeBotoes({
       )}
 
       <DisconnectButton>Sair</DisconnectButton>
+    </div>
+  );
+}
+
+/**
+ * Trocar microfone, câmera e alto-falante no meio da reunião (feedback da 1ª
+ * reunião: o menu pequeno do LiveKit não era achado). Lista simples, grande,
+ * em português. A troca vale na hora, sem sair da sala.
+ */
+function PainelDeAparelhos({ observador, fechar }: { observador: boolean; fechar: () => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-label="Áudio e vídeo"
+      className="absolute bottom-full left-1/2 z-40 mb-2 w-[360px] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border border-[var(--c-333333)] bg-[var(--c-121212)] p-4 shadow-2xl"
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-base font-semibold text-[var(--c-F2EFE7)]">Áudio e vídeo</p>
+        <button type="button" onClick={fechar} aria-label="Fechar" className="text-[var(--c-A9A294)] hover:text-[var(--c-F2EFE7)]">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+      <div className="space-y-3">
+        {!observador && <SeletorDeAparelho tipo="audioinput" rotulo="Microfone" />}
+        {!observador && <SeletorDeAparelho tipo="videoinput" rotulo="Câmera" />}
+        <SeletorDeAparelho tipo="audiooutput" rotulo="Alto-falante / fone" />
+      </div>
+    </div>
+  );
+}
+
+function SeletorDeAparelho({ tipo, rotulo }: { tipo: MediaDeviceKind; rotulo: string }) {
+  const [erro, setErro] = useState('');
+  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({
+    kind: tipo,
+    onError: () => setErro('Não consegui trocar. Veja se o navegador tem permissão.'),
+  });
+  // Alto-falante não dá para escolher em alguns navegadores (Safari, Firefox).
+  if (tipo === 'audiooutput' && devices.length === 0) return null;
+  const id = `aparelho-${tipo}`;
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block text-[13px] font-semibold text-[var(--c-BDB6A8)]">{rotulo}</label>
+      <select
+        id={id}
+        value={activeDeviceId}
+        onChange={(e) => {
+          setErro('');
+          void setActiveMediaDevice(e.target.value);
+        }}
+        className="w-full rounded-lg border border-[var(--c-333333)] bg-[var(--c-171717)] px-3 py-2.5 text-sm text-[var(--c-F2EFE7)]"
+      >
+        {devices.length === 0 && <option value="">Nenhum encontrado</option>}
+        {devices.map((d, i) => (
+          <option key={d.deviceId} value={d.deviceId}>
+            {d.label || `${rotulo} ${i + 1}`}
+          </option>
+        ))}
+      </select>
+      {erro && <p className="mt-1 text-[13px] text-[var(--c-F5A3A3)]">{erro}</p>}
     </div>
   );
 }
@@ -506,20 +715,202 @@ function PainelChat({
 
 /** O painel da equipe, à esquerda. O lead nunca vê. */
 function PainelEquipe({
-  ocultarEu, salaId, tipo, engajamento,
+  ocultarEu, salaId, tipo, engajamento, contextoParaCoach, segundos, alerta, aoMudarBloco, abordagem, podeMudar,
 }: {
   ocultarEu: boolean;
   salaId: string | null;
   tipo: 1 | 2;
   engajamento: Engajamento;
+  contextoParaCoach: () => string;
+  segundos: Record<string, number>;
+  alerta: string | null;
+  aoMudarBloco: (bloco: string | null) => void;
+  abordagem: Abordagem | null;
+  podeMudar: boolean;
 }) {
   return (
     <aside className="hidden w-[380px] shrink-0 flex-col gap-3 overflow-y-auto pr-1 lg:flex xl:w-[420px]">
+      {/* O alerta de monólogo vem antes de tudo: é o que mais importa na hora. */}
+      {alerta && <AlertaMonologo texto={alerta} />}
+      {salaId && <ContextoDaReuniao salaId={salaId} inicial={abordagem} podeMudar={podeMudar} />}
       {/* Coach primeiro: é o que o closer olha durante a conversa. */}
-      {salaId && <PainelCoach salaId={salaId} tipo={tipo} engajamento={engajamento.paraCoach} />}
+      {salaId && (
+        <PainelCoach salaId={salaId} tipo={tipo} engajamento={contextoParaCoach} aoMudarBloco={aoMudarBloco} />
+      )}
       <PainelEngajamento engajamento={engajamento} />
-      <TempoDeFala ocultarEu={ocultarEu} />
+      <TempoDeFala ocultarEu={ocultarEu} segundos={segundos} />
     </aside>
+  );
+}
+
+/**
+ * Como o lead chegou (inbound, outbound...). Escolhido no agendamento ou aqui
+ * mesmo, durante a reunião — o Coach usa já na próxima dica.
+ */
+function ContextoDaReuniao({
+  salaId, inicial, podeMudar,
+}: {
+  salaId: string;
+  inicial: Abordagem | null;
+  podeMudar: boolean;
+}) {
+  const [abordagem, setAbordagem] = useState<Abordagem | ''>(inicial ?? '');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(false);
+  const atual = ABORDAGENS.find((a) => a.valor === abordagem);
+
+  async function muda(v: Abordagem) {
+    const antes = abordagem;
+    setAbordagem(v);
+    setSalvando(true);
+    setErro(false);
+    try {
+      await mudaAbordagem(salaId, v);
+    } catch {
+      setAbordagem(antes);
+      setErro(true);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className={`rounded-2xl border-2 p-4 ${abordagem ? 'border-[var(--c-333333)]' : 'border-[var(--c-E8A838)]'} bg-[var(--c-121212)]`}>
+      <label htmlFor="abordagem-sala" className="mb-2 block text-[13px] font-semibold uppercase tracking-[1.6px] text-[var(--c-BDB6A8)]">
+        Como o lead chegou
+      </label>
+      {podeMudar ? (
+        <select
+          id="abordagem-sala"
+          value={abordagem}
+          disabled={salvando}
+          onChange={(e) => void muda(e.target.value as Abordagem)}
+          className="w-full rounded-lg border border-[var(--c-333333)] bg-[var(--c-171717)] px-3 py-2.5 text-base font-semibold text-[var(--c-F2EFE7)]"
+        >
+          <option value="" disabled>Escolha: inbound, outbound…</option>
+          {ABORDAGENS.map((a) => <option key={a.valor} value={a.valor}>{a.texto}</option>)}
+        </select>
+      ) : (
+        <p className="text-base font-semibold text-[var(--c-F2EFE7)]">{atual?.texto ?? 'Não informado'}</p>
+      )}
+      <p className="mt-2 text-sm leading-snug text-[var(--c-C9C2B4)]">
+        {erro ? 'Não consegui salvar. Tente de novo.' : atual?.dica ?? 'Escolha para o Coach ajustar as dicas a este tipo de lead.'}
+      </p>
+    </div>
+  );
+}
+
+/** "Você está falando há 2 minutos seguidos…" — vermelho, na hora, sem esperar a IA. */
+function AlertaMonologo({ texto }: { texto: string }) {
+  return (
+    <div role="alert" className="rounded-2xl border-2 border-[var(--c-E5484D)] bg-[var(--c-2A1212)] p-4 shadow-lg">
+      <p className="mb-1 text-xs font-bold uppercase tracking-[1.4px] text-[var(--c-F5A3A3)]">⚠ Alerta</p>
+      <p className="text-base font-semibold leading-snug text-[var(--c-F2EFE7)]">{texto}</p>
+    </div>
+  );
+}
+
+/**
+ * Faixa embaixo do vídeo (só a equipe): a curva de engajamento da reunião
+ * inteira, o tempo de fala com a faixa ideal e a etapa do método.
+ */
+function FaixaDaReuniao({
+  cliente, segundos, bloco, roteiro,
+}: {
+  cliente: Engajamento['pessoas'][number] | null;
+  segundos: Record<string, number>;
+  bloco: string | null;
+  roteiro: string[];
+}) {
+  const participantes = useParticipants();
+  const daRT = participantes.filter(ehCloser).reduce((t, p) => t + (segundos[p.identity] ?? 0), 0);
+  const deFora = participantes.filter(ehCliente).reduce((t, p) => t + (segundos[p.identity] ?? 0), 0);
+  const total = daRT + deFora;
+  const pctRT = total > 0 ? Math.round((daRT / total) * 100) : 0;
+  const monopoliza = total >= 60 && pctRT > 60;
+  const curva = cliente?.curva ?? [];
+  const etapa = bloco ? roteiro.indexOf(bloco) : -1;
+
+  return (
+    <div className="hidden grid-cols-3 gap-3 px-3 pb-1 md:grid">
+      <section className="rounded-xl border border-[var(--c-333333)] bg-[var(--c-121212)] px-4 py-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[1.4px] text-[var(--c-BDB6A8)]">
+          Curva de engajamento{curva.length > 0 ? ` · ${curva.length} min` : ''}
+        </p>
+        {curva.length === 0 ? (
+          <p className="text-sm text-[var(--c-A9A294)]">Começa quando o cliente aparecer na câmera.</p>
+        ) : (
+          <>
+            <div className="flex h-10 items-end gap-[3px]" role="img" aria-label="Atenção do cliente minuto a minuto">
+              {curva.slice(-30).map((m) => (
+                <div
+                  key={m.minuto}
+                  title={`Minuto ${m.minuto}: ${m.atencao}%`}
+                  className={`min-w-[5px] flex-1 rounded-t ${
+                    cliente?.quedaDesde !== null && cliente?.quedaDesde !== undefined && m.minuto >= cliente.quedaDesde
+                      ? 'bg-[var(--c-F0A35E)]'
+                      : 'bg-[var(--c-7FD1A0)]'
+                  }`}
+                  style={{ height: `${Math.max(6, m.atencao)}%` }}
+                />
+              ))}
+            </div>
+            <p className="mt-1 text-[13px] text-[var(--c-BDB6A8)]">
+              {cliente?.quedaDesde !== null && cliente?.quedaDesde !== undefined
+                ? <span className="font-semibold text-[var(--c-F0A35E)]">Queda desde o minuto {cliente.quedaDesde}</span>
+                : 'Sem queda agora'}
+            </p>
+          </>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-[var(--c-333333)] bg-[var(--c-121212)] px-4 py-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[1.4px] text-[var(--c-BDB6A8)]">Tempo de fala</p>
+        {total === 0 ? (
+          <p className="text-sm text-[var(--c-A9A294)]">Começa a contar quando alguém falar.</p>
+        ) : (
+          <>
+            <div className="flex h-5 w-full overflow-hidden rounded-full bg-[var(--c-242424)]">
+              <div
+                className={`flex items-center justify-start pl-2 text-[11px] font-bold text-[var(--c-0D0D0D)] ${monopoliza ? 'bg-[var(--c-F0A35E)]' : 'bg-[var(--c-C0B072)]'}`}
+                style={{ width: `${pctRT}%` }}
+              >
+                {pctRT >= 15 ? `RT ${pctRT}%` : ''}
+              </div>
+              <div className="flex flex-1 items-center justify-end pr-2 text-[11px] font-bold text-[var(--c-F2EFE7)]">
+                {100 - pctRT >= 15 ? `Cliente ${100 - pctRT}%` : ''}
+              </div>
+            </div>
+            <p className="mt-1 text-[13px] text-[var(--c-BDB6A8)]">
+              {monopoliza
+                ? <span className="font-semibold text-[var(--c-F0A35E)]">Fora da faixa: você está monopolizando</span>
+                : 'Faixa ideal: a RT fala até metade do tempo'}
+            </p>
+          </>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-[var(--c-333333)] bg-[var(--c-121212)] px-4 py-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[1.4px] text-[var(--c-BDB6A8)]">Etapa do método</p>
+        {etapa < 0 ? (
+          <p className="text-sm text-[var(--c-A9A294)]">O Coach marca a etapa assim que a conversa engrenar.</p>
+        ) : (
+          <>
+            <p className="text-lg font-bold text-[var(--c-F2EFE7)]">{bloco}</p>
+            <div className="mt-1.5 flex gap-1">
+              {roteiro.map((b, i) => (
+                <span
+                  key={b}
+                  title={b}
+                  className={`h-1.5 flex-1 rounded-full ${i < etapa ? 'bg-[var(--c-3E9E6A)]' : i === etapa ? 'bg-[var(--c-C0B072)]' : 'bg-[var(--c-242424)]'}`}
+                />
+              ))}
+            </div>
+            <p className="mt-1 text-[13px] text-[var(--c-BDB6A8)]">Etapa {etapa + 1} de {roteiro.length}</p>
+          </>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -672,25 +1063,8 @@ function PedidosDeEntrada({ slug }: { slug: string }) {
  * LiveKit já sabe quem está falando (é o mesmo sinal que acende a borda do
  * vídeo), então não precisa de transcrição para isso.
  */
-function TempoDeFala({ ocultarEu }: { ocultarEu: boolean }) {
-  const falando = useSpeakingParticipants();
+function TempoDeFala({ ocultarEu, segundos }: { ocultarEu: boolean; segundos: Record<string, number> }) {
   const participantes = useParticipants();
-  const [segundos, setSegundos] = useState<Record<string, number>>({});
-  const falandoAgora = useRef(falando);
-  falandoAgora.current = falando;
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      const ids = falandoAgora.current.filter(ehGente).map((p) => p.identity);
-      if (ids.length === 0) return;
-      setSegundos((s) => {
-        const novo = { ...s };
-        ids.forEach((id) => (novo[id] = (novo[id] ?? 0) + 1));
-        return novo;
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, []);
 
   const pessoas = useMemo(
     () => participantes.filter((p) => ehGente(p) && !(ocultarEu && p.isLocal)),

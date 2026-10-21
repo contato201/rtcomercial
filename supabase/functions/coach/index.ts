@@ -176,8 +176,28 @@ Responda olhando o estado atual e o trecho novo:
     "vou ver com o mantenedor". Vazio se não houver.
 
 Engajamento (quando vier): medido pela câmera do cliente no último minuto. "Atenção" é quanto
-tempo ele ficou olhando para a tela. É um sinal, não uma certeza. Atenção abaixo de 50% por
-causa do closer falando demais → dica para fazer uma pergunta e devolver a palavra.`;
+tempo ele ficou olhando para a tela; pode vir a queda ("caiu 27 pts em 3 min") e sinais do rosto
+(tensão, nenhum aceno, expressão neutra, acenou = concordou). É um sinal, não uma certeza.
+Regras:
+  - Atenção abaixo de 40%, ou caindo 20 pts ou mais → evite_agora: "Não apresente preço nem plano
+    agora: com o cliente desengajado, a proposta vira objeção." E fala_sugerida devolve a palavra
+    com uma pergunta sobre a realidade dele.
+  - Closer falando sozinho há 2 min ou mais → fala_sugerida para parar e perguntar ("Deixa eu parar
+    aqui um segundo. Do que eu falei até agora, o que faz sentido para a sua realidade hoje?").
+  - Tensão ou nenhum aceno durante a proposta → risco: padrão de reunião que termina em
+    "vou pensar e te retorno".
+  - Acenos e sorriso → bom sinal: siga para o próximo passo do roteiro.`;
+
+// Como o lead chegou muda a conversa (pedido do Allan depois da 1ª reunião).
+const ABORDAGEM: Record<string, string> = {
+  inbound: "INBOUND — o lead nos procurou (preencheu o diagnóstico ou um formulário). Na abertura e no " +
+    "motivo, pergunte o que motivou a procura AGORA e o que ele espera da conversa; use as respostas dele.",
+  outbound: "OUTBOUND — nós procuramos o lead; ele não pediu a reunião. Gere interesse antes de qualquer " +
+    "apresentação: valide se a dor existe, peça permissão para fazer perguntas, não presuma interesse.",
+  indicacao: "INDICAÇÃO — veio por indicação. Use quem indicou para gerar confiança e pergunte o que essa " +
+    "pessoa contou sobre a RT.",
+  cliente: "JÁ É CLIENTE — renovação ou expansão. Parta dos resultados que ele já teve com a RT.",
+};
 
 // Engajamento do relatório: uma linha por pessoa, minuto a minuto.
 function linhasDoEngajamento(linhas: Array<{ quem: string; minuto: number; atencao: number; sorriso: number }>) {
@@ -221,7 +241,7 @@ Deno.serve(async (req) => {
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
   const { data: sala } = await db
     .from("reunioes_salas")
-    .select("id, titulo, lead_nome, sdr, closer, origem, tipo_reuniao, notas_sdr, inicio")
+    .select("id, titulo, lead_nome, sdr, closer, origem, tipo_reuniao, notas_sdr, abordagem, inicio")
     .eq("id", String(corpo.sala_id ?? ""))
     .maybeSingle();
   if (!sala) return json({ ok: false, erro: "sala_nao_encontrada" }, 404);
@@ -236,6 +256,7 @@ Deno.serve(async (req) => {
     `Roteiro desta reunião: ${ROTEIRO[tipo].join(" → ")}.`,
     `Cliente: ${sala.lead_nome ?? "não cadastrado"}. Closer: ${sala.closer ?? "não informado"}. SDR: ${sala.sdr ?? "não informado"}. Origem: ${sala.origem ?? "não informada"}.`,
     `Notas do SDR: ${sala.notas_sdr?.trim() || "nenhuma"}.`,
+    `Como o lead chegou: ${ABORDAGEM[sala.abordagem as string] ?? "não informado (descubra cedo: ele nos procurou ou fomos nós?)"}`,
   ].join("\n");
 
   try {

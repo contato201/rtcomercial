@@ -14,7 +14,7 @@ const diasAtras = (d: number) => new Date(AGORA - d * 86_400_000).toISOString();
 const sala = (extra: Partial<Sala> = {}): Sala => ({
   id: 's1', slug: 'abc', titulo: 'Reunião de diagnóstico', lead_nome: 'Mariana Alves',
   lead_email: 'mariana@escola.com.br', sdr: 'Rafael', closer: 'Allan', convidados: [], acesso: 'espera',
-  instantanea: false, consentimento_em: null, tipo_reuniao: 1, notas_sdr: null, origem: 'Instagram',
+  instantanea: false, consentimento_em: null, tipo_reuniao: 1, notas_sdr: null, abordagem: null, origem: 'Instagram',
   inicio: diasAtras(2), duracao_min: 60, status: 'encerrada', gravar: false,
   entrou_em: diasAtras(2), encerrada_em: new Date(new Date(diasAtras(2)).getTime() + 40 * 60_000).toISOString(),
   lead_entrou: true, observacoes: null, created_at: diasAtras(3), ...extra,

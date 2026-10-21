@@ -14,6 +14,19 @@ export type PapelSala = 'anfitriao' | 'observador' | 'lead' | 'convidado';
 export type AcessoSala = 'convidados' | 'espera';
 
 /** Uma reunião como a equipe vê (tabela completa). */
+/**
+ * Como o lead chegou até a reunião. Pedido do Allan depois da 1ª reunião:
+ * "no inbound faz sentido perguntar o que motivou; no outbound muda tudo".
+ */
+export type Abordagem = 'inbound' | 'outbound' | 'indicacao' | 'cliente';
+
+export const ABORDAGENS: Array<{ valor: Abordagem; texto: string; dica: string }> = [
+  { valor: 'inbound', texto: 'Inbound — o lead nos procurou', dica: 'Preencheu o diagnóstico ou um formulário. Comece perguntando o que motivou a procura.' },
+  { valor: 'outbound', texto: 'Outbound — nós procuramos o lead', dica: 'Ele não pediu a reunião. Crie interesse e valide a dor antes de apresentar.' },
+  { valor: 'indicacao', texto: 'Indicação', dica: 'Use quem indicou para gerar confiança e pergunte o que essa pessoa contou.' },
+  { valor: 'cliente', texto: 'Já é cliente', dica: 'Renovação ou expansão: parta dos resultados que ele já teve.' },
+];
+
 export interface Sala {
   id: string;
   slug: string;
@@ -34,6 +47,8 @@ export interface Sala {
   tipo_reuniao: 1 | 2;
   /** O que o SDR já descobriu — o Coach lê antes de começar. */
   notas_sdr: string | null;
+  /** Como o lead chegou: muda toda a abordagem da conversa (e o Coach). */
+  abordagem: Abordagem | null;
   origem: string | null;
   inicio: string;
   duracao_min: number;
@@ -75,6 +90,7 @@ export interface Cracha {
     closer: string | null;
     origem: string | null;
     acesso: AcessoSala | null;
+    abordagem: Abordagem | null;
     /** Começa a gravar sozinho quando o anfitrião entra. */
     gravar: boolean;
   };
@@ -291,7 +307,13 @@ export type NovaSala = Pick<Sala, 'titulo' | 'inicio'> &
   Partial<Pick<Sala,
     | 'lead_nome' | 'lead_email' | 'sdr' | 'closer' | 'convidados' | 'acesso'
     | 'instantanea' | 'origem' | 'duracao_min' | 'gravar' | 'observacoes'
-    | 'tipo_reuniao' | 'notas_sdr'>>;
+    | 'tipo_reuniao' | 'notas_sdr' | 'abordagem'>>;
+
+/** Troca, de dentro da sala, como o lead chegou (o Coach passa a usar na próxima dica). */
+export async function mudaAbordagem(salaId: string, abordagem: Abordagem | null): Promise<void> {
+  const { error } = await tabela().update({ abordagem }).eq('id', salaId);
+  if (error) throw error;
+}
 
 export async function criaSala(nova: NovaSala): Promise<Sala> {
   const { data: sessao } = await supabase.auth.getUser();

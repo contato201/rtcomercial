@@ -37,12 +37,14 @@ const papelDe = (p: Participant) => {
 };
 
 export function PainelCoach({
-  salaId, tipo, engajamento,
+  salaId, tipo, engajamento, aoMudarBloco,
 }: {
   salaId: string;
   tipo: TipoReuniao;
   /** Frase do engajamento do último minuto (Fase 4), mandada junto com a fala. */
   engajamento?: () => string;
+  /** Avisa a sala quando o Coach muda a etapa do roteiro (faixa embaixo do vídeo). */
+  aoMudarBloco?: (bloco: string | null) => void;
 }) {
   const sala = useRoomContext();
   const { localParticipant } = useLocalParticipant();
@@ -131,6 +133,10 @@ export function PainelCoach({
       void guarda(); // o que sobrou antes de sair
     };
   }, [gravo, salaId, tipo]);
+
+  useEffect(() => {
+    aoMudarBloco?.(estado.bloco);
+  }, [estado.bloco, aoMudarBloco]);
 
   // ── Quem só acompanha: lê do banco ─────────────────────────────────────
   useEffect(() => {

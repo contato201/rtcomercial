@@ -24,7 +24,7 @@ import { buscaClosers, salvaClosers } from '@/lib/closerNames';
 import {
   cancelaSala, criaReuniaoAgora, criaSala, duracaoMin, estaEsquecida, fechaSalaEsquecida,
   linkDaSala, linkGoogleAgenda, listaGravacoes, listaSalas, quando,
-  separaEmails, situacao, type AcessoSala, type Gravacao, type Sala, type Situacao,
+  ABORDAGENS, separaEmails, situacao, type Abordagem, type AcessoSala, type Gravacao, type Sala, type Situacao,
 } from '@/lib/salas';
 
 /**
@@ -62,6 +62,7 @@ const VAZIO = {
   inicio: agoraLocal(),
   acesso: 'espera' as AcessoSala,
   tipo_reuniao: 1 as 1 | 2,
+  abordagem: '' as Abordagem | '',
   notas_sdr: '',
   gravar: false,
 };
@@ -184,6 +185,7 @@ const Reunioes = () => {
         inicio: new Date(form.inicio).toISOString(),
         duracao_min: 60,
         tipo_reuniao: form.tipo_reuniao,
+        abordagem: form.abordagem || null,
         notas_sdr: form.notas_sdr.trim() || null,
         gravar: form.gravar,
       });
@@ -497,6 +499,19 @@ const Reunioes = () => {
                 </SelectContent>
               </Select>
               <p className="mt-1 text-[11px] text-muted-foreground">Só a equipe vê. Não vai no convite.</p>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Label className="mb-1.5 block text-xs font-semibold">Como o lead chegou</Label>
+              <Select value={form.abordagem} onValueChange={(v) => setForm({ ...form, abordagem: v as Abordagem })}>
+                <SelectTrigger><SelectValue placeholder="Inbound, outbound, indicação…" /></SelectTrigger>
+                <SelectContent>
+                  {ABORDAGENS.map((a) => <SelectItem key={a.valor} value={a.valor}>{a.texto}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {ABORDAGENS.find((a) => a.valor === form.abordagem)?.dica
+                  ?? 'Muda a conversa: o Coach ajusta as dicas. Dá para escolher também dentro da sala.'}
+              </p>
             </div>
           </div>
 

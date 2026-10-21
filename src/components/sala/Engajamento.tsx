@@ -4,16 +4,16 @@ import { Track, type Participant } from 'livekit-client';
 import type { FaceLandmarker } from '@mediapipe/tasks-vision';
 import { quemGrava } from '@/lib/coach';
 import {
-  leRosto, porMinuto, resume, resumoParaCoach, salvaEngajamento, situacaoAgora, ultimas,
-  type Amostra, type Resumo,
+  inicioDaQueda, leRosto, porMinuto, resume, resumoParaCoach, salvaEngajamento, sinaisDoLead, situacaoAgora,
+  tendencia, ultimas, type Amostra, type Resumo, type Sinal,
 } from '@/lib/engajamento';
 
 /**
  * Fase 4 — o medidor de engajamento (só a equipe vê).
  *
- * O MediaPipe (do Google) roda aqui no navegador, de graça: uma vez por
+ * O MediaPipe (do Google) roda aqui no navegador, de graça: 4 vezes por
  * segundo olha o vídeo de cada pessoa de fora que leu o aviso do rosto e
- * anota se ela está olhando para a tela e se está sorrindo. Nada de imagem
+ * anota se ela está olhando, sorrindo, tensa e se acenou. Nada de imagem
  * sai do computador. Quem grava (o mesmo anfitrião do Coach) guarda no banco
  * a porcentagem de cada minuto, que entra no relatório do fim.
  */
@@ -22,7 +22,8 @@ import {
 const WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm';
 const MODELO =
   'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
-const OLHA_MS = 1_000;
+const OLHA_MS = 250; // 4 por segundo: o aceno dura menos de 1 s
+const REDESENHA_A_CADA = 4; // a tela só atualiza 1 vez por segundo
 const GUARDA_MS = 60_000;
 
 const metadados = (p: Participant) => {
@@ -42,6 +43,13 @@ export interface PessoaEngajamento {
   nome: string;
   situacao: ReturnType<typeof situacaoAgora>;
   resumo: Resumo;
+  /** Pontos de atenção ganhos/perdidos contra 3 min atrás (null = cedo demais). */
+  tendencia: number | null;
+  sinais: Sinal[];
+  /** Atenção minuto a minuto desde o início — a curva embaixo do vídeo. */
+  curva: Array<{ minuto: number; atencao: number }>;
+  /** Minuto em que a queda atual começou (null = não está em queda). */
+  quedaDesde: number | null;
 }
 
 export interface Engajamento {
@@ -107,6 +115,7 @@ export function useEngajamento({ ativo, salaId }: { ativo: boolean; salaId: stri
       .catch(() => vivo && setFalhou(true))
       .finally(() => vivo && setCarregando(false));
 
+    let voltas = 0;
     const olha = () => {
       if (!detector) return;
       for (const p of alvosAtuais.current) {
@@ -137,7 +146,7 @@ export function useEngajamento({ ativo, salaId }: { ativo: boolean; salaId: stri
           // um quadro ruim não para a reunião
         }
       }
-      setTique((t) => t + 1);
+      if (++voltas % REDESENHA_A_CADA === 0) setTique((t) => t + 1);
     };
 
     const t = setInterval(olha, OLHA_MS);
@@ -168,8 +177,19 @@ export function useEngajamento({ ativo, salaId }: { ativo: boolean; salaId: stri
 
   const agora = Date.now();
   const pessoas = alvos.map((p) => {
-    const recentes = ultimas(amostras.current.get(p.identity)?.lista ?? [], agora);
-    return { identidade: p.identity, nome: p.name || 'Convidado', situacao: situacaoAgora(recentes), resumo: resume(recentes) };
+    const lista = amostras.current.get(p.identity)?.lista ?? [];
+    const recentes = ultimas(lista, agora);
+    const curva = porMinuto('', '', lista, inicio.current).map((l) => ({ minuto: l.minuto, atencao: l.atencao }));
+    return {
+      identidade: p.identity,
+      nome: p.name || 'Convidado',
+      situacao: situacaoAgora(recentes),
+      resumo: resume(recentes),
+      tendencia: tendencia(lista, agora),
+      sinais: sinaisDoLead(recentes),
+      curva,
+      quedaDesde: inicioDaQueda(curva),
+    };
   });
 
   return {
@@ -179,7 +199,9 @@ export function useEngajamento({ ativo, salaId }: { ativo: boolean; salaId: stri
     falhou,
     paraCoach: () =>
       resumoParaCoach(
-        [...amostras.current.values()].map(({ nome, lista }) => ({ nome, recentes: ultimas(lista, Date.now()) })),
+        [...amostras.current.values()].map(({ nome, lista }) => ({
+          nome, recentes: ultimas(lista, Date.now()), tendencia: tendencia(lista, Date.now()),
+        })),
       ),
   };
 }
@@ -232,8 +254,10 @@ export function PainelEngajamento({ engajamento }: { engajamento: Engajamento })
                 {temDado && (
                   <p className="mt-1 text-[13px] tabular-nums text-[var(--c-BDB6A8)]">
                     Atenção {p.resumo.atencao}% · sorriu {p.resumo.sorriso}% · último minuto
+                    {textoTendencia(p.tendencia) && <span className={corTendencia(p.tendencia)}> · {textoTendencia(p.tendencia)}</span>}
                   </p>
                 )}
+                {p.sinais.length > 0 && <ListaDeSinais sinais={p.sinais} />}
               </li>
             );
           })}
@@ -250,6 +274,62 @@ export function PainelEngajamento({ engajamento }: { engajamento: Engajamento })
           {semPermissao} pessoa{semPermissao > 1 ? 's' : ''} sem o aviso do rosto (não analisada{semPermissao > 1 ? 's' : ''}).
         </p>
       )}
+    </div>
+  );
+}
+
+// ── Peças usadas também em cima do vídeo ───────────────────────────────────
+
+/** "↓ 27 pts em 3 min" (só quando mudou de verdade). */
+export function textoTendencia(t: number | null): string | null {
+  if (t === null || Math.abs(t) < 10) return null;
+  return `${t < 0 ? '↓' : '↑'} ${Math.abs(t)} pts em 3 min`;
+}
+const corTendencia = (t: number | null) =>
+  t !== null && t < 0 ? 'font-semibold text-[var(--c-F0A35E)]' : 'font-semibold text-[var(--c-7FD1A0)]';
+
+function ListaDeSinais({ sinais }: { sinais: Sinal[] }) {
+  return (
+    <ul className="mt-2 space-y-1">
+      {sinais.map((s) => (
+        <li key={s.texto} className="flex items-center gap-2 text-[13px] text-[var(--c-E8E4DA)]">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${s.bom ? 'bg-[var(--c-7FD1A0)]' : 'bg-[var(--c-F0A35E)]'}`} />
+          {s.texto}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * O número grande em cima do vídeo, como no "Abracadabra Meet": a atenção do
+ * cliente agora, para onde está indo e os sinais do rosto. Só a equipe vê.
+ */
+export function SeloEngajamento({ pessoa }: { pessoa: PessoaEngajamento }) {
+  const r = pessoa.resumo;
+  if (r.amostras === 0) return null;
+  if (pessoa.situacao === 'sem_rosto') {
+    return (
+      <div className="rounded-xl border border-[var(--c-333333)] bg-[var(--c-121212)] px-4 py-3 text-sm font-semibold text-[var(--c-BDB6A8)] shadow-lg">
+        {pessoa.nome}: fora da câmera
+      </div>
+    );
+  }
+  const baixo = r.atencao < 50;
+  return (
+    <div className={`w-[260px] rounded-xl border-2 bg-[var(--c-121212)] px-4 py-3 shadow-xl ${baixo ? 'border-[var(--c-F0A35E)]' : 'border-[var(--c-7FD1A0)]'}`}>
+      <p className="text-[11px] font-bold uppercase tracking-[1.4px] text-[var(--c-BDB6A8)]">
+        Engajamento · {pessoa.nome}
+      </p>
+      <div className="flex items-baseline gap-2">
+        <span className={`text-4xl font-black tabular-nums ${baixo ? 'text-[var(--c-F0A35E)]' : 'text-[var(--c-7FD1A0)]'}`}>
+          {r.atencao}%
+        </span>
+        {textoTendencia(pessoa.tendencia) && (
+          <span className={`text-sm ${corTendencia(pessoa.tendencia)}`}>{textoTendencia(pessoa.tendencia)}</span>
+        )}
+      </div>
+      {pessoa.sinais.length > 0 && <ListaDeSinais sinais={pessoa.sinais} />}
     </div>
   );
 }
